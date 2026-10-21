@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/features/import/data/json_importer.dart';
 
 void main() {
@@ -88,6 +89,52 @@ void main() {
       final result = JsonCourseImporter.parse(json, totalWeeks: 18);
       expect(result.courses, hasLength(1));
       expect(result.courses.first.name, 'A');
+      expect(result.platforms, isEmpty);
+    });
+  });
+
+  group('JsonCourseImporter - 课程平台', () {
+    test('顶层 platforms 按课程名解析，非法条目跳过并计入 skipped', () {
+      final json = jsonEncode({
+        'courses': [
+          {'name': '操作系统', 'dayOfWeek': 2, 'startSection': 3, 'endSection': 4, 'weeks': [1, 2]},
+        ],
+        'platforms': {
+          '操作系统': [
+            {'purpose': 'online_course', 'name': '学习通', 'url': 'https://mooc1.chaoxing.com'},
+            {'purpose': 'group', 'name': 'QQ 群', 'url': ''},
+            {'purpose': '网课', 'name': '用了中文用途'},
+            {'purpose': 'lab'},
+          ],
+          '体育': 'not a list',
+        },
+      });
+
+      final result = JsonCourseImporter.parse(json, totalWeeks: 18);
+
+      expect(result.courses, hasLength(1));
+      expect(result.platforms, {
+        '操作系统': const [
+          CoursePlatform(
+            purpose: CoursePlatformPurpose.onlineCourse,
+            name: '学习通',
+            url: 'https://mooc1.chaoxing.com',
+          ),
+          CoursePlatform(purpose: CoursePlatformPurpose.group, name: 'QQ 群'),
+        ],
+      });
+      expect(result.skipped, hasLength(3));
+    });
+
+    test('没有 platforms 字段时平台为空', () {
+      final json = jsonEncode({
+        'courses': [
+          {'name': 'A', 'dayOfWeek': 1, 'startSection': 1, 'endSection': 2, 'weeks': [1]},
+        ],
+      });
+      final result = JsonCourseImporter.parse(json, totalWeeks: 18);
+      expect(result.platforms, isEmpty);
+      expect(result.skipped, isEmpty);
     });
   });
 }

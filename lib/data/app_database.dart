@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'tables/course_platform_table.dart';
 import 'tables/course_table.dart';
 import 'tables/semester_table.dart';
 
@@ -15,12 +16,22 @@ part 'app_database.g.dart';
 ///
 /// 首次启动无学期时，[seedDefaultSemester] 写入一个默认激活学期，
 /// 让用户立刻拥有可操作的「当前周」，避免空状态困惑。
-@DriftDatabase(tables: [Courses, Semesters])
+@DriftDatabase(tables: [Courses, Semesters, CoursePlatforms])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
+  /// 版本 2：新增课程平台表。
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          // 1 → 2 只新建课程平台表，已有课程与学期保持不动。
+          if (from < 2) await m.createTable(coursePlatforms);
+        },
+      );
 
   /// 序列化并发播种，避免首启瞬间多次调用导致写入多个学期。
   Future<void>? _seedFuture;

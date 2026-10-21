@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:hormone/data/app_database.dart';
 import 'package:hormone/data/repositories/backup_repository.dart';
+import 'package:hormone/data/repositories/course_platform_repository.dart';
 import 'package:hormone/data/repositories/course_repository.dart';
 import 'package:hormone/data/repositories/semester_repository.dart';
 
@@ -18,6 +19,11 @@ final courseRepositoryProvider = Provider<CourseRepository>((ref) {
 
 final semesterRepositoryProvider = Provider<SemesterRepository>((ref) {
   return SemesterRepository(ref.watch(appDatabaseProvider));
+});
+
+final coursePlatformRepositoryProvider =
+    Provider<CoursePlatformRepository>((ref) {
+  return CoursePlatformRepository(ref.watch(appDatabaseProvider));
 });
 
 final backupRepositoryProvider = Provider<BackupRepository>((ref) {

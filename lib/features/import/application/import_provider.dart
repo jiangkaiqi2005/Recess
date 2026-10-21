@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/core/models/semester.dart';
 import 'package:hormone/data/providers/database_providers.dart';
 import 'package:hormone/features/import/domain/import_course.dart';
@@ -32,6 +33,9 @@ class ImportState {
   final int totalWeeks;
   final ImportMode mode;
 
+  /// JSON 文件里按课程名给出的课程平台，确认导入时写入目标学期。
+  final Map<String, List<CoursePlatform>> platforms;
+
   const ImportState({
     this.status = ImportStatus.idle,
     this.courses = const [],
@@ -40,6 +44,7 @@ class ImportState {
     this.skipped = const [],
     this.totalWeeks = 18,
     this.mode = ImportMode.replace,
+    this.platforms = const {},
   });
 
   ImportState copyWith({
@@ -50,6 +55,7 @@ class ImportState {
     List<String>? skipped,
     int? totalWeeks,
     ImportMode? mode,
+    Map<String, List<CoursePlatform>>? platforms,
   }) =>
       ImportState(
         status: status ?? this.status,
@@ -59,6 +65,7 @@ class ImportState {
         skipped: skipped ?? this.skipped,
         totalWeeks: totalWeeks ?? this.totalWeeks,
         mode: mode ?? this.mode,
+        platforms: platforms ?? this.platforms,
       );
 
   int get selectedCount => courses.where((c) => c.selected).length;
@@ -108,7 +115,8 @@ class ImportNotifier extends StateNotifier<ImportState> {
         return;
       }
 
-      final (courses, skipped) = _parseByType(ext, content, semester);
+      final (courses, platforms, skipped) =
+          _parseByType(ext, content, semester);
       if (courses.isEmpty) {
         state = state.copyWith(
           status: ImportStatus.error,
@@ -122,6 +130,7 @@ class ImportNotifier extends StateNotifier<ImportState> {
         courses: courses,
         totalWeeks: semester.totalWeeks,
         skipped: skipped,
+        platforms: platforms,
       );
     } catch (e) {
       state = state.copyWith(
@@ -167,6 +176,12 @@ class ImportNotifier extends StateNotifier<ImportState> {
     } else {
       await repo.replaceForSemester(semester.id, replacements);
     }
+    // 平台按课程名归属，替换课程不会删除已有平台；文件里给出的平台按课程名
+    // 整体覆盖到目标学期。
+    final platformRepo = _ref.read(coursePlatformRepositoryProvider);
+    for (final entry in state.platforms.entries) {
+      await platformRepo.replacePlatforms(semester.id, entry.key, entry.value);
+    }
     final count = replacements.length;
 
     // 课程流由 drift watch 自动发射新数据，无需手动 invalidate；
@@ -188,7 +203,8 @@ class ImportNotifier extends StateNotifier<ImportState> {
     return repo.getActiveSemester();
   }
 
-  (List<ImportCourse>, List<String>) _parseByType(
+  (List<ImportCourse>, Map<String, List<CoursePlatform>>, List<String>)
+      _parseByType(
     String ext,
     String content,
     Semester semester,
@@ -199,19 +215,25 @@ class ImportNotifier extends StateNotifier<ImportState> {
           content,
           totalWeeks: semester.totalWeeks,
         );
-        return (result.courses, result.skipped);
+        return (result.courses, result.platforms, result.skipped);
       case 'ics':
+        // ICS 不携带课程平台。
         return (
           IcsCourseParser.parse(
             content,
             semesterStart: semester.startDate,
             totalWeeks: semester.totalWeeks,
           ),
+          const <String, List<CoursePlatform>>{},
           const <String>[],
         );
       default:
         // 不支持的格式，返回空。
-        return (const <ImportCourse>[], const <String>[]);
+        return (
+          const <ImportCourse>[],
+          const <String, List<CoursePlatform>>{},
+          const <String>[],
+        );
     }
   }
 

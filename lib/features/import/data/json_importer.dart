@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:hormone/core/constants/app_constants.dart';
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/features/import/domain/import_course.dart';
 
 /// JSON 课程导入器。采用「显式领域模板」——字段与 App 内部模型一一对应，
@@ -20,19 +21,32 @@ import 'package:hormone/features/import/domain/import_course.dart';
 ///       "color": "#5B8DEF",
 ///       "notes": ""
 ///     }
-///   ]
+///   ],
+///   "platforms": {
+///     "高等数学": [
+///       {"purpose": "online_course", "name": "学习通", "url": "https://..."}
+///     ]
+///   }
 /// }
 /// ```
 ///
+/// `platforms` 可选，按课程名给出课程平台，`purpose` 取
+/// `online_course` / `lab` / `homework` / `group` / `other`。
+///
 /// 容错策略：单条记录字段非法时跳过该条并计入 [skipped]，其余照常导入。
 class JsonCourseImporter {
-  /// 返回导入课程与跳过的条目（用于 UI 提示）。
-  static ({List<ImportCourse> courses, List<String> skipped}) parse(
+  /// 返回导入课程、按课程名分组的课程平台与跳过的条目（用于 UI 提示）。
+  static ({
+    List<ImportCourse> courses,
+    Map<String, List<CoursePlatform>> platforms,
+    List<String> skipped,
+  }) parse(
     String jsonText, {
     int? totalWeeks,
   }) {
     final skipped = <String>[];
     final List<dynamic> rawList;
+    Object? rawPlatforms;
 
     try {
       final decoded = jsonDecode(jsonText);
@@ -40,6 +54,7 @@ class JsonCourseImporter {
         rawList = decoded;
       } else if (decoded is Map && decoded['courses'] is List) {
         rawList = decoded['courses'] as List;
+        rawPlatforms = decoded['platforms'];
       } else {
         throw const FormatException('JSON 顶层应为数组或 {"courses": [...]}');
       }
@@ -60,7 +75,8 @@ class JsonCourseImporter {
       final course = _parseOne(map, i, totalWeeks, skipped);
       if (course != null) result.add(course);
     }
-    return (courses: result, skipped: skipped);
+    final platforms = parseCoursePlatformGroups(rawPlatforms, skipped: skipped);
+    return (courses: result, platforms: platforms, skipped: skipped);
   }
 
   static ImportCourse? _parseOne(

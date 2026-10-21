@@ -2,9 +2,13 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/core/models/semester.dart';
 import 'package:hormone/data/app_database.dart' as db;
 import 'package:hormone/data/mappers.dart';
+import 'package:hormone/data/repositories/course_platform_repository.dart';
+import 'package:hormone/data/repositories/course_repository.dart';
+import 'package:hormone/data/repositories/semester_repository.dart';
 
 /// 备份恢复的结果：恢复了多少学期、多少课程。
 class RestoreResult {
@@ -13,18 +17,22 @@ class RestoreResult {
   const RestoreResult({required this.semesterCount, required this.courseCount});
 }
 
-/// 备份文件解析/校验：与 [export_service.dart] 导出的 JSON 格式对应。
+/// 备份文件解析/校验：与 [BackupRepository.exportJson] 导出的 JSON 格式对应。
 ///
 /// 顶层含 `app == 'hormone'` 校验，`semesters` 为数组。校验不通过抛
 /// [FormatException]（数据完全不改动，保证恢复失败不留半截状态）。
 class BackupFile {
   final List<Semester> semesters;
   final Map<String, List<Course>> coursesBySemester;
+
+  /// 学期 id → 课程名 → 课程平台。
+  final Map<String, Map<String, List<CoursePlatform>>> platformsBySemester;
   final String? activeSemesterId;
 
   const BackupFile._({
     required this.semesters,
     required this.coursesBySemester,
+    required this.platformsBySemester,
     this.activeSemesterId,
   });
 
@@ -48,6 +56,7 @@ class BackupFile {
 
     final semesters = <Semester>[];
     final coursesBySemester = <String, List<Course>>{};
+    final platformsBySemester = <String, Map<String, List<CoursePlatform>>>{};
     final semesterIds = <String>{};
     String? activeSemesterId;
 
@@ -116,10 +125,13 @@ class BackupFile {
         }
         coursesBySemester[id] = courses;
       }
+      // 旧版备份没有 platforms 字段，解析为空即可。
+      platformsBySemester[id] = parseCoursePlatformGroups(s['platforms']);
     }
     return BackupFile._(
       semesters: semesters,
       coursesBySemester: coursesBySemester,
+      platformsBySemester: platformsBySemester,
       activeSemesterId: activeSemesterId,
     );
   }
@@ -163,6 +175,56 @@ class BackupRepository {
 
   BackupRepository(this._db);
 
+  /// 把全部学期、课程与课程平台导出为备份 JSON（格式与 [BackupFile] 对应）。
+  Future<String> exportJson() async {
+    final semesterRepo = SemesterRepository(_db);
+    final courseRepo = CourseRepository(_db);
+    final platformRepo = CoursePlatformRepository(_db);
+
+    final semesters = await semesterRepo.getSemesters();
+    final active = await semesterRepo.getActiveSemester();
+    final data = <String, dynamic>{
+      'app': 'hormone',
+      'version': 1,
+      'exportedAt': DateTime.now().toIso8601String(),
+      'semesters': <Map<String, dynamic>>[],
+    };
+
+    for (final semester in semesters) {
+      final courses = await courseRepo.getCourses(semester.id);
+      final platforms = await platformRepo.getPlatformsBySemester(semester.id);
+      (data['semesters'] as List).add({
+        'id': semester.id,
+        'name': semester.name,
+        'startDate': semester.startDate.toIso8601String(),
+        'totalWeeks': semester.totalWeeks,
+        'currentWeekOverride': semester.currentWeekOverride,
+        'isActive': active?.id == semester.id,
+        'courses': courses
+            .map((c) => {
+                  'id': c.id,
+                  'name': c.name,
+                  'teacher': c.teacher,
+                  'location': c.location,
+                  'dayOfWeek': c.dayOfWeek,
+                  'startSection': c.startSection,
+                  'endSection': c.endSection,
+                  'startTime': c.startTime,
+                  'endTime': c.endTime,
+                  'weeks': c.weeks,
+                  'colorValue': c.colorValue,
+                  'notes': c.notes,
+                })
+            .toList(),
+        'platforms': {
+          for (final entry in platforms.entries)
+            entry.key: entry.value.map((p) => p.toJson()).toList(),
+        },
+      });
+    }
+    return const JsonEncoder.withIndent('  ').convert(data);
+  }
+
   /// 解析并恢复备份。成功返回恢复统计；失败抛异常且数据库保持原样
   /// （全部写入在单个事务内，任一步失败即回滚）。
   Future<RestoreResult> restore(String jsonText) async {
@@ -173,8 +235,9 @@ class BackupRepository {
       // 1. 清空现有数据
       await _db.delete(_db.courses).go();
       await _db.delete(_db.semesters).go();
+      await _db.delete(_db.coursePlatforms).go();
 
-      // 2. 批量写入学期
+      // 2. 批量写入学期、课程与课程平台
       await _db.batch((batch) {
         batch.insertAll(
           _db.semesters,
@@ -186,6 +249,18 @@ class BackupRepository {
             entry.value.map((c) => c.toCompanion()).toList(),
           );
           courseCount += entry.value.length;
+        }
+        for (final semester in backup.platformsBySemester.entries) {
+          for (final group in semester.value.entries) {
+            batch.insertAll(_db.coursePlatforms, [
+              for (var i = 0; i < group.value.length; i++)
+                group.value[i].toCompanion(
+                  semesterId: semester.key,
+                  courseName: group.key,
+                  sortOrder: i,
+                ),
+            ]);
+          }
         }
       });
     });

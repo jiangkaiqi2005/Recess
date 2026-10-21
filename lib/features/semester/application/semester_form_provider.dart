@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:hormone/core/models/semester.dart';
 import 'package:hormone/data/providers/database_providers.dart';
+import 'package:hormone/data/repositories/course_platform_repository.dart';
 import 'package:hormone/data/repositories/course_repository.dart';
 import 'package:hormone/data/repositories/semester_repository.dart';
 
@@ -12,13 +13,15 @@ final semesterFormProvider =
   (ref) => SemesterFormNotifier(
     ref.watch(semesterRepositoryProvider),
     ref.watch(courseRepositoryProvider),
+    ref.watch(coursePlatformRepositoryProvider),
   ),
 );
 
 class SemesterFormNotifier extends StateNotifier<Semester> {
   final SemesterRepository _repo;
   final CourseRepository _courseRepo;
-  SemesterFormNotifier(this._repo, this._courseRepo)
+  final CoursePlatformRepository _platformRepo;
+  SemesterFormNotifier(this._repo, this._courseRepo, this._platformRepo)
       : super(Semester(
           id: '',
           name: '',
@@ -56,8 +59,9 @@ class SemesterFormNotifier extends StateNotifier<Semester> {
 
   Future<void> delete() async {
     if (state.id.isEmpty) return;
-    // 先清理关联课程，避免孤儿数据
+    // 先清理关联课程与课程平台，避免孤儿数据
     await _courseRepo.deleteBySemester(state.id);
+    await _platformRepo.deleteBySemester(state.id);
     await _repo.delete(state.id);
   }
 }

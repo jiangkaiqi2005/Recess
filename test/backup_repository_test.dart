@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/core/models/semester.dart';
 import 'package:hormone/data/app_database.dart' as db;
 import 'package:hormone/data/repositories/backup_repository.dart';
+import 'package:hormone/data/repositories/course_platform_repository.dart';
 import 'package:hormone/data/repositories/course_repository.dart';
 import 'package:hormone/data/repositories/semester_repository.dart';
 
@@ -118,6 +120,113 @@ void main() {
 
     final c2 = await courses.getCourses('s2');
     expect(c2.single.colorValue, 0xFF5B8DEF); // 无颜色时回退默认蓝
+  });
+
+  test('导出再恢复：课程平台按学期原样往返', () async {
+    final platforms = CoursePlatformRepository(database);
+    await semesters.upsert(Semester(
+      id: 's1',
+      name: '2026 秋',
+      startDate: DateTime(2026, 9, 1),
+      totalWeeks: 18,
+    ));
+    await semesters.setActive('s1');
+    await semesters.upsert(Semester(
+      id: 's2',
+      name: '2025 春',
+      startDate: DateTime(2025, 3, 1),
+      totalWeeks: 16,
+    ));
+    await courses.upsert(const Course(
+      id: 'c1',
+      semesterId: 's1',
+      name: '操作系统',
+      dayOfWeek: 2,
+      startSection: 3,
+      endSection: 4,
+      weeks: [1, 2],
+    ));
+    const online = CoursePlatform(
+      purpose: CoursePlatformPurpose.onlineCourse,
+      name: '学习通',
+      url: 'https://mooc1.chaoxing.com',
+    );
+    const group = CoursePlatform(
+      purpose: CoursePlatformPurpose.group,
+      name: 'QQ 群',
+    );
+    const lab = CoursePlatform(
+      purpose: CoursePlatformPurpose.lab,
+      name: '头歌',
+    );
+    await platforms.replacePlatforms('s1', '操作系统', [online, group]);
+    await platforms.replacePlatforms('s2', '操作系统', [lab]);
+
+    final exported = await backup.exportJson();
+    final decoded = jsonDecode(exported) as Map<String, dynamic>;
+    final s1 = (decoded['semesters'] as List)
+        .cast<Map<String, dynamic>>()
+        .firstWhere((s) => s['id'] == 's1');
+    expect(s1['platforms'], {
+      '操作系统': [
+        {
+          'purpose': 'online_course',
+          'name': '学习通',
+          'url': 'https://mooc1.chaoxing.com',
+        },
+        {'purpose': 'group', 'name': 'QQ 群', 'url': null},
+      ],
+    });
+
+    // 恢复前把平台改乱，确认恢复后以备份为准。
+    await platforms.replacePlatforms('s1', '操作系统', const []);
+    await platforms.replacePlatforms('s1', '别的课', [lab]);
+
+    await backup.restore(exported);
+
+    expect(await platforms.getPlatforms('s1', '操作系统'), [online, group]);
+    expect(await platforms.getPlatforms('s1', '别的课'), isEmpty);
+    expect(await platforms.getPlatforms('s2', '操作系统'), [lab]);
+    expect((await courses.getCourses('s1')).single.name, '操作系统');
+    expect((await semesters.getActiveSemester())?.id, 's1');
+  });
+
+  test('旧备份没有 platforms 字段时照常恢复', () async {
+    final platforms = CoursePlatformRepository(database);
+
+    final result = await backup.restore(exportFixture());
+
+    expect(result.semesterCount, 2);
+    expect(await platforms.getPlatformsBySemester('s1'), isEmpty);
+    expect(await courses.getCourses('s1'), hasLength(1));
+  });
+
+  test('备份中的非法平台条目被跳过，其余照常恢复', () async {
+    final data = {
+      'app': 'hormone',
+      'semesters': [
+        {
+          'id': 's1',
+          'name': 'A',
+          'startDate': '2026-09-01',
+          'totalWeeks': 18,
+          'platforms': {
+            '操作系统': [
+              {'purpose': 'lab', 'name': '头歌'},
+              {'purpose': 'unknown', 'name': '未知用途'},
+              {'purpose': 'lab', 'name': ''},
+              'not an object',
+            ],
+          },
+        },
+      ],
+    };
+    await backup.restore(const JsonEncoder().convert(data));
+
+    expect(
+      await CoursePlatformRepository(database).getPlatforms('s1', '操作系统'),
+      const [CoursePlatform(purpose: CoursePlatformPurpose.lab, name: '头歌')],
+    );
   });
 
   test('非备份文件（缺少 app 标识）抛出错误且不改动数据', () async {

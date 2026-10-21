@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/core/models/semester.dart';
 import 'package:hormone/data/app_database.dart' as db;
 
@@ -51,6 +52,32 @@ extension CourseDomainMapper on Course {
         weeks: Value(weeks.isEmpty ? '' : weeks.join(',')),
         colorValue: Value(colorValue),
         notes: Value(notes),
+      );
+}
+
+extension CoursePlatformEntityMapper on db.CoursePlatform {
+  /// 未知的用途键（例如更新版本写入、旧版本读取）回退为「其他」。
+  CoursePlatform toDomain() => CoursePlatform(
+        purpose: CoursePlatformPurpose.fromKey(purpose) ??
+            CoursePlatformPurpose.other,
+        name: name,
+        url: url,
+      );
+}
+
+extension CoursePlatformDomainMapper on CoursePlatform {
+  db.CoursePlatformsCompanion toCompanion({
+    required String semesterId,
+    required String courseName,
+    required int sortOrder,
+  }) =>
+      db.CoursePlatformsCompanion.insert(
+        semesterId: semesterId,
+        courseName: courseName,
+        purpose: purpose.key,
+        name: name,
+        url: Value(url),
+        sortOrder: sortOrder,
       );
 }
 
