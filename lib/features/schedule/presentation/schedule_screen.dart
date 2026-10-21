@@ -45,7 +45,13 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final semester = ref.watch(activeSemesterProvider).valueOrNull;
     final totalWeeks = semester?.totalWeeks ?? 18;
     final now = DateTime.now();
-    final currentWeek = semester == null ? null : currentWeekOf(semester, now);
+    // 开学前或学期已结束时没有可翻到的「本周」，不显示后缀与「回到本周」。
+    final computedWeek = semester == null ? null : currentWeekOf(semester, now);
+    final currentWeek = computedWeek != null &&
+            computedWeek >= 1 &&
+            computedWeek <= totalWeeks
+        ? computedWeek
+        : null;
     final isViewingCurrentWeek =
         currentWeek == null || currentWeek == selectedWeek;
     final theme = Theme.of(context);

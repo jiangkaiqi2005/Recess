@@ -31,7 +31,10 @@ void main() {
     await database.close();
   });
 
-  Future<void> pumpSchedule(WidgetTester tester) async {
+  Future<void> pumpSchedule(
+    WidgetTester tester, {
+    DateTime? startDate,
+  }) async {
     await tester.binding.setSurfaceSize(const Size(360, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -40,7 +43,7 @@ void main() {
       await repo.upsert(Semester(
         id: 'semester',
         name: '测试学期',
-        startDate: semesterStart,
+        startDate: startDate ?? semesterStart,
         totalWeeks: 18,
       ));
       await repo.setActive('semester');
@@ -165,5 +168,36 @@ void main() {
     await openWeekMenu(tester);
     expect(find.text('回到本周'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('开学前没有当前周：标题不带“当前为第 N 周”，菜单没有“回到本周”',
+      (tester) async {
+    await pumpSchedule(
+      tester,
+      startDate: today.add(Duration(days: 8 - today.weekday + 14)),
+    );
+
+    expect(find.text('第 1 周'), findsOneWidget);
+    expect(find.textContaining('当前为第'), findsNothing);
+
+    await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(find.text('第 2 周'), findsOneWidget);
+
+    await openWeekMenu(tester);
+    expect(find.text('回到本周'), findsNothing);
+    expect(find.text('跳转到第几周'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('学期已结束时同样不显示当前周后缀', (tester) async {
+    await pumpSchedule(
+      tester,
+      startDate: today.subtract(const Duration(days: 7 * 30)),
+    );
+
+    expect(find.textContaining('当前为第'), findsNothing);
+    await openWeekMenu(tester);
+    expect(find.text('回到本周'), findsNothing);
   });
 }
