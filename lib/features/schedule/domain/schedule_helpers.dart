@@ -74,6 +74,24 @@ List<Course> filterCourses(List<Course> courses, String query) {
       .toList(growable: false);
 }
 
+/// 周视图显示的节次数：取「最后一个设了时间的节次」与「本学期课程最大
+/// endSection」中较大者；没有节次设了时间时只看课程，且至少显示 1 节。
+int visibleSectionCount({
+  required Map<int, SectionTime> sectionTimes,
+  required Iterable<Course> courses,
+}) {
+  var count = 1;
+  for (final entry in sectionTimes.entries) {
+    if (entry.value.startTime.isNotEmpty && entry.key > count) {
+      count = entry.key;
+    }
+  }
+  for (final c in courses) {
+    if (c.endSection > count) count = c.endSection;
+  }
+  return count;
+}
+
 int? _clockToMinutes(String? clock) {
   if (clock == null || clock.isEmpty) return null;
   final parts = clock.split(':');

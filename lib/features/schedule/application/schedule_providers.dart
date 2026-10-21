@@ -25,8 +25,7 @@ class SelectedWeekNotifier extends StateNotifier<int> {
       final semester = await _repo.getActiveSemester();
       if (semester == null) return;
       // 优先使用手动覆盖的当前周（调课/假期），否则按开学日期推算。
-      final computed = semester.currentWeekOverride ??
-          computeCurrentWeek(semester.startDate, DateTime.now());
+      final computed = currentWeekOf(semester, DateTime.now());
       final capped = computed < 1
           ? 1
           : (computed > semester.totalWeeks ? semester.totalWeeks : computed);

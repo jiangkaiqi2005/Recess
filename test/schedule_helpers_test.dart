@@ -113,4 +113,54 @@ void main() {
     expect(filterCourses([a, b], '三'), [a]); // 教师名匹配
     expect(filterCourses([a, b], ''), hasLength(2));
   });
+
+  group('visibleSectionCount', () {
+    final timed = {
+      for (var i = 1; i <= 12; i++) i: const SectionTime('08:00', 45),
+      for (var i = 13; i <= 16; i++) i: const SectionTime('', 45),
+    };
+
+    test('课程都在已设时间的节次内时，显示到最后一个设了时间的节次', () {
+      expect(
+        visibleSectionCount(
+          sectionTimes: timed,
+          courses: [_c('a', 1, 1, 2), _c('b', 3, 9, 11)],
+        ),
+        12,
+      );
+    });
+
+    test('有课程晚于最后一个设了时间的节次时，显示到该课程结束', () {
+      expect(
+        visibleSectionCount(
+          sectionTimes: timed,
+          courses: [_c('a', 1, 1, 2), _c('b', 3, 13, 14)],
+        ),
+        14,
+      );
+    });
+
+    test('没有节次设了时间时显示到最大结束节次', () {
+      final untimed = {
+        for (var i = 1; i <= 16; i++) i: const SectionTime('', 45),
+      };
+      expect(
+        visibleSectionCount(
+          sectionTimes: untimed,
+          courses: [_c('a', 1, 3, 5)],
+        ),
+        5,
+      );
+    });
+
+    test('既没有设时间也没有课程时至少显示 1 节', () {
+      expect(
+        visibleSectionCount(
+          sectionTimes: {1: const SectionTime('', 45)},
+          courses: const [],
+        ),
+        1,
+      );
+    });
+  });
 }

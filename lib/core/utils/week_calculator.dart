@@ -1,6 +1,9 @@
 /// 周次与时间计算工具（纯函数，便于单测）。
 ///
 /// 约定：dayOfWeek 1=周一 .. 7=周日，与 [DateTime.weekday] 一致。
+library;
+
+import 'package:hormone/core/models/semester.dart';
 
 /// 根据开学日期与今天推算当前周（1-based）。早于开学返回 0。
 int computeCurrentWeek(DateTime startDate, DateTime today) {
@@ -12,6 +15,12 @@ int computeCurrentWeek(DateTime startDate, DateTime today) {
   if (days < 0) return 0;
   return (days ~/ 7) + 1;
 }
+
+/// 学期的当前周：手动修改过（调课/假期）就用修改值，否则由开学日期推算。
+/// 主页标题、今天高亮、初始查看周与「今日课程」都以它为准。
+int currentWeekOf(Semester semester, DateTime today) =>
+    semester.currentWeekOverride ??
+    computeCurrentWeek(semester.startDate, today);
 
 /// 返回某学期第 [week] 周、星期 [weekday] 的日期。
 DateTime dateForWeekday(DateTime semesterStart, int week, int weekday) {

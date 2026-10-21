@@ -1,21 +1,27 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:hormone/core/models/course.dart';
 import 'package:hormone/core/utils/week_calculator.dart';
+import 'package:hormone/features/schedule/domain/schedule_helpers.dart';
 import 'package:hormone/features/semester/application/semester_providers.dart';
 import 'package:hormone/features/settings/application/section_times_provider.dart';
 import 'course_detail_sheet.dart';
 
-/// 每节高度（px）。16 节约 896px，超出屏幕时网格区可纵向滚动。
+/// 每节高度（px）。节次多到超出屏幕时网格区可纵向滚动。
 const double _sectionHeight = 56.0;
 
 /// 卡片与节格之间的留白。
-const double _cardInset = 4.0;
+const double _cardInset = 2.0;
 
 /// 左侧时间轴宽度。
-const double _timeAxisWidth = 40.0;
+const double _timeAxisWidth = 44.0;
+
+/// 表格底部在系统导航条之外额外留出的空白。
+const double _bottomGap = 24.0;
 
 /// 周视图课程表：左侧节次时间轴 + 右侧 7 天列，课程卡片按节次定位。
 /// 点击课程卡片弹出详情，长按进入编辑。
@@ -40,19 +46,17 @@ class WeekView extends ConsumerWidget {
     // 只取一次当前日期，避免多次 DateTime.now() 在午夜边界不一致。
     final now = DateTime.now();
     final todayWeekday = now.weekday; // 1..7
-    final maxSections = sectionTimes.length;
 
     // 节高随系统字号缩放（clamp 1.0–1.6）：大字号下自动加高避免挤压。
     final sectionHeight = _sectionHeight *
         (MediaQuery.textScalerOf(context).scale(12) / 12).clamp(1.0, 1.6);
 
     // 学期开学日期，用于推算选中周每天的实际日期。
-    final semesterStart =
-        ref.watch(activeSemesterProvider).valueOrNull?.startDate;
-    // 仅当查看的是当前周时，才高亮"今天"所在列（避免查看历史/未来周时
-    // 误高亮某一天的日期）。currentWeek>0 防御开学前误判。
-    final currentWeek =
-        semesterStart != null ? computeCurrentWeek(semesterStart, now) : 0;
+    final semester = ref.watch(activeSemesterProvider).valueOrNull;
+    final semesterStart = semester?.startDate;
+    // 仅当查看的是当前周时，才在表头标示"今天"（避免查看历史/未来周时
+    // 误标某一天的日期）。currentWeek>0 防御开学前误判。
+    final currentWeek = semester != null ? currentWeekOf(semester, now) : 0;
     final isCurrentWeek = currentWeek > 0 && currentWeek == selectedWeek;
 
     return Column(
@@ -87,17 +91,24 @@ class WeekView extends ConsumerWidget {
                 byDay[c.dayOfWeek]?.add(c);
               }
 
-              final totalHeight = maxSections * sectionHeight;
+              final sectionCount = visibleSectionCount(
+                sectionTimes: sectionTimes,
+                courses: allCourses,
+              );
+              final totalHeight = sectionCount * sectionHeight;
 
               return SingleChildScrollView(
                 key: const Key('week-view-vertical-scroll'),
                 scrollDirection: Axis.vertical,
                 physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.paddingOf(context).bottom + _bottomGap,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _TimeAxis(
-                      totalHeight: totalHeight,
+                      sectionCount: sectionCount,
                       sectionHeight: sectionHeight,
                       sectionTimes: sectionTimes,
                     ),
@@ -108,9 +119,7 @@ class WeekView extends ConsumerWidget {
                           final day = i + 1;
                           return Expanded(
                             child: _DayColumn(
-                              day: day,
                               sectionHeight: sectionHeight,
-                              isToday: isCurrentWeek && day == todayWeekday,
                               courses: byDay[day]!,
                               totalHeight: totalHeight,
                               onTapCourse: (course) =>
@@ -211,7 +220,6 @@ class _DayHeaderRow extends StatelessWidget {
                       Text(
                         '${date.day}',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          fontSize: 10,
                           fontWeight:
                               isToday ? FontWeight.bold : FontWeight.normal,
                           color: isToday
@@ -232,12 +240,13 @@ class _DayHeaderRow extends StatelessWidget {
 }
 
 /// 左侧节次 + 该节起止时间（上下排列，使用自定义时间表）。
+/// 节次号与起止时间分两级字号，未设时间的节次只显示节次号。
 class _TimeAxis extends StatelessWidget {
-  final double totalHeight;
+  final int sectionCount;
   final double sectionHeight;
   final Map<int, SectionTime> sectionTimes;
   const _TimeAxis({
-    required this.totalHeight,
+    required this.sectionCount,
     required this.sectionHeight,
     required this.sectionTimes,
   });
@@ -245,67 +254,40 @@ class _TimeAxis extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final count = sectionTimes.length;
+    final timeStyle = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      height: 1.15,
+    );
     return SizedBox(
       key: const Key('week-view-time-axis'),
       width: _timeAxisWidth,
-      height: totalHeight,
-      child: Stack(
-        children: List.generate(count, (i) {
+      height: sectionCount * sectionHeight,
+      child: Column(
+        children: List.generate(sectionCount, (i) {
           final section = i + 1;
           final sectionTime = sectionTimes[section];
           final startTime = sectionTime?.startTime ?? '';
           final endTime = sectionTime?.endTime ?? '';
-          return Positioned(
-            top: i * sectionHeight,
-            left: 0,
-            right: 0,
+          return SizedBox(
             height: sectionHeight,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '$section',
-                        key: ValueKey('section-axis-$section'),
-                        semanticsLabel: '第$section节',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.hintColor,
-                          fontSize: 10,
-                          height: 1,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (startTime.isNotEmpty) const SizedBox(height: 2),
-                      if (startTime.isNotEmpty)
-                        Text(
-                          startTime,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.hintColor,
-                            fontSize: 8.5,
-                            height: 1,
-                          ),
-                        ),
-                      if (endTime.isNotEmpty) const SizedBox(height: 1),
-                      if (endTime.isNotEmpty)
-                        Text(
-                          endTime,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.hintColor,
-                            fontSize: 8.5,
-                            height: 1,
-                          ),
-                        ),
-                    ],
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$section',
+                  key: ValueKey('section-axis-$section'),
+                  semanticsLabel: '第$section节',
+                  softWrap: false,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
                   ),
                 ),
-              ),
+                if (startTime.isNotEmpty)
+                  Text(startTime, softWrap: false, style: timeStyle),
+                if (endTime.isNotEmpty)
+                  Text(endTime, softWrap: false, style: timeStyle),
+              ],
             ),
           );
         }),
@@ -314,10 +296,8 @@ class _TimeAxis extends StatelessWidget {
   }
 }
 
-/// 单日列：按节次定位课程卡片，今天列背景微高亮。
+/// 单日列：按节次定位课程卡片，不画网格线。
 class _DayColumn extends StatelessWidget {
-  final int day;
-  final bool isToday;
   final List<Course> courses;
   final double sectionHeight;
   final double totalHeight;
@@ -325,8 +305,6 @@ class _DayColumn extends StatelessWidget {
   final void Function(Course) onLongPressCourse;
 
   const _DayColumn({
-    required this.day,
-    required this.isToday,
     required this.courses,
     required this.sectionHeight,
     required this.totalHeight,
@@ -336,73 +314,35 @@ class _DayColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final gridColor = theme.colorScheme.outlineVariant.withAlpha(
-      theme.brightness == Brightness.dark ? 76 : 92,
-    );
-    final sectionCount = (totalHeight / sectionHeight).round();
-    return Container(
+    return SizedBox(
       height: totalHeight,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: isToday
-            ? theme.colorScheme.primary.withAlpha(
-                theme.brightness == Brightness.dark ? 24 : 15,
-              )
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        border: Border(left: BorderSide(color: gridColor, width: 0.6)),
-      ),
       child: Stack(
-        children: [
-          // 课表网格是信息结构而不是装饰：横线对应节次，竖线对应星期。
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Column(
-                children: List.generate(
-                  sectionCount,
-                  (_) => SizedBox(
-                    height: sectionHeight,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: gridColor, width: 0.6),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          ...courses.map((c) {
-            final top = (c.startSection - 1) * sectionHeight + _cardInset;
-            final height =
-                (c.endSection - c.startSection + 1) * sectionHeight -
-                    _cardInset * 2;
-            return Positioned(
+        children: courses.map((c) {
+          final top = (c.startSection - 1) * sectionHeight + _cardInset;
+          final height = (c.endSection - c.startSection + 1) * sectionHeight -
+              _cardInset * 2;
+          return Positioned(
+            key: ValueKey(c.id),
+            top: top,
+            left: _cardInset,
+            right: _cardInset,
+            height: height,
+            child: CourseCard(
               key: ValueKey(c.id),
-              top: top,
-              left: _cardInset,
-              right: _cardInset,
-              height: height,
-              child: CourseCard(
-                key: ValueKey(c.id),
-                course: c,
-                onTap: () => onTapCourse(c),
-                onLongPress: () => onLongPressCourse(c),
-              ),
-            );
-          }),
-        ],
+              course: c,
+              onTap: () => onTapCourse(c),
+              onLongPress: () => onLongPressCourse(c),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 }
 
-/// 课程卡片：用课程色时间轨建立识别，低饱和卡面承载文字。
+/// 课程卡片：课程色实色圆角色块，白字只写课名和“@教室”。
 ///
-/// 教室固定在卡片底部并保留多行空间；教师仅在高卡片中补充展示。
+/// 教师与课程平台不上卡片，只在详情面板里显示；语义标签仍包含教师。
 class CourseCard extends StatelessWidget {
   final Course course;
   final VoidCallback onTap;
@@ -417,17 +357,11 @@ class CourseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = Color(course.colorValue);
-    final surface = courseCardSurfaceColor(
-      accent,
-      theme.colorScheme,
+    final background = courseCardColor(
+      Color(course.colorValue),
       theme.brightness,
     );
-    final foreground = courseCardForegroundColor(surface);
-    final border = Color.alphaBlend(
-      accent.withAlpha(theme.brightness == Brightness.dark ? 138 : 112),
-      surface,
-    );
+    final location = course.location?.trim() ?? '';
 
     return Semantics(
       container: true,
@@ -436,104 +370,48 @@ class CourseCard extends StatelessWidget {
       label: _semanticLabel,
       hint: '点击查看详情，长按编辑',
       child: Material(
-        color: surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: border, width: 0.8),
-        ),
+        color: background,
+        borderRadius: BorderRadius.circular(6),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           onLongPress: onLongPress,
-          overlayColor: WidgetStatePropertyAll(accent.withAlpha(28)),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compactWidth = constraints.maxWidth < 56;
-              final compactHeight = constraints.maxHeight < 64;
-              final hasLocation = course.location?.trim().isNotEmpty ?? false;
-              final hasTeacher = course.teacher?.trim().isNotEmpty ?? false;
-              final showLocation = constraints.maxHeight >= 40 && hasLocation;
-              final showTeacher = hasTeacher &&
-                  (constraints.maxHeight >= 132 ||
-                      (!showLocation && constraints.maxHeight >= 72));
-              final fontSize = compactWidth ? 10.5 : 11.5;
-              final locationLines = compactHeight ? 2 : 3;
-              final locationFontSize = compactWidth ? 8.5 : 9.0;
-              final locationHeight = showLocation
-                  ? locationLines * locationFontSize * 1.05 + 2
-                  : 0.0;
-              final teacherHeight =
-                  showTeacher ? (compactWidth ? 8.5 : 9.0) * 1.15 + 2 : 0.0;
-              final detailHeight = locationHeight + teacherHeight;
-              final verticalPadding = constraints.maxHeight < 56 ? 2.5 : 5.0;
-              final titleHeight =
-                  constraints.maxHeight - verticalPadding * 2 - detailHeight;
-              final titleLines =
-                  (titleHeight / (fontSize * 1.08)).floor().clamp(1, 4);
-
-              return Stack(
-                children: [
-                  Positioned(
-                    key: const Key('course-card-color-rail'),
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: compactWidth ? 3 : 4,
-                    child: ColoredBox(color: accent),
-                  ),
-                  Positioned.fill(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        compactWidth ? 6 : 8,
-                        verticalPadding,
-                        compactWidth ? 3 : 5,
-                        verticalPadding,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Align(
-                              alignment: Alignment.topLeft,
-                              child: Text(
-                                course.name,
-                                key: const Key('course-card-name'),
-                                maxLines: titleLines,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: fontSize,
-                                  height: 1.08,
-                                  letterSpacing: compactWidth ? -0.35 : -0.15,
-                                  fontWeight: FontWeight.w700,
-                                  color: foreground,
-                                ),
-                              ),
-                            ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(5, 5, 4, 4),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final nameStyle = theme.textTheme.labelMedium!.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
+                );
+                // 按卡片可用高度能容纳的行数截断，字号跟随系统缩放。
+                final lineHeight = MediaQuery.textScalerOf(context)
+                        .scale(nameStyle.fontSize!) *
+                    nameStyle.height!;
+                final maxLines =
+                    math.max(1, (constraints.maxHeight / lineHeight).floor());
+                return Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: course.name),
+                      if (location.isNotEmpty)
+                        TextSpan(
+                          text: '\n@$location',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w500,
                           ),
-                          if (showTeacher)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 2),
-                              child: _CourseCardMeta(
-                                key: const Key('course-card-teacher'),
-                                value: course.teacher!.trim(),
-                                color: foreground,
-                                fontSize: compactWidth ? 8.5 : 9,
-                              ),
-                            ),
-                          if (showLocation)
-                            _CourseCardLocation(
-                              value: course.location!.trim(),
-                              color: foreground,
-                              fontSize: locationFontSize,
-                              maxLines: locationLines,
-                            ),
-                        ],
-                      ),
-                    ),
+                        ),
+                    ],
                   ),
-                ],
-              );
-            },
+                  key: const Key('course-card-text'),
+                  style: nameStyle,
+                  maxLines: maxLines,
+                  overflow: TextOverflow.clip,
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -554,110 +432,23 @@ class CourseCard extends StatelessWidget {
   }
 }
 
-/// 固定在课程卡片底部的教室区；细分隔线让扫视时能快速定位关键信息。
-class _CourseCardLocation extends StatelessWidget {
-  final String value;
-  final Color color;
-  final double fontSize;
-  final int maxLines;
-
-  const _CourseCardLocation({
-    required this.value,
-    required this.color,
-    required this.fontSize,
-    required this.maxLines,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: maxLines * fontSize * 1.05 + 2,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: color.withAlpha(55), width: 0.6),
-          ),
-        ),
-        child: Align(
-          alignment: Alignment.bottomLeft,
-          child: Text(
-            value,
-            key: const Key('course-card-location'),
-            maxLines: maxLines,
-            overflow: TextOverflow.ellipsis,
-            softWrap: true,
-            style: TextStyle(
-              fontSize: fontSize,
-              height: 1.05,
-              letterSpacing: -0.2,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ),
-      ),
-    );
+/// 由课程色推导卡片底色：保留色相与饱和度，只降低亮度，直到白字对比度
+/// 达到 3:1；深色模式下亮度再乘以 0.82，避免色块在深底上发亮刺眼。
+Color courseCardColor(Color base, Brightness brightness) {
+  var hsl = HSLColor.fromColor(base);
+  var color = base;
+  while (_contrastWithWhite(color) < 3.0 && hsl.lightness > 0) {
+    hsl = hsl.withLightness(math.max(0, hsl.lightness - 0.01));
+    color = hsl.toColor();
   }
-}
-
-class _CourseCardMeta extends StatelessWidget {
-  final String value;
-  final Color color;
-  final double fontSize;
-
-  const _CourseCardMeta({
-    super.key,
-    required this.value,
-    required this.color,
-    required this.fontSize,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      value,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        fontSize: fontSize,
-        height: 1.15,
-        fontWeight: FontWeight.w600,
-        color: color,
-      ),
-    );
+  if (brightness == Brightness.dark) {
+    color = hsl.withLightness(hsl.lightness * 0.82).toColor();
   }
+  return color;
 }
 
-/// 将课程色混入主题表面，降低一屏七列课程块的色彩噪声。
-Color courseCardSurfaceColor(
-  Color accent,
-  ColorScheme colorScheme,
-  Brightness brightness,
-) {
-  final alpha = brightness == Brightness.dark ? 66 : 42;
-  return Color.alphaBlend(accent.withAlpha(alpha), colorScheme.surface);
-}
-
-/// 在深色墨水和白色之间选择对比度更高的课程卡片前景色。
-Color courseCardForegroundColor(Color background) {
-  const darkInk = Color(0xFF101522);
-  const lightInk = Colors.white;
-  final backgroundLuminance = background.computeLuminance();
-
-  double contrast(Color foreground) {
-    final foregroundLuminance = foreground.computeLuminance();
-    final lighter = foregroundLuminance > backgroundLuminance
-        ? foregroundLuminance
-        : backgroundLuminance;
-    final darker = foregroundLuminance > backgroundLuminance
-        ? backgroundLuminance
-        : foregroundLuminance;
-    return (lighter + 0.05) / (darker + 0.05);
-  }
-
-  return contrast(darkInk) >= contrast(lightInk) ? darkInk : lightInk;
-}
+double _contrastWithWhite(Color background) =>
+    1.05 / (background.computeLuminance() + 0.05);
 
 /// 无课程时的友好空状态。区分"无任何课程"和"本周无课"。
 class _EmptyWeekHint extends StatelessWidget {

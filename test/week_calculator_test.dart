@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hormone/core/models/semester.dart';
 import 'package:hormone/core/utils/week_calculator.dart';
 
 void main() {
@@ -97,6 +98,29 @@ void main() {
     });
     test('空周次永远为假', () {
       expect(courseOnWeek(const [], 1), isFalse);
+    });
+  });
+
+  group('currentWeekOf', () {
+    test('没有手动修改时按开学日期推算', () {
+      final semester = Semester(
+        id: 's',
+        name: '学期',
+        startDate: monday,
+        totalWeeks: 18,
+      );
+      expect(currentWeekOf(semester, monday.add(const Duration(days: 15))), 3);
+    });
+
+    test('有手动修改时以修改值为准', () {
+      final semester = Semester(
+        id: 's',
+        name: '学期',
+        startDate: monday,
+        totalWeeks: 18,
+        currentWeekOverride: 9,
+      );
+      expect(currentWeekOf(semester, monday.add(const Duration(days: 15))), 9);
     });
   });
 }

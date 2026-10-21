@@ -53,10 +53,11 @@ void main() {
 
     await pump(tester);
 
+    for (final t in ['1', '08:00', '08:45']) { final e = find.text(t).evaluate(); for (final el in e) { debugPrint('SIZE $t ${el.size}'); } }
     final scrollView = find.byKey(const Key('week-view-vertical-scroll'));
-    final section16 = find.byKey(const ValueKey('section-axis-16'));
+    final section12 = find.byKey(const ValueKey('section-axis-12'));
     expect(scrollView, findsOneWidget);
-    expect(section16, findsOneWidget);
+    expect(section12, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/semester.dart';
 import 'package:hormone/core/utils/week_calculator.dart';
 import 'package:hormone/data/providers/database_providers.dart';
 import 'package:hormone/features/schedule/domain/schedule_helpers.dart';
@@ -13,7 +14,7 @@ import 'course_detail_sheet.dart';
 import 'course_search_delegate.dart';
 import 'week_view.dart';
 
-/// 课程表主页：学期选择 + 周选择器 + 周视图时间轴。
+/// 课程表主页：日期 + 查看周标题（点开为周操作菜单）+ 可左右滑动的周视图。
 class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({super.key});
 
@@ -41,49 +42,111 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedWeek = ref.watch(selectedWeekProvider);
-    final activeSemester = ref.watch(activeSemesterProvider);
+    final semester = ref.watch(activeSemesterProvider).valueOrNull;
+    final totalWeeks = semester?.totalWeeks ?? 18;
+    final now = DateTime.now();
+    final currentWeek = semester == null ? null : currentWeekOf(semester, now);
+    final isViewingCurrentWeek =
+        currentWeek == null || currentWeek == selectedWeek;
+    final theme = Theme.of(context);
+    // 顶栏高度随系统字号缩放，避免两行标题在大字号下被挤压。
+    final textScale =
+        (MediaQuery.textScalerOf(context).scale(12) / 12).clamp(1.0, 1.6);
 
-    final semesterName =
-        activeSemester.whenOrNull(data: (s) => s?.name) ?? '未设置学期';
-    final totalWeeks =
-        activeSemester.whenOrNull(data: (s) => s?.totalWeeks) ?? 18;
-
-    final computedWeek = activeSemester.whenOrNull(
-      data: (s) =>
-          s == null ? null : computeCurrentWeek(s.startDate, DateTime.now()),
-    );
-    final isCurrentWeek = computedWeek != null && computedWeek == selectedWeek;
-
-    // 外部周次变化（异步首屏定位、切学期、深链跳转等）时对齐分页位置。
+    // 外部周次变化（异步首屏定位、深链跳转等）时对齐分页位置。
     // 每次 build 后也兜底同步，覆盖 Provider 在 PageView 挂载前完成初始化的竞态。
     ref.listen<int>(selectedWeekProvider, (prev, next) {
       _schedulePageSync(next);
     });
     _schedulePageSync(selectedWeek);
 
+    // 在设置里切换了激活学期：查看周重置到新学期的当前周。
+    ref.listen<AsyncValue<Semester?>>(activeSemesterProvider, (prev, next) {
+      final before = prev?.valueOrNull;
+      final after = next.valueOrNull;
+      if (before == null || after == null || before.id == after.id) return;
+      ref.read(selectedWeekProvider.notifier).goTo(
+            currentWeekOf(after, DateTime.now()),
+            totalWeeks: after.totalWeeks,
+          );
+    });
+
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 52,
-        title: InkWell(
-          onTap: () => _showSemesterPicker(context, ref),
-          borderRadius: BorderRadius.circular(8),
+        toolbarHeight: 72 * textScale,
+        titleSpacing: 12,
+        title: PopupMenuButton<_WeekMenuAction>(
+          key: const Key('schedule-week-menu'),
+          tooltip: '周操作',
+          position: PopupMenuPosition.under,
+          offset: const Offset(0, 4),
+          onSelected: (action) {
+            switch (action) {
+              case _WeekMenuAction.jump:
+                _showWeekPicker(
+                  title: '跳转到第几周',
+                  totalWeeks: totalWeeks,
+                  selected: selectedWeek,
+                  onPick: (week) => _animateToWeek(week, totalWeeks),
+                );
+              case _WeekMenuAction.backToCurrent:
+                if (currentWeek != null) {
+                  _animateToWeek(currentWeek, totalWeeks);
+                }
+              case _WeekMenuAction.setCurrent:
+                _showWeekPicker(
+                  title: '修改当前周',
+                  totalWeeks: totalWeeks,
+                  selected: currentWeek ?? selectedWeek,
+                  onPick: _setCurrentWeek,
+                );
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: _WeekMenuAction.jump,
+              child: _ScheduleMenuItem(
+                icon: Icons.calendar_view_month_outlined,
+                label: '跳转到第几周',
+              ),
+            ),
+            if (!isViewingCurrentWeek)
+              const PopupMenuItem(
+                value: _WeekMenuAction.backToCurrent,
+                child: _ScheduleMenuItem(
+                  icon: Icons.today_outlined,
+                  label: '回到本周',
+                ),
+              ),
+            const PopupMenuItem(
+              value: _WeekMenuAction.setCurrent,
+              child: _ScheduleMenuItem(
+                icon: Icons.edit_calendar_outlined,
+                label: '修改当前周',
+              ),
+            ),
+          ],
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Row(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
-                  child: Text(
-                    semesterName,
-                    style: Theme.of(context).textTheme.titleMedium,
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  '${now.year}/${now.month}/${now.day}',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    height: 1.15,
                   ),
                 ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.arrow_drop_down,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.primary,
+                const SizedBox(height: 2),
+                Text(
+                  isViewingCurrentWeek
+                      ? '第 $selectedWeek 周'
+                      : '第 $selectedWeek 周   当前为第 $currentWeek 周',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -91,6 +154,11 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         ),
         centerTitle: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: '添加课程',
+            onPressed: () => context.push('/course/edit'),
+          ),
           IconButton(
             icon: const Icon(Icons.search),
             tooltip: '搜索课程',
@@ -135,87 +203,150 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _WeekSelector(
-            selectedWeek: selectedWeek,
-            totalWeeks: totalWeeks,
-            isCurrentWeek: isCurrentWeek,
-            currentWeek: computedWeek ?? 1,
-            onPrev: () {
-              _animateToWeek(selectedWeek - 1, totalWeeks);
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: totalWeeks,
+        allowImplicitScrolling: true,
+        physics: const _SchedulePagePhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        onPageChanged: (index) {
+          final week = index + 1;
+          if (week != selectedWeek) {
+            ref
+                .read(selectedWeekProvider.notifier)
+                .goTo(week, totalWeeks: totalWeeks);
+          }
+        },
+        itemBuilder: (context, index) {
+          final week = index + 1;
+          final page = RepaintBoundary(
+            child: WeekView(
+              key: ValueKey(week),
+              selectedWeek: week,
+              onImport: () => context.push('/import'),
+              onWebViewImport: () => context.push('/import/webview'),
+            ),
+          );
+          // 只让轻量的合成层随手势变化，WeekView 本身作为 child 不会
+          // 每帧重建；轻微缩放与透明度差形成更自然的前后页交接。
+          return AnimatedBuilder(
+            animation: _pageController,
+            child: page,
+            builder: (context, child) {
+              var currentPage = index.toDouble();
+              if (_pageController.hasClients &&
+                  _pageController.position.hasContentDimensions) {
+                currentPage = _pageController.page ?? currentPage;
+              }
+              final distance =
+                  (currentPage - index).abs().clamp(0.0, 1.0).toDouble();
+              return Transform.scale(
+                scale: 1 - distance * 0.012,
+                alignment: Alignment.center,
+                child: Opacity(
+                  opacity: 1 - distance * 0.08,
+                  child: child,
+                ),
+              );
             },
-            onNext: () {
-              _animateToWeek(selectedWeek + 1, totalWeeks);
-            },
-            onJumpToWeek: (week) {
-              _animateToWeek(week, totalWeeks);
-            },
-          ),
-          _WeekProgressIndicator(
-            controller: _pageController,
-            selectedWeek: selectedWeek,
-            totalWeeks: totalWeeks,
-          ),
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: totalWeeks,
-              allowImplicitScrolling: true,
-              physics: const _SchedulePagePhysics(
-                parent: BouncingScrollPhysics(),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 把选中的周写成激活学期的手动当前周，翻到该周并提示。
+  Future<void> _setCurrentWeek(int week) async {
+    final semester = ref.read(activeSemesterProvider).valueOrNull;
+    if (semester == null) return;
+    await ref
+        .read(semesterRepositoryProvider)
+        .upsert(semester.copyWith(currentWeekOverride: week));
+    ref.invalidate(activeSemesterProvider);
+    if (!mounted) return;
+    _animateToWeek(week, semester.totalWeeks);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('当前周已改为第 $week 周')));
+  }
+
+  /// 选周网格底部弹层，「跳转到第几周」与「修改当前周」共用。
+  void _showWeekPicker({
+    required String title,
+    required int totalWeeks,
+    required int selected,
+    required ValueChanged<int> onPick,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(title, style: theme.textTheme.titleMedium),
               ),
-              onPageChanged: (index) {
-                final week = index + 1;
-                if (week != selectedWeek) {
-                  ref
-                      .read(selectedWeekProvider.notifier)
-                      .goTo(week, totalWeeks: totalWeeks);
-                }
-              },
-              itemBuilder: (context, index) {
-                final week = index + 1;
-                final page = RepaintBoundary(
-                  child: WeekView(
-                    key: ValueKey(week),
-                    selectedWeek: week,
-                    onImport: () => context.push('/import'),
-                    onWebViewImport: () => context.push('/import/webview'),
+              const Divider(height: 1),
+              SizedBox(
+                height: 300,
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 5,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 1.5,
                   ),
-                );
-                // 只让轻量的合成层随手势变化，WeekView 本身作为 child 不会
-                // 每帧重建；轻微缩放与透明度差形成更自然的前后页交接。
-                return AnimatedBuilder(
-                  animation: _pageController,
-                  child: page,
-                  builder: (context, child) {
-                    var currentPage = index.toDouble();
-                    if (_pageController.hasClients &&
-                        _pageController.position.hasContentDimensions) {
-                      currentPage = _pageController.page ?? currentPage;
-                    }
-                    final distance =
-                        (currentPage - index).abs().clamp(0.0, 1.0).toDouble();
-                    return Transform.scale(
-                      scale: 1 - distance * 0.012,
-                      alignment: Alignment.center,
-                      child: Opacity(
-                        opacity: 1 - distance * 0.08,
-                        child: child,
+                  itemCount: totalWeeks,
+                  itemBuilder: (context, i) {
+                    final week = i + 1;
+                    final isSelected = week == selected;
+                    return InkWell(
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        onPick(week);
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.dividerColor,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$week',
+                          style: TextStyle(
+                            color: isSelected
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSurface,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
                       ),
                     );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/course/edit'),
-        tooltip: '添加课程',
-        child: const Icon(Icons.add),
-      ),
+        );
+      },
     );
   }
 
@@ -263,10 +394,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         ref.read(scheduleCoursesProvider).value ?? const <Course>[];
     final sectionTimes = ref.read(sectionTimesProvider);
     final now = DateTime.now();
-    final currentWeek = semester == null
-        ? 0
-        : semester.currentWeekOverride ??
-            computeCurrentWeek(semester.startDate, now);
+    final currentWeek = semester == null ? 0 : currentWeekOf(semester, now);
     final slots = todayCourseSlots(
       courses: courses,
       currentWeek: currentWeek,
@@ -389,103 +517,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       },
     );
   }
-
-  void _showSemesterPicker(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return Consumer(
-          builder: (context, ref, _) {
-            final semestersAsync = ref.watch(semestersProvider);
-            final active = ref.watch(activeSemesterProvider).value;
-            final theme = Theme.of(context);
-
-            return semestersAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('加载失败：$e'),
-              ),
-              data: (semesters) {
-                return SafeArea(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Text('切换学期', style: theme.textTheme.titleMedium),
-                            const Spacer(),
-                            TextButton.icon(
-                              onPressed: () {
-                                Navigator.of(ctx).pop();
-                                context.push('/semester');
-                              },
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text('管理'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      ...semesters.map((s) {
-                        final isActive = s.id == active?.id;
-                        return ListTile(
-                          leading: Icon(
-                            isActive
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_off,
-                            color: isActive
-                                ? theme.colorScheme.primary
-                                : theme.hintColor,
-                          ),
-                          title: Text(s.name),
-                          subtitle: Text('${s.totalWeeks} 周'),
-                          trailing: isActive
-                              ? Chip(
-                                  label: const Text('当前'),
-                                  visualDensity: VisualDensity.compact,
-                                  backgroundColor: theme.colorScheme.primary
-                                      .withAlpha((0.12 * 255).round()),
-                                )
-                              : null,
-                          onTap: isActive
-                              ? null
-                              : () async {
-                                  final repo =
-                                      ref.read(semesterRepositoryProvider);
-                                  await repo.setActive(s.id);
-                                  // scheduleCoursesProvider 内部 watch 了
-                                  // activeSemesterProvider，失效会自动传播。
-                                  ref.invalidate(activeSemesterProvider);
-                                  // 切换学期后重置到当前周
-                                  ref.read(selectedWeekProvider.notifier).goTo(
-                                      computeCurrentWeek(
-                                          s.startDate, DateTime.now()),
-                                      totalWeeks: s.totalWeeks);
-                                  if (ctx.mounted) Navigator.of(ctx).pop();
-                                },
-                        );
-                      }),
-                      const SizedBox(height: 8),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
 }
 
 /// 更轻、更快收敛的分页弹簧，并在 Android 上保留自然的边界回弹。
@@ -505,252 +536,7 @@ class _SchedulePagePhysics extends PageScrollPhysics {
   }
 }
 
-/// 与 PageController 逐帧联动的学期进度线，手指移动多少，进度就移动多少。
-class _WeekProgressIndicator extends StatelessWidget {
-  final PageController controller;
-  final int selectedWeek;
-  final int totalWeeks;
-
-  const _WeekProgressIndicator({
-    required this.controller,
-    required this.selectedWeek,
-    required this.totalWeeks,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 0, 18, 6),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(999),
-        child: SizedBox(
-          height: 3,
-          child: AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) {
-              var page = (selectedWeek - 1).toDouble();
-              if (controller.hasClients &&
-                  controller.position.hasContentDimensions) {
-                page = controller.page ?? page;
-              }
-              final progress = totalWeeks <= 1
-                  ? 1.0
-                  : ((page + 1) / totalWeeks).clamp(0.0, 1.0).toDouble();
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  ColoredBox(
-                    color: theme.colorScheme.outlineVariant.withAlpha(105),
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: FractionallySizedBox(
-                      widthFactor: progress,
-                      child: ColoredBox(color: theme.colorScheme.primary),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WeekSelector extends StatelessWidget {
-  final int selectedWeek;
-  final int totalWeeks;
-  final bool isCurrentWeek;
-  final int currentWeek;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-  final ValueChanged<int>? onJumpToWeek;
-
-  const _WeekSelector({
-    required this.selectedWeek,
-    required this.totalWeeks,
-    required this.isCurrentWeek,
-    required this.currentWeek,
-    required this.onPrev,
-    required this.onNext,
-    this.onJumpToWeek,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      key: const Key('schedule-week-selector'),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          IconButton(
-            icon: Icon(Icons.chevron_left,
-                size: 20, color: theme.colorScheme.primary),
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-            onPressed: selectedWeek > 1 ? onPrev : null,
-          ),
-          Expanded(
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  InkWell(
-                    onTap: onJumpToWeek != null
-                        ? () => _showWeekPicker(context)
-                        : null,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // 周次数字轻 crossfade，避免切周时瞬间跳变
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 150),
-                            child: Text(
-                              '第 $selectedWeek / $totalWeeks 周',
-                              key: ValueKey('$selectedWeek-$totalWeeks'),
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                decoration: onJumpToWeek != null
-                                    ? TextDecoration.underline
-                                    : null,
-                              ),
-                            ),
-                          ),
-                          if (onJumpToWeek != null) ...[
-                            const SizedBox(width: 2),
-                            Icon(Icons.arrow_drop_down,
-                                size: 16, color: theme.colorScheme.primary),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (isCurrentWeek) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary
-                            .withAlpha((0.12 * 255).round()),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '本周',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          if (!isCurrentWeek && onJumpToWeek != null)
-            TextButton(
-              onPressed: () => onJumpToWeek!(currentWeek),
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-              ),
-              child: const Text('本周'),
-            ),
-          IconButton(
-            icon: Icon(Icons.chevron_right,
-                size: 20, color: theme.colorScheme.primary),
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-            onPressed: selectedWeek < totalWeeks ? onNext : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showWeekPicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('跳转到第几周',
-                    style: Theme.of(context).textTheme.titleMedium),
-              ),
-              const Divider(height: 1),
-              SizedBox(
-                height: 300,
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 1.5,
-                  ),
-                  itemCount: totalWeeks,
-                  itemBuilder: (context, i) {
-                    final week = i + 1;
-                    final isSelected = week == selectedWeek;
-                    return InkWell(
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        onJumpToWeek?.call(week);
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '$week',
-                          style: TextStyle(
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.onPrimary
-                                : Theme.of(context).colorScheme.onSurface,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
+enum _WeekMenuAction { jump, backToCurrent, setCurrent }
 
 enum _ScheduleMenuAction { today, importGuide, settings }
 
