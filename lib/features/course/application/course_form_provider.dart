@@ -3,7 +3,9 @@ import 'package:uuid/uuid.dart';
 
 import 'package:hormone/core/constants/app_constants.dart';
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/data/providers/database_providers.dart';
+import 'package:hormone/data/repositories/course_platform_repository.dart';
 import 'package:hormone/data/repositories/course_repository.dart';
 
 /// 解析课程编辑页的初始数据：
@@ -49,12 +51,16 @@ final courseInitialProvider =
 /// 课程表单状态机。所有字段修改都通过 copyWith 生成新状态，UI 直接 watch。
 final courseFormProvider =
     StateNotifierProvider.autoDispose<CourseFormNotifier, Course>(
-  (ref) => CourseFormNotifier(ref.watch(courseRepositoryProvider)),
+  (ref) => CourseFormNotifier(
+    ref.watch(courseRepositoryProvider),
+    ref.watch(coursePlatformRepositoryProvider),
+  ),
 );
 
 class CourseFormNotifier extends StateNotifier<Course> {
   final CourseRepository _repo;
-  CourseFormNotifier(this._repo)
+  final CoursePlatformRepository _platformRepo;
+  CourseFormNotifier(this._repo, this._platformRepo)
       : super(const Course(
           id: '',
           semesterId: '',
@@ -68,11 +74,15 @@ class CourseFormNotifier extends StateNotifier<Course> {
 
   bool _initialized = false;
 
+  /// 编辑已有课程时的原课程名，保存时据此判断是否改名；新建/复制时为 null。
+  String? _originalName;
+
   /// 用解析出的初始课程填充表单（仅一次，避免覆盖用户已输入内容）。
   void init(Course initial) {
     if (_initialized) return;
     _initialized = true;
     state = initial;
+    _originalName = initial.id.isEmpty ? null : initial.name;
   }
 
   void setName(String v) => state = state.copyWith(name: v);
@@ -147,12 +157,30 @@ class CourseFormNotifier extends StateNotifier<Course> {
   /// 保存：新增时生成 id，编辑时沿用。
   /// 无学期时返回 false；无周次时返回 null（课程不会显示）；
   /// DB 错误时抛出异常由 UI 捕获。
-  Future<bool?> save() async {
+  ///
+  /// 课程名变了时先把旧名下的平台迁移到新名下；[platforms] 非 null 表示
+  /// 用户在编辑页改过平台，整体写到当前课程名下。
+  Future<bool?> save({List<CoursePlatform>? platforms}) async {
     if (state.semesterId.isEmpty) return false;
     if (state.weeks.isEmpty) return null;
     final toSave =
         state.copyWith(id: state.id.isEmpty ? const Uuid().v4() : state.id);
     await _repo.upsert(toSave);
+    final originalName = _originalName;
+    if (originalName != null) {
+      await _platformRepo.migrateOnRename(
+        toSave.semesterId,
+        from: originalName,
+        to: toSave.name,
+      );
+    }
+    if (platforms != null) {
+      await _platformRepo.replacePlatforms(
+        toSave.semesterId,
+        toSave.name,
+        platforms,
+      );
+    }
     return true;
   }
 }

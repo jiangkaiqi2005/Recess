@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import 'package:hormone/core/constants/app_constants.dart';
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/features/course/application/course_form_provider.dart';
+import 'package:hormone/features/course/application/course_platforms_provider.dart';
+import 'package:hormone/features/course/presentation/course_platform_icon.dart';
 import 'package:hormone/data/providers/database_providers.dart';
 import 'package:hormone/features/semester/application/semester_providers.dart';
 import 'package:hormone/features/settings/application/section_times_provider.dart';
@@ -62,9 +65,12 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
           data: (initial) {
             if (!_initialized) {
               _initialized = true;
-              Future.microtask(
-                () => ref.read(courseFormProvider.notifier).init(initial),
-              );
+              Future.microtask(() {
+                ref.read(courseFormProvider.notifier).init(initial);
+                ref
+                    .read(coursePlatformsFormProvider.notifier)
+                    .load(initial.semesterId, initial.name);
+              });
             }
             return CourseFormBody(
               initial: initial,
@@ -110,9 +116,14 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
       );
       return;
     }
+    final platformsForm = ref.read(coursePlatformsFormProvider.notifier);
     bool? ok;
     try {
-      ok = await ref.read(courseFormProvider.notifier).save();
+      ok = await ref.read(courseFormProvider.notifier).save(
+            platforms: platformsForm.changed
+                ? ref.read(coursePlatformsFormProvider)
+                : null,
+          );
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -360,6 +371,11 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
           }).toList(),
         ),
         const SizedBox(height: 20),
+        _PlatformSection(
+          courseName: course.name.trim(),
+          onChanged: widget.onChanged,
+        ),
+        const SizedBox(height: 20),
         const _FieldLabel('备注'),
         TextField(
           controller: _notesCtrl,
@@ -417,6 +433,190 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
       }
       if (context.mounted) context.pop();
     }
+  }
+}
+
+/// 「课程平台」区块：列表 + 添加/编辑/删除。改动随页面「保存」一起持久化。
+class _PlatformSection extends ConsumerWidget {
+  final String courseName;
+  final VoidCallback? onChanged;
+
+  const _PlatformSection({required this.courseName, this.onChanged});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final platforms = ref.watch(coursePlatformsFormProvider);
+    final notifier = ref.read(coursePlatformsFormProvider.notifier);
+
+    Future<void> edit(int? index) async {
+      final result = await showDialog<CoursePlatform>(
+        context: context,
+        builder: (_) => _CoursePlatformDialog(
+          initial: index == null ? null : platforms[index],
+        ),
+      );
+      if (result == null) return;
+      if (index == null) {
+        notifier.add(result);
+      } else {
+        notifier.replaceAt(index, result);
+      }
+      onChanged?.call();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _FieldLabel('课程平台')),
+            TextButton.icon(
+              onPressed: () => edit(null),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('添加平台'),
+            ),
+          ],
+        ),
+        Text(
+          courseName.isEmpty
+              ? '本学期所有同名课程共享这些平台'
+              : '本学期所有名为“$courseName”的课程共享这些平台',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (var i = 0; i < platforms.length; i++)
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: Icon(coursePlatformIcon(platforms[i].purpose)),
+              title: Text(
+                '${platforms[i].purpose.label} · ${platforms[i].name}',
+              ),
+              subtitle: platforms[i].url == null
+                  ? null
+                  : Text(
+                      platforms[i].url!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline),
+                tooltip: '删除平台',
+                onPressed: () {
+                  notifier.removeAt(i);
+                  onChanged?.call();
+                },
+              ),
+              onTap: () => edit(i),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 新增与修改课程平台共用的弹窗：用途、平台名（必填）、链接（可选）。
+class _CoursePlatformDialog extends StatefulWidget {
+  final CoursePlatform? initial;
+  const _CoursePlatformDialog({this.initial});
+
+  @override
+  State<_CoursePlatformDialog> createState() => _CoursePlatformDialogState();
+}
+
+class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
+  late CoursePlatformPurpose _purpose =
+      widget.initial?.purpose ?? CoursePlatformPurpose.onlineCourse;
+  late final _nameCtrl = TextEditingController(text: widget.initial?.name);
+  late final _urlCtrl = TextEditingController(text: widget.initial?.url);
+  String? _nameError;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      setState(() => _nameError = '请填写平台名');
+      return;
+    }
+    final url = _urlCtrl.text.trim();
+    Navigator.of(context).pop(CoursePlatform(
+      purpose: _purpose,
+      name: name,
+      url: url.isEmpty ? null : url,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.initial == null ? '添加平台' : '编辑平台'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<CoursePlatformPurpose>(
+              initialValue: _purpose,
+              decoration: const InputDecoration(labelText: '用途'),
+              items: [
+                for (final purpose in CoursePlatformPurpose.values)
+                  DropdownMenuItem(
+                    value: purpose,
+                    child: Row(
+                      children: [
+                        Icon(coursePlatformIcon(purpose), size: 20),
+                        const SizedBox(width: 10),
+                        Text(purpose.label),
+                      ],
+                    ),
+                  ),
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => _purpose = v);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _nameCtrl,
+              decoration: InputDecoration(
+                labelText: '平台名',
+                hintText: '如：学习通',
+                errorText: _nameError,
+              ),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _urlCtrl,
+              decoration: const InputDecoration(
+                labelText: '链接（可选）',
+                hintText: 'https://',
+              ),
+              keyboardType: TextInputType.url,
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('确定'),
+        ),
+      ],
+    );
   }
 }
 

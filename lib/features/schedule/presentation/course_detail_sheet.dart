@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/course_platform.dart';
+import 'package:hormone/features/course/application/course_platforms_provider.dart';
+import 'package:hormone/features/course/presentation/course_platform_icon.dart';
 import 'package:hormone/features/settings/application/section_times_provider.dart';
 
 const _dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
@@ -24,7 +30,8 @@ void showCourseDetailSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
     builder: (ctx) {
-      return Padding(
+      // 平台条目较多时面板内容可滚动，避免超出弹层高度。
+      return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -74,6 +81,7 @@ void showCourseDetailSheet(
               label: '周次',
               value: _formatWeeks(course.weeks),
             ),
+            _PlatformSection(course: course),
             if (course.notes != null && course.notes!.isNotEmpty)
               _DetailRow(
                 icon: Icons.notes_outlined,
@@ -150,6 +158,98 @@ String _formatSectionTime(
   final end = sectionTimes[endSection]?.endTime ?? '';
   if (start.isEmpty || end.isEmpty) return '';
   return ' ($start-$end)';
+}
+
+/// 「课程平台」区块，只负责显示；增删改在课程编辑页里做。
+class _PlatformSection extends ConsumerWidget {
+  final Course course;
+  const _PlatformSection({required this.course});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final platforms = ref
+            .watch(coursePlatformsProvider(
+              (semesterId: course.semesterId, courseName: course.name),
+            ))
+            .valueOrNull ??
+        const <CoursePlatform>[];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.apps_outlined, size: 18, color: theme.hintColor),
+              const SizedBox(width: 10),
+              Text(
+                '课程平台',
+                style:
+                    theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+              ),
+            ],
+          ),
+          if (platforms.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 28, top: 6),
+              child: Text(
+                '还没有填写，可在“编辑课程”里添加',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            for (final platform in platforms)
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 18),
+                visualDensity: VisualDensity.compact,
+                leading: Icon(coursePlatformIcon(platform.purpose)),
+                title: Text('${platform.purpose.label} · ${platform.name}'),
+                subtitle: platform.url == null
+                    ? null
+                    : Text(
+                        platform.url!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                trailing: platform.url == null
+                    ? null
+                    : const Icon(Icons.open_in_new, size: 18),
+                onTap: platform.url == null
+                    ? null
+                    : () => _open(context, platform.url!),
+                onLongPress: platform.url == null
+                    ? null
+                    : () => _copy(context, platform.url!),
+              ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _open(BuildContext context, String url) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final uri = Uri.tryParse(url);
+    var opened = false;
+    try {
+      opened = uri != null &&
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened) {
+      messenger.showSnackBar(SnackBar(content: Text('无法打开链接：$url')));
+    }
+  }
+
+  Future<void> _copy(BuildContext context, String url) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(ClipboardData(text: url));
+    messenger.showSnackBar(const SnackBar(content: Text('已复制链接')));
+  }
 }
 
 class _DetailRow extends StatelessWidget {
