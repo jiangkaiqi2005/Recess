@@ -1,5 +1,6 @@
 import 'package:hormone/core/constants/app_constants.dart';
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/course_platform.dart';
 
 /// 导入过程中的单门课程中间表示。
 ///
@@ -73,6 +74,19 @@ class ImportCourse {
     }
     return '${sorted.join(',')}周';
   }
+}
+
+/// 只保留实际导入的课程（预览中勾选的）所对应的课程平台，课程名 trim 后匹配。
+/// 取消勾选的课程不应把平台写进目标学期。
+CoursePlatformGroups platformsForImportedCourses(
+  CoursePlatformGroups platforms,
+  Iterable<ImportCourse> imported,
+) {
+  final names = {for (final c in imported) c.name.trim()};
+  return {
+    for (final entry in platforms.entries)
+      if (names.contains(entry.key.trim())) entry.key: entry.value,
+  };
 }
 
 /// 判断两门导入课程是否时间冲突：同一星期、节次重叠且周次有交集。

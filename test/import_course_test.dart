@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/features/import/domain/import_course.dart';
 
 ImportCourse _c({
@@ -124,6 +125,28 @@ void main() {
     test('默认为替换模式', () {
       expect(ImportMode.replace, isA<ImportMode>());
       expect(ImportMode.values, containsAll([ImportMode.replace, ImportMode.merge]));
+    });
+  });
+
+  group('platformsForImportedCourses', () {
+    const online = CoursePlatform(
+      purpose: CoursePlatformPurpose.onlineCourse,
+      name: '学习通',
+    );
+    const lab = CoursePlatform(purpose: CoursePlatformPurpose.lab, name: '头歌');
+
+    test('只保留实际导入的课程名对应的平台', () {
+      final result = platformsForImportedCourses(
+        {
+          '操作系统': [online],
+          '取消勾选的课': [lab],
+          '文件里没有的课': [lab],
+        },
+        [_c(name: '操作系统'), _c(name: '编译原理')],
+      );
+      expect(result, {
+        '操作系统': [online],
+      });
     });
   });
 }

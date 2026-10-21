@@ -34,7 +34,7 @@ class ImportState {
   final ImportMode mode;
 
   /// JSON 文件里按课程名给出的课程平台，确认导入时写入目标学期。
-  final Map<String, List<CoursePlatform>> platforms;
+  final CoursePlatformGroups platforms;
 
   const ImportState({
     this.status = ImportStatus.idle,
@@ -55,7 +55,7 @@ class ImportState {
     List<String>? skipped,
     int? totalWeeks,
     ImportMode? mode,
-    Map<String, List<CoursePlatform>>? platforms,
+    CoursePlatformGroups? platforms,
   }) =>
       ImportState(
         status: status ?? this.status,
@@ -177,9 +177,10 @@ class ImportNotifier extends StateNotifier<ImportState> {
       await repo.replaceForSemester(semester.id, replacements);
     }
     // 平台按课程名归属，替换课程不会删除已有平台；文件里给出的平台按课程名
-    // 整体覆盖到目标学期。
+    // 整体覆盖到目标学期，但只写实际导入的课程。
     final platformRepo = _ref.read(coursePlatformRepositoryProvider);
-    for (final entry in state.platforms.entries) {
+    final platforms = platformsForImportedCourses(state.platforms, toImport);
+    for (final entry in platforms.entries) {
       await platformRepo.replacePlatforms(semester.id, entry.key, entry.value);
     }
     final count = replacements.length;
@@ -203,7 +204,7 @@ class ImportNotifier extends StateNotifier<ImportState> {
     return repo.getActiveSemester();
   }
 
-  (List<ImportCourse>, Map<String, List<CoursePlatform>>, List<String>)
+  (List<ImportCourse>, CoursePlatformGroups, List<String>)
       _parseByType(
     String ext,
     String content,
@@ -224,14 +225,14 @@ class ImportNotifier extends StateNotifier<ImportState> {
             semesterStart: semester.startDate,
             totalWeeks: semester.totalWeeks,
           ),
-          const <String, List<CoursePlatform>>{},
+          const {},
           const <String>[],
         );
       default:
         // 不支持的格式，返回空。
         return (
           const <ImportCourse>[],
-          const <String, List<CoursePlatform>>{},
+          const {},
           const <String>[],
         );
     }
