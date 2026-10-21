@@ -7,7 +7,7 @@ import 'package:hormone/core/models/course.dart';
 import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/features/course/application/course_form_provider.dart';
 import 'package:hormone/features/course/application/course_platforms_provider.dart';
-import 'package:hormone/features/course/presentation/course_platform_icon.dart';
+import 'package:hormone/features/course/presentation/course_platform_display.dart';
 import 'package:hormone/data/providers/database_providers.dart';
 import 'package:hormone/features/semester/application/semester_providers.dart';
 import 'package:hormone/features/settings/application/section_times_provider.dart';
@@ -497,9 +497,7 @@ class _PlatformSection extends ConsumerWidget {
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               leading: Icon(coursePlatformIcon(platforms[i].purpose)),
-              title: Text(
-                '${platforms[i].purpose.label} · ${platforms[i].name}',
-              ),
+              title: Text(coursePlatformTitle(platforms[i])),
               subtitle: platforms[i].url == null
                   ? null
                   : Text(

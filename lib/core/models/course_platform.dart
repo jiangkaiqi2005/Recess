@@ -49,15 +49,18 @@ class CoursePlatform {
   int get hashCode => Object.hash(purpose, name, url);
 }
 
+/// 同一学期内按课程名分组的课程平台：课程名 → 该课的平台（组内有序）。
+typedef CoursePlatformGroups = Map<String, List<CoursePlatform>>;
+
 /// 解析 JSON 中的 `platforms` 字段：`{"<课程名>": [{"purpose", "name", "url"}]}`。
 ///
 /// 备份恢复与 JSON 课表导入共用。用途键未知、平台名为空或条目不是对象时跳过
 /// 该条，并把原因追加到 [skipped]；字段整体不是对象时视为没有平台。
-Map<String, List<CoursePlatform>> parseCoursePlatformGroups(
+CoursePlatformGroups parseCoursePlatformGroups(
   Object? raw, {
   List<String>? skipped,
 }) {
-  final result = <String, List<CoursePlatform>>{};
+  final CoursePlatformGroups result = {};
   if (raw is! Map) return result;
   for (final entry in raw.entries) {
     final courseName = entry.key.toString().trim();

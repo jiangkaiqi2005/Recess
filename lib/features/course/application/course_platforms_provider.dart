@@ -34,7 +34,7 @@ class CoursePlatformsFormNotifier extends StateNotifier<List<CoursePlatform>> {
   String _semesterId = '';
   String? _originalName;
   String? _currentName;
-  final Map<String, List<CoursePlatform>> _drafts = {};
+  final CoursePlatformGroups _drafts = {};
 
   /// 保存时要写到当前课程名下的列表；null 表示没有改动，不写平台。
   List<CoursePlatform>? get pendingForCurrentName => _drafts[_currentName];

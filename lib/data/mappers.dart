@@ -81,6 +81,22 @@ extension CoursePlatformDomainMapper on CoursePlatform {
       );
 }
 
+extension CoursePlatformListMapper on List<CoursePlatform> {
+  /// 一门课的整组平台，按列表顺序写入 sortOrder。
+  List<db.CoursePlatformsCompanion> toCompanions({
+    required String semesterId,
+    required String courseName,
+  }) =>
+      [
+        for (var i = 0; i < length; i++)
+          this[i].toCompanion(
+            semesterId: semesterId,
+            courseName: courseName,
+            sortOrder: i,
+          ),
+      ];
+}
+
 extension SemesterEntityMapper on db.Semester {
   Semester toDomain() => Semester(
         id: id,

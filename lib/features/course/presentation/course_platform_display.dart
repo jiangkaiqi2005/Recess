@@ -10,3 +10,7 @@ IconData coursePlatformIcon(CoursePlatformPurpose purpose) => switch (purpose) {
       CoursePlatformPurpose.group => Icons.forum_outlined,
       CoursePlatformPurpose.other => Icons.link,
     };
+
+/// 课程平台条目的标题「用途 · 平台名」，详情面板与编辑页共用。
+String coursePlatformTitle(CoursePlatform platform) =>
+    '${platform.purpose.label} · ${platform.name}';

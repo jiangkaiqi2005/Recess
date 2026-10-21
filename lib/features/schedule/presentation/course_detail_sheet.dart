@@ -7,7 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:hormone/core/models/course.dart';
 import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/features/course/application/course_platforms_provider.dart';
-import 'package:hormone/features/course/presentation/course_platform_icon.dart';
+import 'package:hormone/features/course/presentation/course_platform_display.dart';
 import 'package:hormone/features/settings/application/section_times_provider.dart';
 
 const _dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
@@ -236,7 +236,7 @@ class _PlatformSection extends ConsumerWidget {
                 contentPadding: const EdgeInsets.only(left: 18),
                 visualDensity: VisualDensity.compact,
                 leading: Icon(coursePlatformIcon(platform.purpose)),
-                title: Text('${platform.purpose.label} · ${platform.name}'),
+                title: Text(coursePlatformTitle(platform)),
                 subtitle: platform.url == null
                     ? null
                     : Text(

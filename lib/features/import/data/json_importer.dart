@@ -38,7 +38,7 @@ class JsonCourseImporter {
   /// 返回导入课程、按课程名分组的课程平台与跳过的条目（用于 UI 提示）。
   static ({
     List<ImportCourse> courses,
-    Map<String, List<CoursePlatform>> platforms,
+    CoursePlatformGroups platforms,
     List<String> skipped,
   }) parse(
     String jsonText, {

@@ -31,7 +31,7 @@ class CoursePlatformRepository {
   }
 
   /// 某学期的全部平台，按课程名分组（JSON 备份导出使用）。
-  Future<Map<String, List<CoursePlatform>>> getPlatformsBySemester(
+  Future<CoursePlatformGroups> getPlatformsBySemester(
     String semesterId,
   ) async {
     final rows = await (_db.select(_db.coursePlatforms)
@@ -41,7 +41,7 @@ class CoursePlatformRepository {
             (p) => OrderingTerm.asc(p.sortOrder),
           ]))
         .get();
-    final result = <String, List<CoursePlatform>>{};
+    final CoursePlatformGroups result = {};
     for (final row in rows) {
       result.putIfAbsent(row.courseName, () => []).add(row.toDomain());
     }
@@ -59,14 +59,10 @@ class CoursePlatformRepository {
       await _deleteFor(semesterId, name);
       if (platforms.isEmpty) return;
       await _db.batch((batch) {
-        batch.insertAll(_db.coursePlatforms, [
-          for (var i = 0; i < platforms.length; i++)
-            platforms[i].toCompanion(
-              semesterId: semesterId,
-              courseName: name,
-              sortOrder: i,
-            ),
-        ]);
+        batch.insertAll(
+          _db.coursePlatforms,
+          platforms.toCompanions(semesterId: semesterId, courseName: name),
+        );
       });
     });
   }

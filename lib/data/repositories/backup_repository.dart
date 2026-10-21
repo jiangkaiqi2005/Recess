@@ -26,7 +26,7 @@ class BackupFile {
   final Map<String, List<Course>> coursesBySemester;
 
   /// 学期 id → 课程名 → 课程平台。
-  final Map<String, Map<String, List<CoursePlatform>>> platformsBySemester;
+  final Map<String, CoursePlatformGroups> platformsBySemester;
   final String? activeSemesterId;
 
   const BackupFile._({
@@ -56,7 +56,7 @@ class BackupFile {
 
     final semesters = <Semester>[];
     final coursesBySemester = <String, List<Course>>{};
-    final platformsBySemester = <String, Map<String, List<CoursePlatform>>>{};
+    final platformsBySemester = <String, CoursePlatformGroups>{};
     final semesterIds = <String>{};
     String? activeSemesterId;
 
@@ -252,14 +252,13 @@ class BackupRepository {
         }
         for (final semester in backup.platformsBySemester.entries) {
           for (final group in semester.value.entries) {
-            batch.insertAll(_db.coursePlatforms, [
-              for (var i = 0; i < group.value.length; i++)
-                group.value[i].toCompanion(
-                  semesterId: semester.key,
-                  courseName: group.key,
-                  sortOrder: i,
-                ),
-            ]);
+            batch.insertAll(
+              _db.coursePlatforms,
+              group.value.toCompanions(
+                semesterId: semester.key,
+                courseName: group.key,
+              ),
+            );
           }
         }
       });
