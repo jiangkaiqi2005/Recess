@@ -31,7 +31,7 @@ void showCourseDetailSheet(
     ),
     builder: (ctx) {
       // 平台条目较多时面板内容可滚动，避免超出弹层高度。
-      return SingleChildScrollView(
+      return _SheetMessenger(child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -128,9 +128,38 @@ void showCourseDetailSheet(
             ),
           ],
         ),
-      );
+      ));
     },
   );
+}
+
+/// 让面板里的 SnackBar 显示在弹层上方。
+///
+/// 根 ScaffoldMessenger 会把 SnackBar 放进下层页面的 Scaffold，被弹层挡住；
+/// 这里给弹层单独一个 ScaffoldMessenger 和一个铺满弹层、不接收触摸的透明
+/// Scaffold，弹层仍按内容高度布局。
+class _SheetMessenger extends StatelessWidget {
+  final Widget child;
+  const _SheetMessenger({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaffoldMessenger(
+      child: Stack(
+        children: [
+          child,
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: Scaffold(
+                backgroundColor: Colors.transparent,
+                body: SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 String _formatWeeks(List<int> weeks) {

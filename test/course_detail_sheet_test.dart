@@ -117,6 +117,56 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(copied, 'https://mooc1.chaoxing.com');
-    expect(find.text('已复制链接'), findsOneWidget);
+    // 提示显示在弹层自己的 Scaffold 里，而不是被弹层挡住的下层页面。
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('已复制链接'),
+      ),
+      findsOneWidget,
+    );
+    final snackBar = tester.getRect(find.byType(SnackBar));
+    final sheet = tester.getRect(find.byType(BottomSheet));
+    expect(snackBar.bottom, lessThanOrEqualTo(sheet.bottom));
+    expect(snackBar.top, greaterThanOrEqualTo(sheet.top));
+  });
+
+  testWidgets('打开链接失败时在弹层上方提示', (tester) async {
+    // 测试环境默认走 url_launcher 的 MethodChannel 实现，这里让它报告打开失败。
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    String? launched;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (call) async {
+        launched = (call.arguments as Map)['url'] as String?;
+        return false;
+      },
+    );
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null));
+
+    await openSheet(tester, withPlatforms);
+    await tester.tap(find.text('网课 · 学习通'));
+    await tester.pumpAndSettle();
+
+    expect(launched, 'https://mooc1.chaoxing.com');
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('无法打开链接：https://mooc1.chaoxing.com'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('短内容的面板仍按内容高度显示，按钮可点', (tester) async {
+    await openSheet(tester, withoutPlatforms);
+
+    final sheet = tester.getRect(find.byType(BottomSheet));
+    // 默认 800 高的测试窗口里，弹层上限为 9/16；内容较少时应明显更矮。
+    expect(sheet.height, lessThan(800 * 9 / 16));
+    // 铺在上层的透明 Scaffold 不拦截触摸。
+    expect(find.text('编辑课程').hitTestable(), findsOneWidget);
+    expect(find.text('复制课程').hitTestable(), findsOneWidget);
   });
 }
