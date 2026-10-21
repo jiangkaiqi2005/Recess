@@ -19,23 +19,46 @@ final coursePlatformsFormProvider = StateNotifierProvider.autoDispose<
       CoursePlatformsFormNotifier(ref.watch(coursePlatformRepositoryProvider)),
 );
 
+/// 编辑页的平台列表始终对应「当前课程名」下的平台：
+///
+/// - 当前名下已有平台（数据库或本页改过的草稿）时显示它们，改动也作用于它们；
+/// - 编辑已有课程并改成一个还没有平台的新名字时，显示原课程名下的平台，
+///   与保存时的改名迁移（见 `CoursePlatformRepository.migrateOnRename`）一致；
+/// - 其余情况为空列表。
+///
+/// 草稿按课程名分别保存，来回改名不会丢失已做的改动；保存时只写当前名的草稿。
 class CoursePlatformsFormNotifier extends StateNotifier<List<CoursePlatform>> {
   final CoursePlatformRepository _repo;
   CoursePlatformsFormNotifier(this._repo) : super(const []);
 
-  bool _loaded = false;
+  String _semesterId = '';
+  String? _originalName;
+  String? _currentName;
+  final Map<String, List<CoursePlatform>> _drafts = {};
 
-  /// 用户是否改动过列表；没改动时保存不写平台，交给改名迁移处理。
-  bool get changed => _changed;
-  bool _changed = false;
+  /// 保存时要写到当前课程名下的列表；null 表示没有改动，不写平台。
+  List<CoursePlatform>? get pendingForCurrentName => _drafts[_currentName];
 
-  /// 读取课程名下已有的平台（仅一次；用户已开始编辑则不覆盖）。
-  Future<void> load(String semesterId, String courseName) async {
-    if (_loaded) return;
-    _loaded = true;
-    if (semesterId.isEmpty || courseName.trim().isEmpty) return;
-    final platforms = await _repo.getPlatforms(semesterId, courseName);
-    if (mounted && !_changed) state = platforms;
+  /// [originalName] 为编辑已有课程时的原课程名，新建/复制课程时为 null。
+  Future<void> init({
+    required String semesterId,
+    required String courseName,
+    String? originalName,
+  }) {
+    _semesterId = semesterId;
+    _originalName = originalName?.trim();
+    return setCourseName(courseName);
+  }
+
+  /// 课程名输入变化时调用，按新名字重新解析要显示的平台。
+  Future<void> setCourseName(String courseName) async {
+    final name = courseName.trim();
+    if (name == _currentName) return;
+    _currentName = name;
+    final platforms = await _resolve(name);
+    // 只采用最新名字的结果；解析期间用户已对该名字做了改动则不覆盖。
+    if (!mounted || _currentName != name) return;
+    state = _drafts[name] ?? platforms;
   }
 
   void add(CoursePlatform platform) => _set([...state, platform]);
@@ -46,7 +69,28 @@ class CoursePlatformsFormNotifier extends StateNotifier<List<CoursePlatform>> {
   void removeAt(int index) => _set([...state]..removeAt(index));
 
   void _set(List<CoursePlatform> platforms) {
-    _changed = true;
+    final name = _currentName;
+    if (name != null) _drafts[name] = platforms;
     state = platforms;
+  }
+
+  Future<List<CoursePlatform>> _resolve(String name) async {
+    final draft = _drafts[name];
+    if (draft != null) return draft;
+    if (_semesterId.isEmpty || name.isEmpty) return const [];
+    final own = await _repo.getPlatforms(_semesterId, name);
+    if (own.isNotEmpty) return own;
+    final original = _originalName;
+    if (original == null || original.isEmpty || original == name) {
+      return const [];
+    }
+    // 改名到空名下：保存时原名下的平台会迁移过来。原名有草稿时草稿随名字
+    // 一起带过来，并记为新名的草稿，保证保存时写入的正是用户看到的列表。
+    final originalDraft = _drafts[original];
+    if (originalDraft != null) {
+      _drafts[name] = originalDraft;
+      return originalDraft;
+    }
+    return _repo.getPlatforms(_semesterId, original);
   }
 }

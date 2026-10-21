@@ -67,9 +67,11 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
               _initialized = true;
               Future.microtask(() {
                 ref.read(courseFormProvider.notifier).init(initial);
-                ref
-                    .read(coursePlatformsFormProvider.notifier)
-                    .load(initial.semesterId, initial.name);
+                ref.read(coursePlatformsFormProvider.notifier).init(
+                      semesterId: initial.semesterId,
+                      courseName: initial.name,
+                      originalName: initial.id.isEmpty ? null : initial.name,
+                    );
               });
             }
             return CourseFormBody(
@@ -116,13 +118,12 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
       );
       return;
     }
-    final platformsForm = ref.read(coursePlatformsFormProvider.notifier);
     bool? ok;
     try {
       ok = await ref.read(courseFormProvider.notifier).save(
-            platforms: platformsForm.changed
-                ? ref.read(coursePlatformsFormProvider)
-                : null,
+            platforms: ref
+                .read(coursePlatformsFormProvider.notifier)
+                .pendingForCurrentName,
           );
     } catch (e) {
       if (context.mounted) {
@@ -179,6 +180,10 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
 
     _nameCtrl.addListener(() {
       ref.read(courseFormProvider.notifier).setName(_nameCtrl.text);
+      // 平台按课程名归属：名字一变，列表跟着换成新名字下的平台。
+      ref
+          .read(coursePlatformsFormProvider.notifier)
+          .setCourseName(_nameCtrl.text);
       widget.onChanged?.call();
     });
     _teacherCtrl.addListener(() {

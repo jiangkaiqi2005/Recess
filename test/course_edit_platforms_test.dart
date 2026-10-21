@@ -20,6 +20,16 @@ void main() {
 
   late db.AppDatabase database;
 
+  const course = Course(
+    id: 'c1',
+    semesterId: 's1',
+    name: '操作系统',
+    dayOfWeek: 1,
+    startSection: 1,
+    endSection: 2,
+    weeks: [1],
+  );
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     database = db.AppDatabase(NativeDatabase.memory());
@@ -29,7 +39,10 @@ void main() {
     await database.close();
   });
 
-  testWidgets('编辑页添加平台后随“保存”写到当前课程名下', (tester) async {
+  Future<void> pumpEdit(
+    WidgetTester tester, {
+    Future<void> Function()? seed,
+  }) async {
     await tester.binding.setSurfaceSize(const Size(400, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -41,15 +54,8 @@ void main() {
         totalWeeks: 18,
       ));
       await SemesterRepository(database).setActive('s1');
-      await CourseRepository(database).upsert(const Course(
-        id: 'c1',
-        semesterId: 's1',
-        name: '操作系统',
-        dayOfWeek: 1,
-        startSection: 1,
-        endSection: 2,
-        weeks: [1],
-      ));
+      await CourseRepository(database).upsert(course);
+      await seed?.call();
     });
 
     final router = GoRouter(
@@ -70,6 +76,10 @@ void main() {
     );
     router.push('/edit');
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('编辑页添加平台后随“保存”写到当前课程名下', (tester) async {
+    await pumpEdit(tester);
 
     expect(find.text('本学期所有名为“操作系统”的课程共享这些平台'), findsOneWidget);
 
@@ -112,5 +122,32 @@ void main() {
       ),
     ]);
     expect(find.text('首页'), findsOneWidget);
+  });
+
+  testWidgets('改课程名后列表与提示都换成新名字下的平台', (tester) async {
+    await pumpEdit(tester, seed: () async {
+      final platforms = CoursePlatformRepository(database);
+      await platforms.replacePlatforms('s1', '操作系统', const [
+        CoursePlatform(
+          purpose: CoursePlatformPurpose.onlineCourse,
+          name: '学习通',
+        ),
+      ]);
+      await platforms.replacePlatforms('s1', '编译原理', const [
+        CoursePlatform(purpose: CoursePlatformPurpose.lab, name: '头歌'),
+      ]);
+    });
+    expect(find.text('网课 · 学习通'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, '操作系统'),
+      '编译原理',
+    );
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+
+    expect(find.text('本学期所有名为“编译原理”的课程共享这些平台'), findsOneWidget);
+    expect(find.text('实验 · 头歌'), findsOneWidget);
+    expect(find.text('网课 · 学习通'), findsNothing);
   });
 }

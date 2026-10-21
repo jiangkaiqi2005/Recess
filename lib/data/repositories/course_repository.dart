@@ -1,7 +1,9 @@
 import 'package:drift/drift.dart';
 import 'package:hormone/core/models/course.dart';
+import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/data/app_database.dart' as db;
 import 'package:hormone/data/mappers.dart';
+import 'package:hormone/data/repositories/course_platform_repository.dart';
 
 /// 课程数据访问。所有方法以领域模型 [Course] 与外界交互，
 /// 内部使用 drift 实体与流式监听，支撑离线优先与实时 UI 更新。
@@ -42,6 +44,36 @@ class CourseRepository {
       throw ArgumentError('Course.id must not be empty');
     }
     await _db.into(_db.courses).insertOnConflictUpdate(course.toCompanion());
+  }
+
+  /// 编辑页保存：写入课程，并在同一事务内处理课程平台。
+  ///
+  /// [renamedFrom] 为编辑已有课程时的原课程名，名字变了就做改名迁移；
+  /// [platforms] 非 null 时整体写到当前课程名下。任何一步失败整体回滚，
+  /// 不会出现课程已改名、平台却留在旧名下的半截状态。
+  Future<void> saveWithPlatforms(
+    Course course, {
+    String? renamedFrom,
+    List<CoursePlatform>? platforms,
+  }) {
+    final platformRepo = CoursePlatformRepository(_db);
+    return _db.transaction(() async {
+      await upsert(course);
+      if (renamedFrom != null) {
+        await platformRepo.migrateOnRename(
+          course.semesterId,
+          from: renamedFrom,
+          to: course.name,
+        );
+      }
+      if (platforms != null) {
+        await platformRepo.replacePlatforms(
+          course.semesterId,
+          course.name,
+          platforms,
+        );
+      }
+    });
   }
 
   /// 用 [courses] 原子替换指定学期的全部课程。

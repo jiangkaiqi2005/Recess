@@ -5,7 +5,6 @@ import 'package:hormone/core/constants/app_constants.dart';
 import 'package:hormone/core/models/course.dart';
 import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/data/repositories/course_platform_repository.dart';
 import 'package:hormone/data/repositories/course_repository.dart';
 
 /// 解析课程编辑页的初始数据：
@@ -51,16 +50,12 @@ final courseInitialProvider =
 /// 课程表单状态机。所有字段修改都通过 copyWith 生成新状态，UI 直接 watch。
 final courseFormProvider =
     StateNotifierProvider.autoDispose<CourseFormNotifier, Course>(
-  (ref) => CourseFormNotifier(
-    ref.watch(courseRepositoryProvider),
-    ref.watch(coursePlatformRepositoryProvider),
-  ),
+  (ref) => CourseFormNotifier(ref.watch(courseRepositoryProvider)),
 );
 
 class CourseFormNotifier extends StateNotifier<Course> {
   final CourseRepository _repo;
-  final CoursePlatformRepository _platformRepo;
-  CourseFormNotifier(this._repo, this._platformRepo)
+  CourseFormNotifier(this._repo)
       : super(const Course(
           id: '',
           semesterId: '',
@@ -159,28 +154,17 @@ class CourseFormNotifier extends StateNotifier<Course> {
   /// DB 错误时抛出异常由 UI 捕获。
   ///
   /// 课程名变了时先把旧名下的平台迁移到新名下；[platforms] 非 null 表示
-  /// 用户在编辑页改过平台，整体写到当前课程名下。
+  /// 用户在编辑页改过平台，整体写到当前课程名下。课程与平台在同一事务内写入。
   Future<bool?> save({List<CoursePlatform>? platforms}) async {
     if (state.semesterId.isEmpty) return false;
     if (state.weeks.isEmpty) return null;
     final toSave =
         state.copyWith(id: state.id.isEmpty ? const Uuid().v4() : state.id);
-    await _repo.upsert(toSave);
-    final originalName = _originalName;
-    if (originalName != null) {
-      await _platformRepo.migrateOnRename(
-        toSave.semesterId,
-        from: originalName,
-        to: toSave.name,
-      );
-    }
-    if (platforms != null) {
-      await _platformRepo.replacePlatforms(
-        toSave.semesterId,
-        toSave.name,
-        platforms,
-      );
-    }
+    await _repo.saveWithPlatforms(
+      toSave,
+      renamedFrom: _originalName,
+      platforms: platforms,
+    );
     return true;
   }
 }
