@@ -9,7 +9,7 @@
 
 基于 Flutter 构建，使用 Material 3 界面，支持浅色与深色主题。课程与学期保存在本地，导入后可以离线查看。目前仅支持 **Android 7.0（API 24）及以上**。
 
-**[下载最新版](https://github.com/jiangkaiqi2005/recess/releases/latest)** · **[查看更新日志](version)** · **[反馈问题](https://github.com/jiangkaiqi2005/recess/issues)**
+**[下载最新版](https://github.com/jiangkaiqi2005/recess/releases/latest)** · **[查看更新日志](https://github.com/jiangkaiqi2005/recess/releases)** · **[反馈问题](https://github.com/jiangkaiqi2005/recess/issues)**
 
 ## 界面预览
 
@@ -129,7 +129,7 @@ git clone https://github.com/jiangkaiqi2005/recess.git
 cd recess
 git switch develop
 
-flutter create . --platforms=android --org com.aetikyue
+flutter create . --platforms=android --org io.github.jiangkaiqi2005
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
 dart run flutter_launcher_icons
@@ -197,7 +197,7 @@ native_templates/        # Android 原生配置、小组件与更新安装入口
 test/                    # 领域逻辑、数据层与界面测试
 scripts/                 # 本地签名构建脚本
 docs/                    # 设计文档、截图与发布指南
-version/                 # 各版本更新日志
+version/                 # 发版时新建的更新日志
 ```
 
 功能模块按 `application/`、`presentation/` 分层，按需包含 `data/` 和 `domain/`。Repository 对外提供领域模型，drift 实体通过 `mappers.dart` 转换。更多设计说明见 [系统设计文档](docs/system_design.md)。
@@ -241,6 +241,6 @@ flutter build appbundle --release
 
 ## 开源许可
 
-本项目采用 MIT License。
+本项目采用 [MIT License](LICENSE)。
 
 课表配色参考 [WakeUp 课表](https://wakeup.cool/)，感谢提供反馈、参与测试和贡献代码的朋友。

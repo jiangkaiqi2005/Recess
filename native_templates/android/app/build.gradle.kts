@@ -31,7 +31,7 @@ if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = tr
 }
 
 android {
-    namespace = "com.aetikyue.recess"
+    namespace = "io.github.jiangkaiqi2005.recess"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -44,7 +44,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.aetikyue.recess"
+        applicationId = "io.github.jiangkaiqi2005.recess"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // 当前 Flutter stable 的实际构建基线为 API 24。

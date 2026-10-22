@@ -1,10 +1,10 @@
-package com.aetikyue.recess
+package io.github.jiangkaiqi2005.recess
 
 // Android 桌面小组件（App Widget）。读取 home_widget 共享的
 // SharedPreferences 中由 Flutter 侧写入的「今日课程」数据并展示。
 //
 // 注意：此文件位于 native_templates/android/...，请复制到
-// android/app/src/main/java/com/aetikyue/recess/CourseWidgetProvider.kt
+// android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt
 // （package 与真实 applicationId 一致，见 WIDGET_SETUP.md）。
 
 import android.appwidget.AppWidgetManager

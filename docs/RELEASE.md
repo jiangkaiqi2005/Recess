@@ -9,7 +9,7 @@
 首次克隆后生成 Android 原生工程：
 
 ```bash
-flutter create . --platforms=android --org com.aetikyue
+flutter create . --platforms=android --org io.github.jiangkaiqi2005
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
 dart run flutter_launcher_icons
@@ -23,7 +23,7 @@ flutter test
 
 ## 2. Application ID
 
-当前应用包名为 `com.aetikyue.recess`（由 `flutter create --org com.aetikyue`
+当前应用包名为 `io.github.jiangkaiqi2005.recess`（由 `flutter create --org io.github.jiangkaiqi2005`
 生成；`pubspec.yaml` 项目名为 `recess`）。如需修改，在生成后的
 `android/app/build.gradle.kts` 中同步修改：
 
@@ -38,7 +38,7 @@ android {
 
 同时修改 `CourseWidgetProvider.kt` 顶部的 Kotlin 包名和对应目录结构，
 以及 `.github/workflows/release.yml` 中 `flutter create` 的 `--org` 参数
-（否则 CI 产物包名仍是 `com.aetikyue.recess`）。
+（否则 CI 产物包名仍是 `io.github.jiangkaiqi2005.recess`）。
 
 > ⚠️ 包名是应用身份标识，Google Play 上架后不可更改；请提前确认未被占用。
 

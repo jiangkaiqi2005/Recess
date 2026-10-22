@@ -11,7 +11,7 @@ Flutter 侧的 `lib/features/widget/` 已经能够把今日课程写入
 在仓库根目录执行：
 
 ```bash
-flutter create . --platforms=android --org com.aetikyue
+flutter create . --platforms=android --org io.github.jiangkaiqi2005
 flutter pub get
 ```
 
@@ -21,13 +21,13 @@ flutter pub get
 |---|---|
 | `native_templates/android/app/build.gradle.kts` | `android/app/build.gradle.kts` |
 | `native_templates/android/app/src/main/AndroidManifest.xml` | `android/app/src/main/AndroidManifest.xml` |
-| `native_templates/android/app/src/main/kotlin/com/aetikyue/recess/MainActivity.kt` | `android/app/src/main/kotlin/com/aetikyue/recess/MainActivity.kt` |
-| `native_templates/android/app/src/main/java/com/aetikyue/recess/CourseWidgetProvider.kt` | `android/app/src/main/java/com/aetikyue/recess/CourseWidgetProvider.kt` |
+| `native_templates/android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt` | `android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt` |
+| `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt` |
 | `native_templates/android/app/src/main/res/xml/course_widget_info.xml` | `android/app/src/main/res/xml/course_widget_info.xml` |
 | `native_templates/android/app/src/main/res/layout/course_widget.xml` | `android/app/src/main/res/layout/course_widget.xml` |
 | `native_templates/android/app/src/main/res/xml/filepaths.xml` | `android/app/src/main/res/xml/filepaths.xml` |
 
-模板中的 Kotlin 包名与真实包名 `com.aetikyue.recess` 一致，复制后无需修改。
+模板中的 Kotlin 包名与真实包名 `io.github.jiangkaiqi2005.recess` 一致，复制后无需修改。
 
 也可以在 PowerShell 中一次性覆盖复制整个原生模板：
 

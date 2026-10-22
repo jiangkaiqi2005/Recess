@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 class UpdateInstaller {
-  static const _channel = MethodChannel('com.aetikyue.recess/update');
+  static const _channel = MethodChannel('io.github.jiangkaiqi2005.recess/update');
 
   /// false 表示已打开授权页；用户授权后可复用已校验的安装包重试。
   Future<bool> install(File apk) async =>

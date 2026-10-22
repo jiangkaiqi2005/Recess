@@ -30,7 +30,7 @@
 
 本地签名构建还会自动检查四份 APK 的包名、版本号、版本代码和固定签名证书。也可单独运行 `scripts/verify_signed_apks.ps1`，不匹配时直接报错。
 
-原生安装入口保存在 `native_templates/android/app/src/main/kotlin/com/aetikyue/recess/MainActivity.kt`。重建 Android 平台目录时，须连同 Manifest 与 `res/xml/filepaths.xml` 一并应用；发布流程和本地签名脚本均已包含这一步。
+原生安装入口保存在 `native_templates/android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt`。重建 Android 平台目录时，须连同 Manifest 与 `res/xml/filepaths.xml` 一并应用；发布流程和本地签名脚本均已包含这一步。
 
 ## 接入自有下载源
 

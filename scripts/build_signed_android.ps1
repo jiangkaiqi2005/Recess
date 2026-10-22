@@ -49,9 +49,9 @@ try {
     New-Item -ItemType Directory -Force -Path $releaseDirectory | Out-Null
     # Apply the installer entry point alongside the manifest and FileProvider paths.
     Copy-Item -LiteralPath native_templates/android/app/build.gradle.kts -Destination android/app/build.gradle.kts -Force
-    $mainActivityPath = Join-Path $projectRoot 'android/app/src/main/kotlin/com/aetikyue/recess'
+    $mainActivityPath = Join-Path $projectRoot 'android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess'
     New-Item -ItemType Directory -Force -Path $mainActivityPath | Out-Null
-    Copy-Item -LiteralPath native_templates/android/app/src/main/kotlin/com/aetikyue/recess/MainActivity.kt -Destination $mainActivityPath -Force
+    Copy-Item -LiteralPath native_templates/android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt -Destination $mainActivityPath -Force
     Copy-Item -LiteralPath native_templates/android/app/src/main/AndroidManifest.xml -Destination android/app/src/main/AndroidManifest.xml -Force
     Copy-Item -LiteralPath native_templates/android/app/src/main/res/xml/filepaths.xml -Destination android/app/src/main/res/xml/filepaths.xml -Force
     $targets = [ordered]@{

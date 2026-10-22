@@ -35,7 +35,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     PackageInfo.setMockInitialValues(
       appName: 'Recess',
-      packageName: 'com.aetikyue.recess',
+      packageName: 'io.github.jiangkaiqi2005.recess',
       version: '1.2.4',
       buildNumber: '24',
       buildSignature: 'test',

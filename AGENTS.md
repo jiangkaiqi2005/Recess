@@ -10,7 +10,7 @@ Recess (课表) — a minimal Android college course-schedule app built with Flu
 
 ```bash
 flutter pub get                                              # install deps
-flutter create . --platforms=android --org com.aetikyue         # regenerate Android platform dir (see below)
+flutter create . --platforms=android --org io.github.jiangkaiqi2005         # regenerate Android platform dir (see below)
 dart run build_runner build --delete-conflicting-outputs      # codegen: drift + go_router (after changing tables/routes)
 dart run flutter_launcher_icons                              # regenerate app icons (after changing assets/icon/icon.png)
 dart run flutter_native_splash:create                        # regenerate splash screen
@@ -60,7 +60,7 @@ go_router, declared once in `app/router.dart`. Screens `context.push` existing r
 
 ### Desktop widget bridge
 
-`features/widget/application/widget_service.dart` serializes today's courses to native via `home_widget` (no App Group is configured on Android; widget provider `CourseWidgetProvider`, package `com.aetikyue.recess`). Failures are swallowed — the widget is a nice-to-have and must not affect the main app. `widgetServiceProvider` is a global singleton invoked after imports/edits to refresh.
+`features/widget/application/widget_service.dart` serializes today's courses to native via `home_widget` (no App Group is configured on Android; widget provider `CourseWidgetProvider`, package `io.github.jiangkaiqi2005.recess`). Failures are swallowed — the widget is a nice-to-have and must not affect the main app. `widgetServiceProvider` is a global singleton invoked after imports/edits to refresh.
 
 ## Conventions
 

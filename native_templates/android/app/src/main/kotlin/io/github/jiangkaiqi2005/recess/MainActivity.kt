@@ -1,4 +1,4 @@
-package com.aetikyue.recess
+package io.github.jiangkaiqi2005.recess
 
 import android.content.Intent
 import android.net.Uri
@@ -16,7 +16,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
-            "com.aetikyue.recess/update").setMethodCallHandler { call, result ->
+            "io.github.jiangkaiqi2005.recess/update").setMethodCallHandler { call, result ->
             if (call.method != "installApk") {
                 result.notImplemented()
                 return@setMethodCallHandler

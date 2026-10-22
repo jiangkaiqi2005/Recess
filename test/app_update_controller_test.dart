@@ -22,7 +22,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     PackageInfo.setMockInitialValues(
       appName: 'Recess',
-      packageName: 'com.aetikyue.recess',
+      packageName: 'io.github.jiangkaiqi2005.recess',
       version: '1.2.2',
       buildNumber: '22',
       buildSignature: 'test',

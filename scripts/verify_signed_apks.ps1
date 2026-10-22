@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$expectedPackage = 'com.aetikyue.recess'
+$expectedPackage = 'io.github.jiangkaiqi2005.recess'
 $expectedCertificate = '7206848b62105dcc9ea3e62a7a2f11158f14b6705849e10441dcf68fae52a6f6'
 
 $pubspec = Get-Content -LiteralPath (Join-Path $projectRoot 'pubspec.yaml') -Raw

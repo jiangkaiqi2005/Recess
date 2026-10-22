@@ -1,7 +1,7 @@
-# hormone 增量设计与任务分解（4 项任务）
+# recess 增量设计与任务分解（4 项任务）
 
 > 架构师：高见远（software-architect）｜面向工程师的交付物
-> 范围：周切换滑动过渡动画、导入按钮迁移、hormone 主题 logo、空周时间轴消失修复
+> 范围：周切换滑动过渡动画、导入按钮迁移、recess 主题 logo、空周时间轴消失修复
 > 技术栈（已核实）：Flutter + Riverpod + go_router + drift（状态/路由/持久化均不变）
 
 ---
@@ -189,7 +189,7 @@ sequenceDiagram
 | **T1** | 周切换滑动过渡动画（PageView + 防死循环） | `week_view.dart`、`schedule_screen.dart`（去 GestureDetector）、`test/week_view_test.dart` | 无 | **P0** |
 | **T2** | 导入按钮移至右上角设置按钮旁（PopupMenu） | `schedule_screen.dart`（去 FAB+加菜单）、`import_menu.dart`（新）、`test/schedule_screen_test.dart`（新） | 无（与 T1 同改 schedule_screen.dart，建议 T2 先于 T1 落地或紧随） | **P0** |
 | **T4** | 加固空周/三态时间轴恒可见（渲染契约 + 回归） | `week_view.dart`（三态外壳）、`test/week_view_empty_test.dart`（新） | **T1**（在 T1 重构后的结构上加固） | **P1** |
-| **T3** | hormone 主题 logo（SVG 概念 + Python 落地 + 重生成 PNG） | `generate_assets.py`（改写）、`assets/logo_concept.svg`（新）、`icon.png`/`logo.png`（重生成） | 无（可并行） | **P2** |
+| **T3** | recess 主题 logo（SVG 概念 + Python 落地 + 重生成 PNG） | `generate_assets.py`（改写）、`assets/logo_concept.svg`（新）、`icon.png`/`logo.png`（重生成） | 无（可并行） | **P2** |
 
 **实现顺序建议**：`T2 → T1 → T4 → T3`。`T2` 与 `T3` 互不依赖、可并行；因 `T2`、`T1` 都改 `schedule_screen.dart`，按序（先 T2 后 T1）可避免同文件反复改；`T4` 必须在 `T1` 之后（在其新结构上加固）；`T3` 随时可做的品牌/资产任务，置后。
 
@@ -200,7 +200,7 @@ graph TD
     T2[T2 导入按钮迁移]
     T1[T1 周切换滑动动画]
     T4[T4 空周时间轴加固]
-    T3[T3 hormone logo]
+    T3[T3 recess logo]
     T2 --> T1
     T1 --> T4
     T3
