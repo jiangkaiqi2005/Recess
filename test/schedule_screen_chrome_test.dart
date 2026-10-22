@@ -150,6 +150,36 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('横向轻拖回弹保留周视图元素和纵向滚动位置', (tester) async {
+    await pumpSchedule(tester);
+    await tester.binding.setSurfaceSize(const Size(360, 500));
+    await tester.pumpAndSettle();
+    final currentWeek = find.byKey(const ValueKey(3));
+    final verticalScroll = find.descendant(
+      of: currentWeek,
+      matching: find.byKey(const Key('week-view-vertical-scroll')),
+    );
+    final scrollable = find.descendant(
+      of: verticalScroll,
+      matching: find.byType(Scrollable),
+    );
+
+    await tester.drag(verticalScroll, const Offset(0, -100));
+    await tester.pumpAndSettle();
+    final element = tester.element(currentWeek);
+    final offset = tester.state<ScrollableState>(scrollable).position.pixels;
+    expect(offset, greaterThan(0));
+
+    await tester.drag(find.byType(PageView), const Offset(-60, 0));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 2);
+    expect(tester.element(currentWeek), same(element));
+    expect(tester.state<ScrollableState>(scrollable).position.pixels,
+        closeTo(offset, 0.000001));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('翻页用缩放和背景色遮罩淡化，静止页不加效果', (tester) async {
     await pumpSchedule(tester);
     final background = Theme.of(tester.element(find.byType(PageView)))
@@ -173,7 +203,7 @@ void main() {
       of: currentPage,
       matching: find.byType(ColoredBox),
     );
-    expect(scale, findsNothing);
+    expect(tester.widget<Transform>(scale).transform.isIdentity(), isTrue);
     expect(mask, findsNothing);
 
     await tester.drag(find.byType(PageView), const Offset(-120, 0));
@@ -200,7 +230,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(currentPage, findsOneWidget);
-    expect(scale, findsNothing);
+    expect(tester.widget<Transform>(scale).transform.isIdentity(), isTrue);
     expect(mask, findsNothing);
     expect(tester.takeException(), isNull);
   });

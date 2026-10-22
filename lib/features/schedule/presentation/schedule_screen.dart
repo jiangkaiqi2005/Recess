@@ -247,7 +247,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               }
               final distance =
                   (currentPage - index).abs().clamp(0.0, 1.0).toDouble();
-              if (distance == 0) return child!;
+              // 保持祖先结构不变，避免拖动起落时重建周视图并丢失滚动位置。
               return Transform.scale(
                 scale: 1 - distance * 0.012,
                 alignment: Alignment.center,
@@ -255,15 +255,16 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                   fit: StackFit.expand,
                   children: [
                     child!,
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: ColoredBox(
-                          color: Theme.of(context)
-                              .scaffoldBackgroundColor
-                              .withValues(alpha: distance * 0.08),
+                    if (distance > 0)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: ColoredBox(
+                            color: Theme.of(context)
+                                .scaffoldBackgroundColor
+                                .withValues(alpha: distance * 0.08),
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               );
