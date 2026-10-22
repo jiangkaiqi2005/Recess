@@ -34,6 +34,76 @@ void main() {
   });
 
   group('CquAdapter extractJs', () {
+    test('隐藏的同文本副本不重复返回或计入无法识别星期', () async {
+      final courses = await _runExtractor(r'''
+        const headers = makeHeaders([[5, 500]]);
+        const text = '[2024-01]\n[1-16周] [1-2节] A101\n本科 - 高等数学';
+        const visible = new FakeElement(text, 480, 40);
+        const hidden = new FakeElement(text, 0, 0);
+        installDocument(headers.concat([hidden, visible]));
+      ''');
+
+      expect(courses, hasLength(1));
+      expect(courses.single['dayOfWeek'], DateTime.friday);
+      final (imported, skipped) = importCoursesFromDecoded(courses);
+      expect(imported, hasLength(1));
+      expect(skipped, 0);
+    });
+
+    test('匹配半径外的同课程副本即使教室不同也不重复返回', () async {
+      final courses = await _runExtractor(r'''
+        const headers = makeHeaders([[5, 500]]);
+        const visible = new FakeElement(
+          '[2024-01]\n[1-16周] [1-2节] A101\n本科 - 高等数学', 480, 40);
+        const duplicate = new FakeElement(
+          '[2024-01]\n[1-16周] [1-2节] 第一教学楼A101\n本科 - 高等数学', 580, 40);
+        installDocument(headers.concat([visible, duplicate]));
+      ''');
+
+      expect(courses, hasLength(1));
+      expect(courses.single['dayOfWeek'], DateTime.friday);
+      expect(courses.single['location'], 'A101');
+    });
+
+    test('与已识别课程不同的隐藏卡片仍保留并提示无法识别星期', () async {
+      final courses = await _runExtractor(r'''
+        const headers = makeHeaders([[5, 500]]);
+        const visible = new FakeElement(
+          '[2024-01]\n[1-16周] [1-2节] A101\n本科 - 高等数学', 480, 40);
+        const hidden = new FakeElement(
+          '[2024-02]\n[1-16周] [1-2节] A101\n本科 - 大学物理', 0, 0);
+        installDocument(headers.concat([visible, hidden]));
+      ''');
+
+      expect(courses, hasLength(2));
+      expect(courses.last['name'], '大学物理');
+      expect(courses.last['dayOfWeek'], 0);
+      final (imported, skipped) = importCoursesFromDecoded(courses);
+      expect(imported, hasLength(1));
+      expect(skipped, 1);
+    });
+
+    test('同名隐藏卡片的起止节次或周次不同仍保留', () async {
+      final courses = await _runExtractor(r'''
+        const headers = makeHeaders([[5, 500]]);
+        const visible = new FakeElement(
+          '[2024-01]\n[1-16周] [1-2节] A101\n本科 - 高等数学', 480, 40);
+        const hidden = [
+          '[2024-01]\n[1-16周] [2节] A101\n本科 - 高等数学',
+          '[2024-01]\n[1-16周] [1-3节] A101\n本科 - 高等数学',
+          '[2024-01]\n[2-16周] [1-2节] A101\n本科 - 高等数学',
+          '[2024-01]\n[1-15,17周] [1-2节] A101\n本科 - 高等数学'
+        ].map(text => new FakeElement(text, 0, 0));
+        installDocument(headers.concat([visible], hidden));
+      ''');
+
+      expect(courses, hasLength(5));
+      expect(courses.map((c) => c['dayOfWeek']), [5, 0, 0, 0, 0]);
+      final (imported, skipped) = importCoursesFromDecoded(courses);
+      expect(imported, hasLength(1));
+      expect(skipped, 4);
+    });
+
     test('普通课与无编号实验课混排时保留周四6-9节及各自周次', () async {
       final courses = await _runExtractor(r'''
         const headers = makeHeaders([
