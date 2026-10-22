@@ -34,74 +34,82 @@ void main() {
   });
 
   group('CquAdapter extractJs', () {
-    test('隐藏的同文本副本不重复返回或计入无法识别星期', () async {
+    test('普通课旁的屏外教师详情不生成课程或计入无法识别星期', () async {
       final courses = await _runExtractor(r'''
-        const headers = makeHeaders([[5, 500]]);
-        const text = '[2024-01]\n[1-16周] [1-2节] A101\n本科 - 高等数学';
-        const visible = new FakeElement(text, 480, 40);
-        const hidden = new FakeElement(text, 0, 0);
-        installDocument(headers.concat([hidden, visible]));
+        const headers = makeHeaders([
+          [1, 92], [2, 199], [3, 306], [4, 413],
+          [5, 520], [6, 627], [7, 734]
+        ]);
+        const lecture = new FakeElement(
+          '本科 - 边缘计算[992499-001]\n[4,6-14周] [1-2节]   D1210',
+          42, 101);
+        const detail = new FakeElement(
+          '汪成亮-30470[主讲]; D1210(语音教室) [4,6-14周] [1-2节]',
+          -9917, 134);
+        installDocument(headers.concat([lecture, detail]));
       ''');
 
       expect(courses, hasLength(1));
-      expect(courses.single['dayOfWeek'], DateTime.friday);
+      expect(courses.single['name'], '边缘计算');
+      expect(courses.single['dayOfWeek'], DateTime.monday);
       final (imported, skipped) = importCoursesFromDecoded(courses);
       expect(imported, hasLength(1));
       expect(skipped, 0);
     });
 
-    test('匹配半径外的同课程副本即使教室不同也不重复返回', () async {
+    test('多教师和无教室的教师详情在网格内外均不生成课程', () async {
       final courses = await _runExtractor(r'''
-        const headers = makeHeaders([[5, 500]]);
-        const visible = new FakeElement(
-          '[2024-01]\n[1-16周] [1-2节] A101\n本科 - 高等数学', 480, 40);
-        const duplicate = new FakeElement(
-          '[2024-01]\n[1-16周] [1-2节] 第一教学楼A101\n本科 - 高等数学', 580, 40);
-        installDocument(headers.concat([visible, duplicate]));
+        const headers = makeHeaders([
+          [1, 92], [2, 199], [3, 306], [4, 413],
+          [5, 520], [6, 627], [7, 734]
+        ]);
+        const texts = [
+          '何静媛-06074[主讲]; 袁金凤-32123[主讲]; DS1401 [6周] [6-9节]',
+          '葛亮-30651[主讲]; [1-3周] [10-13节]'
+        ];
+        const details = [];
+        texts.forEach(function(text) {
+          details.push(new FakeElement(text, -9492, 141));
+          details.push(new FakeElement(text, 363, 101));
+        });
+        installDocument(headers.concat(details));
       ''');
 
-      expect(courses, hasLength(1));
-      expect(courses.single['dayOfWeek'], DateTime.friday);
-      expect(courses.single['location'], 'A101');
+      expect(courses, isEmpty);
     });
 
-    test('与已识别课程不同的隐藏卡片仍保留并提示无法识别星期', () async {
+    test('真机 FUSE 和 CGroup 无编号实验课保留标题星期节次和周次', () async {
       final courses = await _runExtractor(r'''
-        const headers = makeHeaders([[5, 500]]);
-        const visible = new FakeElement(
-          '[2024-01]\n[1-16周] [1-2节] A101\n本科 - 高等数学', 480, 40);
-        const hidden = new FakeElement(
-          '[2024-02]\n[1-16周] [1-2节] A101\n本科 - 大学物理', 0, 0);
-        installDocument(headers.concat([visible, hidden]));
+        const headers = makeHeaders([
+          [1, 92], [2, 199], [3, 306], [4, 413],
+          [5, 520], [6, 627], [7, 734]
+        ]);
+        const fuse = new FakeElement(
+          '操作系统[FUSE 用户空间文件系统管理 ]\n[13周] [6-9节]   DS1401',
+          363, 101);
+        const cgroup = new FakeElement(
+          '操作系统[CGroup技术在内存管理中的应用]\n[10周] [6-9节]   DS1401',
+          363, 101);
+        installDocument(headers.concat([fuse, cgroup]));
       ''');
 
       expect(courses, hasLength(2));
-      expect(courses.last['name'], '大学物理');
-      expect(courses.last['dayOfWeek'], 0);
       final (imported, skipped) = importCoursesFromDecoded(courses);
-      expect(imported, hasLength(1));
-      expect(skipped, 1);
-    });
-
-    test('同名隐藏卡片的起止节次或周次不同仍保留', () async {
-      final courses = await _runExtractor(r'''
-        const headers = makeHeaders([[5, 500]]);
-        const visible = new FakeElement(
-          '[2024-01]\n[1-16周] [1-2节] A101\n本科 - 高等数学', 480, 40);
-        const hidden = [
-          '[2024-01]\n[1-16周] [2节] A101\n本科 - 高等数学',
-          '[2024-01]\n[1-16周] [1-3节] A101\n本科 - 高等数学',
-          '[2024-01]\n[2-16周] [1-2节] A101\n本科 - 高等数学',
-          '[2024-01]\n[1-15,17周] [1-2节] A101\n本科 - 高等数学'
-        ].map(text => new FakeElement(text, 0, 0));
-        installDocument(headers.concat([visible], hidden));
-      ''');
-
-      expect(courses, hasLength(5));
-      expect(courses.map((c) => c['dayOfWeek']), [5, 0, 0, 0, 0]);
-      final (imported, skipped) = importCoursesFromDecoded(courses);
-      expect(imported, hasLength(1));
-      expect(skipped, 4);
+      expect(skipped, 0);
+      expect(imported.map((c) => c.name), [
+        '操作系统[FUSE 用户空间文件系统管理 ]',
+        '操作系统[CGroup技术在内存管理中的应用]',
+      ]);
+      expect(imported.map((c) => c.weeks), [
+        [13],
+        [10],
+      ]);
+      for (final course in imported) {
+        expect(course.dayOfWeek, DateTime.thursday);
+        expect(course.startSection, 6);
+        expect(course.endSection, 9);
+        expect(course.location, 'DS1401');
+      }
     });
 
     test('普通课与无编号实验课混排时保留周四6-9节及各自周次', () async {
@@ -238,6 +246,9 @@ void main() {
 
       expect(courses, hasLength(1));
       expect(courses.single['dayOfWeek'], 0);
+      final (imported, skipped) = importCoursesFromDecoded(courses);
+      expect(imported, isEmpty);
+      expect(skipped, 1);
     });
 
     test('发现折叠课程时先展开并返回等待信号', () async {

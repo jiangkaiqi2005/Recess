@@ -248,23 +248,6 @@ class CquAdapter extends SchoolAdapter {
     }
   }
 
-  // 页面会为网格内课程渲染隐藏或网格外的详情副本，无法定位星期。
-  // 仅丢弃有已识别课程对应的副本；教室格式可能不同，不参与匹配。
-  // 没有对应课程的未知星期条目仍保留，让导入预览提示用户。
-  results = results.filter(function(course) {
-    if (course.dayOfWeek !== 0) return true;
-    return !results.some(function(known) {
-      return known.dayOfWeek >= 1 && known.dayOfWeek <= 7 &&
-          known.name === course.name &&
-          known.startSection === course.startSection &&
-          known.endSection === course.endSection &&
-          known.weeks.length === course.weeks.length &&
-          known.weeks.every(function(week, index) {
-            return week === course.weeks[index];
-          });
-    });
-  });
-
   return JSON.stringify(results);
 
   function uncodedTitle(text) {
@@ -274,6 +257,8 @@ class CquAdapter extends SchoolAdapter {
     // 以周次括号为边界，保留标题中的实验项目括号及英文空格。
     var title = text.slice(0, week.index).replace(/\r?\n\s*/g, '').trim()
         .replace(/^(本科|研究生|专科)\s*[-–—]\s*/, '');
+    // 教师详情节点也含周次和节次，标题中的「姓名-工号[角色]」不能当成实验课名。
+    if (/[^\s;；\[\]]+-\d{4,}\[[^\[\]]+\]/.test(title)) return '';
     if (title.length < 2 || title.length > 200 || /^\[/.test(title)) return '';
     return title;
   }
