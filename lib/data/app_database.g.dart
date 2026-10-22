@@ -2025,8 +2025,12 @@ class $$CoursesTableTableManager
                   p0
                       .map(
                         (e) => (
-                          e.readTable(table),
-                          BaseReferences(db, table, e),
+                          e.readTable<$CoursesTable, Course>(table),
+                          BaseReferences<_$AppDatabase, $CoursesTable, Course>(
+                            db,
+                            table,
+                            e,
+                          ),
                         ),
                       )
                       .toList(),
@@ -2249,8 +2253,12 @@ class $$SemestersTableTableManager
                   p0
                       .map(
                         (e) => (
-                          e.readTable(table),
-                          BaseReferences(db, table, e),
+                          e.readTable<$SemestersTable, Semester>(table),
+                          BaseReferences<
+                            _$AppDatabase,
+                            $SemestersTable,
+                            Semester
+                          >(db, table, e),
                         ),
                       )
                       .toList(),
@@ -2502,8 +2510,14 @@ class $$CoursePlatformsTableTableManager
                   p0
                       .map(
                         (e) => (
-                          e.readTable(table),
-                          BaseReferences(db, table, e),
+                          e.readTable<$CoursePlatformsTable, CoursePlatform>(
+                            table,
+                          ),
+                          BaseReferences<
+                            _$AppDatabase,
+                            $CoursePlatformsTable,
+                            CoursePlatform
+                          >(db, table, e),
                         ),
                       )
                       .toList(),

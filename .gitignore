@@ -67,3 +67,7 @@ key.properties
 
 # Locally downloaded CI release artifacts
 release-artifacts/
+
+# Agent skills (local tooling)
+.claude/
+skills-lock.json
