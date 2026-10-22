@@ -40,7 +40,7 @@ Feature-first layering under `lib/`:
 
 ### Riverpod provider chain
 
-`data/providers/database_providers.dart` is the root: `appDatabaseProvider` (process-singleton `AppDatabase`, drift opened on a background isolate) → `courseRepositoryProvider` / `semesterRepositoryProvider`. Feature providers in `features/*/application/` build on these. The schedule screen consumes `scheduleCoursesProvider` (a `StreamProvider` over `CourseRepository.watchCourses`) plus `activeSemesterProvider` (`FutureProvider`). State that survives rebuilds lives in `StateNotifier`s (e.g. `SelectedWeekNotifier`, `courseFormProvider`). `ProviderScope` is set at the root in `main.dart`.
+`data/providers/database_providers.dart` is the root: `appDatabaseProvider` (process-singleton `AppDatabase`, drift opened on a background isolate) → `courseRepositoryProvider` / `semesterRepositoryProvider` / `coursePlatformRepositoryProvider`. Feature providers in `features/*/application/` build on these. The schedule screen consumes `scheduleCoursesProvider` (a `StreamProvider` over `CourseRepository.watchCourses`) plus `activeSemesterProvider` (`FutureProvider`). State that survives rebuilds lives in `StateNotifier`s (e.g. `SelectedWeekNotifier`, `courseFormProvider`). `ProviderScope` is set at the root in `main.dart`.
 
 ### Domain vs. persistence split (important naming collision)
 
@@ -48,7 +48,7 @@ drift generates data classes also named `Course` / `Semester`, identical to the 
 
 ### Database specifics
 
-`schemaVersion = 1`. The `weeks` list on a course is stored as a CSV string (`"1,2,3,16"`) in the `Courses` table — not a join table — and split/joined in `mappers.dart`. On first launch `AppDatabase.seedDefaultSemester()` writes one default active semester (most recent Monday, 18 weeks) so the app never opens to an empty state; the seed is idempotent and serialized.
+`schemaVersion = 2`; the 1→2 migration only creates the `CoursePlatforms` table, whose rows belong to a semester + course name rather than to a single course row (see `docs/adr/0001-course-platforms-keyed-by-name.md`). The `weeks` list on a course is stored as a CSV string (`"1,2,3,16"`) in the `Courses` table — not a join table — and split/joined in `mappers.dart`. On first launch `AppDatabase.seedDefaultSemester()` writes one default active semester (most recent Monday, 18 weeks) so the app never opens to an empty state; the seed is idempotent and serialized.
 
 ### Import pipeline
 
@@ -67,7 +67,7 @@ go_router, declared once in `app/router.dart`. Screens `context.push` existing r
 - `dayOfWeek`: 1=Mon … 7=Sun, matching `DateTime.weekday`.
 - Weeks are 1-based; `computeCurrentWeek(startDate, today)` returns 0 if before start. `currentWeekOverride` on `Semester` takes precedence over the computed week (for调课/假期).
 - Default course color is `0xFF5B8DEF` (the app's primary blue); 10-color palette in the editor.
-- Pure logic (week math, parsers, conflict detection) goes in `core/utils/` or `features/*/domain/` and is unit-tested. Existing tests: `week_calculator`, `ics_parser`, `json_importer`, `import_course`.
+- Pure logic (week math, parsers, conflict detection) goes in `core/utils/` or `features/*/domain/` and is unit-tested. Existing tests include: `week_calculator`, `ics_parser`, `json_importer`, `import_course`, `schedule_helpers`, `course_platform_repository`, `backup_repository`, `app_database_migration`.
 
 ## CI
 
