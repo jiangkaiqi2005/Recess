@@ -96,19 +96,19 @@ base64 -w 0 recess-release-key.jks
 
 密钥本体、alias 和两个密码必须安全离线备份。正式发布前先完成这一步。
 
-当前固定签名沿用了实际发布的 v1.2.2 签名。已校验本地 v1.2.2 APK 的 SHA-256
-与 GitHub Release 一致，且证书与旧 `.android/debug.keystore` 一致；密钥现已复制
-到独立 keystore 并更换存储密码，但证书身份不变（证书名称仍为历史的 Android Debug）。
+Recess 使用独立生成的正式签名，证书名称为 `Recess Release`，密钥别名为 `recess`。
+本地构建和 GitHub Actions 发布必须使用同一份密钥，后续版本继续沿用。
 
 固定证书 SHA-256：
 
 ```text
-7206848b62105dcc9ea3e62a7a2f11158f14b6705849e10441dcf68fae52a6f6
+dc1e286920a75d872d67ae3cfce1c38895837b26add743e07a3f487536b3febd
 ```
 
-v1.2.2 用户无需因本次签名整理卸载 App。更早的历史 CI 包可能使用不同的临时
-debug 证书；只有系统确实提示签名不兼容时，才需要先导出课表备份，再卸载重装。
-这套签名面向 GitHub APK 分发；若将来上架 Google Play，需要另行规划生产签名与迁移。
+当前包名为 `io.github.jiangkaiqi2005.recess`，可与原 Hormone 应用同时安装；
+如需迁移课表，先在旧应用导出备份，再在 Recess 中恢复。
+同包名的 Recess 调试版无法由正式签名 APK 覆盖安装，需先备份并卸载调试版。
+这套签名面向 GitHub APK 分发；若将来上架 Google Play，需要另行规划签名配置。
 
 ## 4. 构建产物
 
