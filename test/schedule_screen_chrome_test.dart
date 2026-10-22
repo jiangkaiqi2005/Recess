@@ -9,7 +9,9 @@ import 'package:hormone/core/models/semester.dart';
 import 'package:hormone/data/app_database.dart' as db;
 import 'package:hormone/data/providers/database_providers.dart';
 import 'package:hormone/data/repositories/semester_repository.dart';
+import 'package:hormone/features/schedule/application/schedule_providers.dart';
 import 'package:hormone/features/schedule/presentation/schedule_screen.dart';
+import 'package:hormone/features/schedule/presentation/week_view.dart';
 import 'package:hormone/features/semester/application/semester_providers.dart';
 
 void main() {
@@ -133,6 +135,75 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('第 3 周'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('翻页只更新周标题，不重建 PageView', (tester) async {
+    await pumpSchedule(tester);
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+
+    await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<PageView>(find.byType(PageView)), same(pageView));
+    expect(find.text('第 4 周   当前为第 3 周'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('拖动翻页中途不对周视图应用透明度', (tester) async {
+    await pumpSchedule(tester);
+
+    await tester.drag(find.byType(PageView), const Offset(-120, 0));
+    await tester.pump(const Duration(milliseconds: 16));
+
+    expect(find.byType(WeekView), findsWidgets);
+    expect(
+      find.ancestor(of: find.byType(WeekView), matching: find.byType(Opacity)),
+      findsNothing,
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('首屏异步定位和外部查看周变化都同步到对应页', (tester) async {
+    await pumpSchedule(tester);
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+    expect(pageView.controller!.page, 2);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ScheduleScreen)),
+    );
+
+    container.read(selectedWeekProvider.notifier).goTo(6, totalWeeks: 18);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<PageView>(find.byType(PageView)), same(pageView));
+    expect(pageView.controller!.page, 5);
+    expect(find.text('第 6 周   当前为第 3 周'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('切换激活学期更新总周数并定位到新学期当前周', (tester) async {
+    await pumpSchedule(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ScheduleScreen)),
+    );
+    final repo = SemesterRepository(database);
+    await tester.runAsync(() async {
+      await repo.upsert(Semester(
+        id: 'new-semester',
+        name: '新学期',
+        startDate: semesterStart.subtract(const Duration(days: 14)),
+        totalWeeks: 8,
+      ));
+      await repo.setActive('new-semester');
+    });
+    container.invalidate(activeSemesterProvider);
+    await tester.pumpAndSettle();
+
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+    expect(pageView.childrenDelegate.estimatedChildCount, 8);
+    expect(pageView.controller!.page, 4);
+    expect(find.text('第 5 周'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

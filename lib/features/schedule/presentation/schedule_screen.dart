@@ -41,7 +41,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedWeek = ref.watch(selectedWeekProvider);
     final semester = ref.watch(activeSemesterProvider).valueOrNull;
     final totalWeeks = semester?.totalWeeks ?? 18;
     final now = DateTime.now();
@@ -52,8 +51,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             computedWeek <= totalWeeks
         ? computedWeek
         : null;
-    final isViewingCurrentWeek =
-        currentWeek == null || currentWeek == selectedWeek;
     final theme = Theme.of(context);
     // 顶栏高度随系统字号缩放，避免两行标题在大字号下被挤压。
     final textScale =
@@ -64,7 +61,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     ref.listen<int>(selectedWeekProvider, (prev, next) {
       _schedulePageSync(next);
     });
-    _schedulePageSync(selectedWeek);
+    _schedulePageSync(ref.read(selectedWeekProvider));
 
     // 在设置里切换了激活学期：查看周重置到新学期的当前周。
     ref.listen<AsyncValue<Semester?>>(activeSemesterProvider, (prev, next) {
@@ -81,81 +78,88 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       appBar: AppBar(
         toolbarHeight: 56 * textScale,
         titleSpacing: 8,
-        title: PopupMenuButton<_WeekMenuAction>(
-          key: const Key('schedule-week-menu'),
-          tooltip: '周操作',
-          position: PopupMenuPosition.under,
-          offset: const Offset(0, 4),
-          onSelected: (action) {
-            switch (action) {
-              case _WeekMenuAction.jump:
-                _showWeekPicker(
-                  title: '跳转到第几周',
-                  totalWeeks: totalWeeks,
-                  selected: selectedWeek,
-                  onPick: (week) => _animateToWeek(week, totalWeeks),
-                );
-              case _WeekMenuAction.backToCurrent:
-                if (currentWeek != null) {
-                  _animateToWeek(currentWeek, totalWeeks);
+        title: Consumer(
+          builder: (context, ref, child) {
+            final selectedWeek = ref.watch(selectedWeekProvider);
+            final isViewingCurrentWeek =
+                currentWeek == null || currentWeek == selectedWeek;
+            return PopupMenuButton<_WeekMenuAction>(
+              key: const Key('schedule-week-menu'),
+              tooltip: '周操作',
+              position: PopupMenuPosition.under,
+              offset: const Offset(0, 4),
+              onSelected: (action) {
+                switch (action) {
+                  case _WeekMenuAction.jump:
+                    _showWeekPicker(
+                      title: '跳转到第几周',
+                      totalWeeks: totalWeeks,
+                      selected: selectedWeek,
+                      onPick: (week) => _animateToWeek(week, totalWeeks),
+                    );
+                  case _WeekMenuAction.backToCurrent:
+                    if (currentWeek != null) {
+                      _animateToWeek(currentWeek, totalWeeks);
+                    }
+                  case _WeekMenuAction.setCurrent:
+                    _showWeekPicker(
+                      title: '修改当前周',
+                      totalWeeks: totalWeeks,
+                      selected: currentWeek ?? selectedWeek,
+                      onPick: _setCurrentWeek,
+                    );
                 }
-              case _WeekMenuAction.setCurrent:
-                _showWeekPicker(
-                  title: '修改当前周',
-                  totalWeeks: totalWeeks,
-                  selected: currentWeek ?? selectedWeek,
-                  onPick: _setCurrentWeek,
-                );
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: _WeekMenuAction.jump,
-              child: _ScheduleMenuItem(
-                icon: Icons.calendar_view_month_outlined,
-                label: '跳转到第几周',
-              ),
-            ),
-            if (!isViewingCurrentWeek)
-              const PopupMenuItem(
-                value: _WeekMenuAction.backToCurrent,
-                child: _ScheduleMenuItem(
-                  icon: Icons.today_outlined,
-                  label: '回到本周',
-                ),
-              ),
-            const PopupMenuItem(
-              value: _WeekMenuAction.setCurrent,
-              child: _ScheduleMenuItem(
-                icon: Icons.edit_calendar_outlined,
-                label: '修改当前周',
-              ),
-            ),
-          ],
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${now.year}/${now.month}/${now.day}',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    height: 1.1,
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: _WeekMenuAction.jump,
+                  child: _ScheduleMenuItem(
+                    icon: Icons.calendar_view_month_outlined,
+                    label: '跳转到第几周',
                   ),
                 ),
-                Text(
-                  isViewingCurrentWeek
-                      ? '第 $selectedWeek 周'
-                      : '第 $selectedWeek 周   当前为第 $currentWeek 周',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                if (!isViewingCurrentWeek)
+                  const PopupMenuItem(
+                    value: _WeekMenuAction.backToCurrent,
+                    child: _ScheduleMenuItem(
+                      icon: Icons.today_outlined,
+                      label: '回到本周',
+                    ),
+                  ),
+                const PopupMenuItem(
+                  value: _WeekMenuAction.setCurrent,
+                  child: _ScheduleMenuItem(
+                    icon: Icons.edit_calendar_outlined,
+                    label: '修改当前周',
                   ),
                 ),
               ],
-            ),
-          ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${now.year}/${now.month}/${now.day}',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.1,
+                      ),
+                    ),
+                    Text(
+                      isViewingCurrentWeek
+                          ? '第 $selectedWeek 周'
+                          : '第 $selectedWeek 周   当前为第 $currentWeek 周',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
         centerTitle: false,
         actions: [
@@ -217,7 +221,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         ),
         onPageChanged: (index) {
           final week = index + 1;
-          if (week != selectedWeek) {
+          if (week != ref.read(selectedWeekProvider)) {
             ref
                 .read(selectedWeekProvider.notifier)
                 .goTo(week, totalWeeks: totalWeeks);
@@ -225,36 +229,11 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         },
         itemBuilder: (context, index) {
           final week = index + 1;
-          final page = RepaintBoundary(
-            child: WeekView(
-              key: ValueKey(week),
-              selectedWeek: week,
-              onImport: () => context.push('/import'),
-              onWebViewImport: () => context.push('/import/webview'),
-            ),
-          );
-          // 只让轻量的合成层随手势变化，WeekView 本身作为 child 不会
-          // 每帧重建；轻微缩放与透明度差形成更自然的前后页交接。
-          return AnimatedBuilder(
-            animation: _pageController,
-            child: page,
-            builder: (context, child) {
-              var currentPage = index.toDouble();
-              if (_pageController.hasClients &&
-                  _pageController.position.hasContentDimensions) {
-                currentPage = _pageController.page ?? currentPage;
-              }
-              final distance =
-                  (currentPage - index).abs().clamp(0.0, 1.0).toDouble();
-              return Transform.scale(
-                scale: 1 - distance * 0.012,
-                alignment: Alignment.center,
-                child: Opacity(
-                  opacity: 1 - distance * 0.08,
-                  child: child,
-                ),
-              );
-            },
+          return WeekView(
+            key: ValueKey(week),
+            selectedWeek: week,
+            onImport: () => context.push('/import'),
+            onWebViewImport: () => context.push('/import/webview'),
           );
         },
       ),
