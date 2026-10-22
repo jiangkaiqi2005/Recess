@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/features/notification/application/reminder_scheduler.dart';
-import 'package:hormone/features/settings/application/section_times_provider.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/features/notification/application/reminder_scheduler.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
 
 void main() {
   // 开学日为 2026-09-01（周二），第 1 周为 8-31(一) ~ 9-6(日)。

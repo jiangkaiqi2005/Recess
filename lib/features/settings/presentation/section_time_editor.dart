@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:hormone/core/constants/app_constants.dart';
+import 'package:recess/core/constants/app_constants.dart';
 import '../application/section_times_provider.dart';
 import '../domain/section_time_shift.dart';
 

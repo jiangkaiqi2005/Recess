@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/import/data/configured_school_adapter.dart';
-import 'package:hormone/features/import/data/jufe_adapter.dart';
-import 'package:hormone/features/import/data/ncu_adapter.dart';
-import 'package:hormone/features/import/data/school_adapter.dart';
+import 'package:recess/features/import/data/configured_school_adapter.dart';
+import 'package:recess/features/import/data/jufe_adapter.dart';
+import 'package:recess/features/import/data/ncu_adapter.dart';
+import 'package:recess/features/import/data/school_adapter.dart';
 
 void main() {
   const expectedSchoolNames = {
@@ -148,7 +148,7 @@ void main() {
     ''';
     final file = File(
       '${Directory.systemTemp.path}${Platform.pathSeparator}'
-      'hormone_zhengfang_${DateTime.now().microsecondsSinceEpoch}.js',
+      'recess_zhengfang_${DateTime.now().microsecondsSinceEpoch}.js',
     );
     await file.writeAsString(script);
     try {

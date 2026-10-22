@@ -4,10 +4,10 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/utils/week_calculator.dart';
-import 'package:hormone/data/providers/database_providers.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/data/providers/database_providers.dart';
 
 /// Android 桌面小组件的 Dart 桥接层。
 ///

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/features/import/domain/import_course.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/features/import/domain/import_course.dart';
 
 /// JSON 课程导入器。采用「显式领域模板」——字段与 App 内部模型一一对应，
 /// 便于手动编写或从其他工具导出。示例：

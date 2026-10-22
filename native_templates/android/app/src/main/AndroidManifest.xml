@@ -12,7 +12,7 @@
         tools:node="remove" />
 
     <application
-        android:label="hormone"
+        android:label="Recess"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true">

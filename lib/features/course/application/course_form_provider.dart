@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/data/repositories/course_repository.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/data/repositories/course_repository.dart';
 
 /// 解析课程编辑页的初始数据：
 /// - 给定 [courseId] 且存在 → 返回该课程（编辑）

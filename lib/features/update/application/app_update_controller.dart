@@ -204,7 +204,7 @@ class AppUpdateController extends StateNotifier<AppUpdateState> {
         message:
             opened
                 ? '请在系统页面确认安装；如果取消或安装未完成，返回后可点“重试安装”'
-                : '请允许 Hormone 安装未知来源应用，返回后点“重试安装”',
+                : '请允许 Recess 安装未知来源应用，返回后点“重试安装”',
       );
     } on UpdateDownloadCanceled {
       // cancelDownload 统一在下载退出后恢复状态。

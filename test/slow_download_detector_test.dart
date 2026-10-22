@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/update/domain/slow_download_detector.dart';
+import 'package:recess/features/update/domain/slow_download_detector.dart';
 
 const _largeApk = 24 * 1024 * 1024;
 

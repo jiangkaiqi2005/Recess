@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/import/data/ics_parser.dart';
+import 'package:recess/features/import/data/ics_parser.dart';
 
 /// 学期：2024-09-02（周一）开学，18 周。
 final _start = DateTime(2024, 9, 2);

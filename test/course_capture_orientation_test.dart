@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/features/import/application/course_capture_orientation.dart';
+import 'package:recess/features/import/application/course_capture_orientation.dart';
 
 void main() {
   test('抓取阶段只请求一次横屏，结束后只请求一次竖屏', () async {

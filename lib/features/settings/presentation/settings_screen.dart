@@ -5,19 +5,19 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/data/repositories/backup_repository.dart';
-import 'package:hormone/features/notification/application/notification_service.dart';
-import 'package:hormone/features/notification/application/reminder_settings_provider.dart';
-import 'package:hormone/features/semester/application/semester_providers.dart';
-import 'package:hormone/features/update/application/app_update_controller.dart';
-import 'package:hormone/features/update/presentation/update_dialog.dart';
+import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/data/repositories/backup_repository.dart';
+import 'package:recess/features/notification/application/notification_service.dart';
+import 'package:recess/features/notification/application/reminder_settings_provider.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
+import 'package:recess/features/update/application/app_update_controller.dart';
+import 'package:recess/features/update/presentation/update_dialog.dart';
 import '../application/theme_mode_provider.dart';
 import 'section_time_editor.dart';
 import '../application/export_service.dart';
 
 /// 项目 GitHub 仓库地址（支持我们）。
-const String _githubUrl = 'https://github.com/Aetik-yue/hormone';
+const String _githubUrl = 'https://github.com/jiangkaiqi2005/recess';
 
 /// 设置页：主题切换、节次时间自定义、导入/导出、学期管理入口。
 class SettingsScreen extends ConsumerWidget {

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/features/import/data/json_importer.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/features/import/data/json_importer.dart';
 
 void main() {
   test('显式 JSON 颜色保留旧色和自定义 ARGB，不替换为显示色', () {

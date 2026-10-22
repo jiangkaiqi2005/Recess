@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hormone/features/schedule/presentation/schedule_screen.dart';
-import 'package:hormone/features/course/presentation/course_edit_screen.dart';
-import 'package:hormone/features/semester/presentation/semester_screen.dart';
-import 'package:hormone/features/import/presentation/import_screen.dart';
-import 'package:hormone/features/import/presentation/course_capture_guide_screen.dart';
-import 'package:hormone/features/import/presentation/webview_import_screen.dart';
-import 'package:hormone/features/settings/presentation/settings_screen.dart';
+import 'package:recess/features/schedule/presentation/schedule_screen.dart';
+import 'package:recess/features/course/presentation/course_edit_screen.dart';
+import 'package:recess/features/semester/presentation/semester_screen.dart';
+import 'package:recess/features/import/presentation/import_screen.dart';
+import 'package:recess/features/import/presentation/course_capture_guide_screen.dart';
+import 'package:recess/features/import/presentation/webview_import_screen.dart';
+import 'package:recess/features/settings/presentation/settings_screen.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 

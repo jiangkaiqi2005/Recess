@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/core/theme/app_theme.dart';
-import 'package:hormone/features/import/application/course_capture_orientation.dart';
-import 'package:hormone/features/import/data/school_adapter.dart';
-import 'package:hormone/features/import/presentation/webview_import_screen.dart';
+import 'package:recess/core/theme/app_theme.dart';
+import 'package:recess/features/import/application/course_capture_orientation.dart';
+import 'package:recess/features/import/data/school_adapter.dart';
+import 'package:recess/features/import/presentation/webview_import_screen.dart';
 
 void main() {
   test('WebView 仅将 ERR_CACHE_MISS 识别为可恢复缓存错误', () {

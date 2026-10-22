@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:hormone/data/app_database.dart';
-import 'package:hormone/data/repositories/backup_repository.dart';
-import 'package:hormone/data/repositories/course_platform_repository.dart';
-import 'package:hormone/data/repositories/course_repository.dart';
-import 'package:hormone/data/repositories/semester_repository.dart';
+import 'package:recess/data/app_database.dart';
+import 'package:recess/data/repositories/backup_repository.dart';
+import 'package:recess/data/repositories/course_platform_repository.dart';
+import 'package:recess/data/repositories/course_repository.dart';
+import 'package:recess/data/repositories/semester_repository.dart';
 
 /// 进程级单例数据库。懒加载，首次访问时打开 SQLite 文件。
 final appDatabaseProvider = Provider<AppDatabase>((ref) {

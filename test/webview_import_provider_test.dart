@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/features/import/application/webview_import_provider.dart';
-import 'package:hormone/features/import/domain/import_course.dart';
+import 'package:recess/features/import/application/webview_import_provider.dart';
+import 'package:recess/features/import/domain/import_course.dart';
 
 void main() {
   group('decodeWebviewExtractResult', () {

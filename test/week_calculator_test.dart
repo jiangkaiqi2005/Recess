@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/core/utils/week_calculator.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/core/utils/week_calculator.dart';
 
 void main() {
   // 2024-09-02 是周一。

@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
-import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/features/notification/application/reminder_scheduler.dart';
-import 'package:hormone/features/notification/application/reminder_settings_provider.dart';
-import 'package:hormone/features/settings/application/section_times_provider.dart';
+import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/features/notification/application/reminder_scheduler.dart';
+import 'package:recess/features/notification/application/reminder_settings_provider.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
 
 /// 课前提醒的原生封装。
 ///

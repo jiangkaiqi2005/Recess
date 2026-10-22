@@ -1,6 +1,6 @@
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/core/utils/week_calculator.dart';
-import 'package:hormone/features/import/domain/import_course.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/features/import/domain/import_course.dart';
 
 /// 自包含的 ICS（iCalendar）课程解析器。
 ///

@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/data/repositories/course_platform_repository.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/data/repositories/course_platform_repository.dart';
 
 /// 某门课（学期 + 课程名）的课程平台流，详情面板使用。
 final coursePlatformsProvider = StreamProvider.autoDispose

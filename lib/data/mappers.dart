@@ -1,9 +1,9 @@
 import 'package:drift/drift.dart';
 
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/data/app_database.dart' as db;
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/data/app_database.dart' as db;
 
 /// drift 实体 <-> 领域模型 的映射。
 /// 领域层（core/models）保持与持久化无关，便于 UI 与单元测试复用。

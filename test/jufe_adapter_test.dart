@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/import/data/jufe_adapter.dart';
-import 'package:hormone/features/import/data/school_adapter.dart';
+import 'package:recess/features/import/data/jufe_adapter.dart';
+import 'package:recess/features/import/data/school_adapter.dart';
 
 void main() {
   final adapter = JufeAdapter();
@@ -147,7 +147,7 @@ Future<dynamic> _runExtractorRaw(String setup) async {
   ''';
   final file = File(
     '${Directory.systemTemp.path}${Platform.pathSeparator}'
-    'hormone_jufe_${DateTime.now().microsecondsSinceEpoch}.js',
+    'recess_jufe_${DateTime.now().microsecondsSinceEpoch}.js',
   );
   await file.writeAsString(script);
   try {

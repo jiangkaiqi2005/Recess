@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/features/course/application/course_platforms_provider.dart';
-import 'package:hormone/features/schedule/presentation/course_detail_sheet.dart';
-import 'package:hormone/features/schedule/presentation/course_search_delegate.dart';
-import 'package:hormone/features/semester/application/semester_providers.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/features/course/application/course_platforms_provider.dart';
+import 'package:recess/features/schedule/presentation/course_detail_sheet.dart';
+import 'package:recess/features/schedule/presentation/course_search_delegate.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
 
 void main() {
   for (final sample in [

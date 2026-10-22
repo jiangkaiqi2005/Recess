@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/features/schedule/presentation/week_view.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/features/schedule/presentation/week_view.dart';
 
 void main() {
   const course = Course(

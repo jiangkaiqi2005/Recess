@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/data/app_database.dart' as db;
-import 'package:hormone/data/mappers.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/data/app_database.dart' as db;
+import 'package:recess/data/mappers.dart';
 
 /// 学期数据访问，含「激活学期」概念与首次启动播种。
 class SemesterRepository {

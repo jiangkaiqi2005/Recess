@@ -68,7 +68,7 @@ class UpdateDownloader {
     _canceled = false;
     final directory = await _directory();
     _checkCanceled();
-    final folder = Directory('${directory.path}/hormone_updates');
+    final folder = Directory('${directory.path}/recess_updates');
     await folder.create(recursive: true);
     // 固定文件名，不将远程文件名用作本地路径。
     final partial = File('${folder.path}/update.apk.part');
@@ -87,7 +87,7 @@ class UpdateDownloader {
         final response = await client
             .send(
               http.Request('GET', urls[index])
-                ..headers['User-Agent'] = 'Hormone-Android-Updater',
+                ..headers['User-Agent'] = 'Recess-Android-Updater',
             )
             .timeout(connectionTimeout);
         _checkCanceled();

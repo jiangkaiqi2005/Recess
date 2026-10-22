@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:hormone/features/import/domain/import_course.dart';
+import 'package:recess/features/import/domain/import_course.dart';
 
 /// 导入执行前的二次确认弹窗。返回 true 表示用户确认继续。
 Future<bool> showImportConfirmDialog(

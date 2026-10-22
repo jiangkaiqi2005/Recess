@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/import/application/webview_import_provider.dart';
-import 'package:hormone/features/import/data/cqu_adapter.dart';
+import 'package:recess/features/import/application/webview_import_provider.dart';
+import 'package:recess/features/import/data/cqu_adapter.dart';
 
 void main() {
   test('区分账号登录入口与课表页，并兼容旧课表路径', () {
@@ -365,7 +365,7 @@ Future<dynamic> _runExtractorRaw(String fixtureSetup, {int runs = 1}) async {
 
   final tempFile = File(
     '${Directory.systemTemp.path}${Platform.pathSeparator}'
-    'hormone_cqu_extractor_${DateTime.now().microsecondsSinceEpoch}.js',
+    'recess_cqu_extractor_${DateTime.now().microsecondsSinceEpoch}.js',
   );
   await tempFile.writeAsString(script);
   try {

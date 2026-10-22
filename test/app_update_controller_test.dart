@@ -4,14 +4,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/update/application/app_update_controller.dart';
-import 'package:hormone/features/update/data/github_release_repository.dart';
-import 'package:hormone/features/update/domain/app_release.dart';
+import 'package:recess/features/update/application/app_update_controller.dart';
+import 'package:recess/features/update/data/github_release_repository.dart';
+import 'package:recess/features/update/domain/app_release.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:hormone/features/update/data/update_downloader.dart';
-import 'package:hormone/features/update/data/update_installer.dart';
-import 'package:hormone/features/update/presentation/update_dialog.dart';
+import 'package:recess/features/update/data/update_downloader.dart';
+import 'package:recess/features/update/data/update_installer.dart';
+import 'package:recess/features/update/presentation/update_dialog.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,8 +21,8 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     PackageInfo.setMockInitialValues(
-      appName: 'Hormone',
-      packageName: 'com.aetikyue.hormone',
+      appName: 'Recess',
+      packageName: 'com.aetikyue.recess',
       version: '1.2.2',
       buildNumber: '22',
       buildSignature: 'test',
@@ -124,7 +124,7 @@ void main() {
 
   test('授权后复用已经下载的 APK 重试安装', () async {
     final directory = await Directory.systemTemp.createTemp(
-      'hormone-install-test-',
+      'recess-install-test-',
     );
     addTearDown(() => directory.delete(recursive: true));
     final apk = await File(
@@ -182,7 +182,7 @@ void main() {
 
   testWidgets('系统安装页取消返回后可直接重试，不重新检查或下载', (tester) async {
     final directory = await tester.runAsync(
-      () => Directory.systemTemp.createTemp('hormone-install-return-test-'),
+      () => Directory.systemTemp.createTemp('recess-install-return-test-'),
     );
     addTearDown(() => directory!.delete(recursive: true));
     final apk = await tester.runAsync(
@@ -425,9 +425,9 @@ AppRelease _release(String tag) => AppRelease(
   tagName: tag,
   releaseName: tag,
   notes: '更新内容',
-  pageUrl: Uri.parse('https://github.com/Aetik-yue/hormone/releases'),
-  apkUrl: Uri.parse('https://github.com/Aetik-yue/hormone/app.apk'),
-  apkFileName: 'hormone-v1.3.0-android.apk',
+  pageUrl: Uri.parse('https://github.com/jiangkaiqi2005/recess/releases'),
+  apkUrl: Uri.parse('https://github.com/jiangkaiqi2005/recess/app.apk'),
+  apkFileName: 'recess-v1.3.0-android.apk',
   apkSize: 42,
   sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   publishedAt: null,

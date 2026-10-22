@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/update/domain/app_release.dart';
+import 'package:recess/features/update/domain/app_release.dart';
 
 void main() {
   group('AppRelease 版本比较', () {
@@ -23,8 +23,8 @@ AppRelease _release(String tag) => AppRelease(
       tagName: tag,
       releaseName: tag,
       notes: '',
-      pageUrl: Uri.parse('https://github.com/Aetik-yue/hormone/releases'),
-      apkUrl: Uri.parse('https://github.com/Aetik-yue/hormone/app.apk'),
+      pageUrl: Uri.parse('https://github.com/jiangkaiqi2005/recess/releases'),
+      apkUrl: Uri.parse('https://github.com/jiangkaiqi2005/recess/app.apk'),
       apkFileName: 'app.apk',
       apkSize: 1,
       sha256:

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/import/data/jgsu_adapter.dart';
+import 'package:recess/features/import/data/jgsu_adapter.dart';
 
 void main() {
   final adapter = JgsuAdapter();
@@ -388,7 +388,7 @@ Future<dynamic> _runExtractorRaw(String setup) async {
   ''';
   final file = File(
     '${Directory.systemTemp.path}${Platform.pathSeparator}'
-    'hormone_jgsu_${DateTime.now().microsecondsSinceEpoch}.js',
+    'recess_jgsu_${DateTime.now().microsecondsSinceEpoch}.js',
   );
   await file.writeAsString(script);
   try {

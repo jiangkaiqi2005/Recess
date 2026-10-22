@@ -4,9 +4,9 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/update/data/update_downloader.dart';
-import 'package:hormone/features/update/domain/app_release.dart';
-import 'package:hormone/features/update/domain/slow_download_detector.dart';
+import 'package:recess/features/update/data/update_downloader.dart';
+import 'package:recess/features/update/domain/app_release.dart';
+import 'package:recess/features/update/domain/slow_download_detector.dart';
 import 'package:http/http.dart' as http;
 
 void main() {
@@ -15,15 +15,15 @@ void main() {
   late AppRelease release;
 
   setUp(() async {
-    directory = await Directory.systemTemp.createTemp('hormone-update-test-');
+    directory = await Directory.systemTemp.createTemp('recess-update-test-');
     release = AppRelease(
       version: AppRelease.parseVersion('v1.3.0'),
       tagName: 'v1.3.0',
       releaseName: '',
       notes: '',
-      pageUrl: Uri.parse('https://github.com/Aetik-yue/hormone/releases'),
+      pageUrl: Uri.parse('https://github.com/jiangkaiqi2005/recess/releases'),
       apkUrl: Uri.parse('https://updates.example.com/app.apk'),
-      fallbackUrls: [Uri.parse('https://github.com/Aetik-yue/hormone/app.apk')],
+      fallbackUrls: [Uri.parse('https://github.com/jiangkaiqi2005/recess/app.apk')],
       apkFileName: 'app.apk',
       apkSize: bytes.length,
       sha256: sha256.convert(bytes).toString(),
@@ -223,7 +223,7 @@ void main() {
       ),
     );
     expect(
-      await Directory('${directory.path}/hormone_updates').list().toList(),
+      await Directory('${directory.path}/recess_updates').list().toList(),
       isEmpty,
     );
   });
@@ -263,7 +263,7 @@ void main() {
     expect(client.closed, isTrue);
     expect(attempts, 1);
     expect(
-      await Directory('${directory.path}/hormone_updates').list().toList(),
+      await Directory('${directory.path}/recess_updates').list().toList(),
       isEmpty,
     );
   });

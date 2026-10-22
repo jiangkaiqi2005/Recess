@@ -1,6 +1,6 @@
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/utils/week_calculator.dart';
-import 'package:hormone/features/settings/application/section_times_provider.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
 
 /// 今日某一门课的状态（相对当前时刻）。
 enum CourseStatus {

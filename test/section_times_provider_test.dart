@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/features/settings/application/section_times_provider.dart';
-import 'package:hormone/features/settings/domain/section_time_shift.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
+import 'package:recess/features/settings/domain/section_time_shift.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

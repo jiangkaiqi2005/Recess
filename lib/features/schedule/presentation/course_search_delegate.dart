@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/features/schedule/domain/schedule_helpers.dart';
-import 'package:hormone/features/semester/application/semester_providers.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/features/schedule/domain/schedule_helpers.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
 
 /// 课程搜索：按名称/教师/教室模糊匹配激活学期全部课程。
 /// 返回选中课程（null 表示取消搜索），由调用方决定后续动作。

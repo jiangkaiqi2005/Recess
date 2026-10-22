@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$expectedPackage = 'com.aetikyue.hormone'
+$expectedPackage = 'com.aetikyue.recess'
 $expectedCertificate = '7206848b62105dcc9ea3e62a7a2f11158f14b6705849e10441dcf68fae52a6f6'
 
 $pubspec = Get-Content -LiteralPath (Join-Path $projectRoot 'pubspec.yaml') -Raw
@@ -82,7 +82,7 @@ if ([string]::IsNullOrWhiteSpace($JavaHome)) {
 }
 
 foreach ($abi in @('android', 'arm64-v8a', 'armeabi-v7a', 'x86_64')) {
-    $apkName = "hormone-v$expectedVersionName-$abi.apk"
+    $apkName = "recess-v$expectedVersionName-$abi.apk"
     $apk = Join-Path $ReleaseDirectory $apkName
     if (-not (Test-Path -LiteralPath $apk -PathType Leaf)) {
         throw "Required APK not found: $apk"
@@ -97,7 +97,7 @@ foreach ($abi in @('android', 'arm64-v8a', 'armeabi-v7a', 'x86_64')) {
     }
     $certificates = [regex]::Matches($signature, '(?m)^Signer #1 certificate SHA-256 digest: ([0-9a-fA-F]{64})\r?$')
     if ($certificates.Count -ne 1 -or $certificates[0].Groups[1].Value -ine $expectedCertificate) {
-        throw "APK does not use the established Hormone release certificate: $apkName"
+        throw "APK does not use the established Recess release certificate: $apkName"
     }
 
     $badgingLines = @(& $aapt dump badging $apk)

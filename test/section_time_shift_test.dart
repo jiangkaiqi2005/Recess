@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/settings/domain/section_time.dart';
-import 'package:hormone/features/settings/domain/section_time_shift.dart';
+import 'package:recess/features/settings/domain/section_time.dart';
+import 'package:recess/features/settings/domain/section_time_shift.dart';
 
 void main() {
   const times = {

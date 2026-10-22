@@ -1,4 +1,4 @@
-# hormone 商店元数据
+# Recess 商店元数据
 
 > 为 Google Play 准备的应用名称、文案、关键词及截图策略。
 > 占位符 `[your-domain]` 请替换为实际官网/隐私政策域名。
@@ -7,9 +7,9 @@
 
 ## 1. 应用名称
 
-- **英文主名**：hormone
-- **中文展示名**：hormone 课表
-- **Android 英文（Play Store 标题）**：hormone: Minimal Course Schedule
+- **英文主名**：Recess
+- **中文展示名**：Recess 课表
+- **Android 英文（Play Store 标题）**：Recess: Minimal Course Schedule
 
 ---
 
@@ -25,7 +25,7 @@
 ### 中文完整描述
 
 ```
-hormone 是一款为大学生设计的纯净课程表应用。
+Recess 是一款为大学生设计的纯净课程表应用。
 
 核心功能：
 • 清晰的周视图：左侧时间轴 + 7 天课程卡片，一目了然。
@@ -46,7 +46,7 @@ hormone 是一款为大学生设计的纯净课程表应用。
 ### 英文完整描述
 
 ```
-hormone is a clean, minimal course schedule app built for college students.
+Recess is a clean, minimal course schedule app built for college students.
 
 Key features:
 • Weekly view: a clear timeline with color-coded course cards across 7 days.
@@ -106,7 +106,7 @@ Google Play 上传 **5 张手机截图**（推荐尺寸：Android 16:9 或 2:1�
 **中文**
 
 ```
-hormone 尊重并保护用户隐私。
+Recess 尊重并保护用户隐私。
 
 本应用为离线优先设计，所有课程、学期、设置数据仅保存在您的设备本地（SQLite），我们不会收集、上传或共享您的任何个人信息。
 本应用无需用户注册、不获取位置权限、不追踪使用行为、不连接第三方分析服务。
@@ -117,7 +117,7 @@ hormone 尊重并保护用户隐私。
 **English**
 
 ```
-hormone respects and protects your privacy.
+Recess respects and protects your privacy.
 
 This app is designed to work offline first. All course, semester, and setting data is stored locally on your device (SQLite). We do not collect, upload, or share any personal information.
 The app does not require user registration, location access, behavior tracking, or third-party analytics.
@@ -130,7 +130,7 @@ Contact us at [support@your-domain.com]
 ## 7. 支持信息
 
 - **支持邮箱**：support@your-domain.com
-- **官网/帮助页**：https://www.your-domain.com/hormone
+- **官网/帮助页**：https://www.your-domain.com/recess
 - **开发者名称**：[Your Name / Studio]
 - **版权信息**：© 2026 [Your Name / Studio]
 

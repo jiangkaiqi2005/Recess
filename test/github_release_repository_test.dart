@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/update/data/github_release_repository.dart';
+import 'package:recess/features/update/data/github_release_repository.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
@@ -15,28 +15,28 @@ void main() {
         return http.Response(
           jsonEncode({
             'tag_name': 'v1.3.0',
-            'name': 'Hormone v1.3.0',
+            'name': 'Recess v1.3.0',
             'body': '新增应用内更新',
             'html_url':
-                'https://github.com/Aetik-yue/hormone/releases/tag/v1.3.0',
+                'https://github.com/jiangkaiqi2005/recess/releases/tag/v1.3.0',
             'published_at': '2026-09-04T10:00:00Z',
             'assets': [
               {
                 'name': 'fallback.apk',
                 'browser_download_url':
-                    'https://github.com/Aetik-yue/hormone/releases/download/v1.3.0/fallback.apk',
+                    'https://github.com/jiangkaiqi2005/recess/releases/download/v1.3.0/fallback.apk',
                 'size': 10,
               },
               {
-                'name': 'hormone-v1.3.0-android.apk',
+                'name': 'recess-v1.3.0-android.apk',
                 'browser_download_url':
-                    'https://github.com/Aetik-yue/hormone/releases/download/v1.3.0/hormone-v1.3.0-android.apk',
+                    'https://github.com/jiangkaiqi2005/recess/releases/download/v1.3.0/recess-v1.3.0-android.apk',
                 'size': 42 * 1024 * 1024,
               },
               {
-                'name': 'hormone-v1.3.0-android.apk.sha256',
+                'name': 'recess-v1.3.0-android.apk.sha256',
                 'browser_download_url':
-                    'https://github.com/Aetik-yue/hormone/releases/download/v1.3.0/hormone-v1.3.0-android.apk.sha256',
+                    'https://github.com/jiangkaiqi2005/recess/releases/download/v1.3.0/recess-v1.3.0-android.apk.sha256',
                 'size': 100,
               },
             ],
@@ -46,7 +46,7 @@ void main() {
         );
       }
       if (request.url.path.endsWith('.sha256')) {
-        return http.Response('$checksum  hormone-v1.3.0-android.apk\n', 200);
+        return http.Response('$checksum  recess-v1.3.0-android.apk\n', 200);
       }
       return http.Response('not found', 404);
     });
@@ -56,7 +56,7 @@ void main() {
 
     expect(release.tagName, 'v1.3.0');
     expect(release.version.toString(), '1.3.0');
-    expect(release.apkFileName, 'hormone-v1.3.0-android.apk');
+    expect(release.apkFileName, 'recess-v1.3.0-android.apk');
     expect(release.apkSize, 42 * 1024 * 1024);
     expect(release.sha256, checksum);
     expect(release.notes, '新增应用内更新');
@@ -68,15 +68,15 @@ void main() {
       (request) async => http.Response(
         jsonEncode({
           'tag_name': 'v1.3.0',
-          'name': 'Hormone v1.3.0',
+          'name': 'Recess v1.3.0',
           'body': '',
           'html_url':
-              'https://github.com/Aetik-yue/hormone/releases/tag/v1.3.0',
+              'https://github.com/jiangkaiqi2005/recess/releases/tag/v1.3.0',
           'assets': [
             {
-              'name': 'hormone-v1.3.0-android.apk',
+              'name': 'recess-v1.3.0-android.apk',
               'browser_download_url':
-                  'https://github.com/Aetik-yue/hormone/releases/download/v1.3.0/hormone-v1.3.0-android.apk',
+                  'https://github.com/jiangkaiqi2005/recess/releases/download/v1.3.0/recess-v1.3.0-android.apk',
               'size': 42,
             },
           ],
@@ -112,17 +112,17 @@ void main() {
             jsonEncode({
               'tag_name': 'v1.3.0',
               'html_url':
-                  'https://github.com/Aetik-yue/hormone/releases/tag/v1.3.0',
+                  'https://github.com/jiangkaiqi2005/recess/releases/tag/v1.3.0',
               'assets': [
                 {
                   'name': 'app.apk',
                   'browser_download_url':
-                      'https://github.com/Aetik-yue/hormone/app.apk',
+                      'https://github.com/jiangkaiqi2005/recess/app.apk',
                 },
                 {
                   'name': 'app.apk.sha256',
                   'browser_download_url':
-                      'https://github.com/Aetik-yue/hormone/app.apk.sha256',
+                      'https://github.com/jiangkaiqi2005/recess/app.apk.sha256',
                 },
               ],
             }),

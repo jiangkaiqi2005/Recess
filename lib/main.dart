@@ -3,30 +3,30 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hormone/app/router.dart';
-import 'package:hormone/core/theme/app_theme.dart';
-import 'package:hormone/features/notification/application/notification_service.dart';
-import 'package:hormone/features/notification/application/reminder_settings_provider.dart';
-import 'package:hormone/features/semester/application/semester_providers.dart';
-import 'package:hormone/features/settings/application/section_times_provider.dart';
-import 'package:hormone/features/settings/application/theme_mode_provider.dart';
-import 'package:hormone/features/update/application/app_update_controller.dart';
-import 'package:hormone/features/update/presentation/update_dialog.dart';
-import 'package:hormone/features/widget/application/widget_service.dart';
+import 'package:recess/app/router.dart';
+import 'package:recess/core/theme/app_theme.dart';
+import 'package:recess/features/notification/application/notification_service.dart';
+import 'package:recess/features/notification/application/reminder_settings_provider.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
+import 'package:recess/features/settings/application/theme_mode_provider.dart';
+import 'package:recess/features/update/application/app_update_controller.dart';
+import 'package:recess/features/update/presentation/update_dialog.dart';
+import 'package:recess/features/widget/application/widget_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: HormoneApp()));
+  runApp(const ProviderScope(child: RecessApp()));
 }
 
-class HormoneApp extends ConsumerWidget {
-  const HormoneApp({super.key});
+class RecessApp extends ConsumerWidget {
+  const RecessApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
-      title: 'hormone',
+      title: 'Recess',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

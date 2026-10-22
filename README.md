@@ -1,15 +1,15 @@
-# Hormone 课表
+# Recess 课表
 
-[![CI](https://github.com/Aetik-yue/hormone/actions/workflows/ci.yml/badge.svg)](https://github.com/Aetik-yue/hormone/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Aetik-yue/hormone)](https://github.com/Aetik-yue/hormone/releases)
-[![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white)](https://github.com/Aetik-yue/hormone/releases/latest)
+[![CI](https://github.com/jiangkaiqi2005/recess/actions/workflows/ci.yml/badge.svg)](https://github.com/jiangkaiqi2005/recess/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jiangkaiqi2005/recess)](https://github.com/jiangkaiqi2005/recess/releases)
+[![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android&logoColor=white)](https://github.com/jiangkaiqi2005/recess/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](#开源许可)
 
 一款简洁、轻量的 Android 大学课程表应用。把教务系统里的课表带到手机上，查看每周安排、设置课前提醒，也能手动添加课程、管理多个学期。
 
 基于 Flutter 构建，使用 Material 3 界面，支持浅色与深色主题。课程与学期保存在本地，导入后可以离线查看。目前仅支持 **Android 7.0（API 24）及以上**。
 
-**[下载最新版](https://github.com/Aetik-yue/hormone/releases/latest)** · **[查看更新日志](version)** · **[反馈问题](https://github.com/Aetik-yue/hormone/issues)**
+**[下载最新版](https://github.com/jiangkaiqi2005/recess/releases/latest)** · **[查看更新日志](version)** · **[反馈问题](https://github.com/jiangkaiqi2005/recess/issues)**
 
 ## 界面预览
 
@@ -30,7 +30,7 @@
 
 ## 下载与开始使用
 
-到 [GitHub Releases](https://github.com/Aetik-yue/hormone/releases/latest) 下载以 `.apk` 结尾的安装包。`.aab` 用于应用分发，不能直接在手机上安装；`.apk.sha256` 是安装包校验文件。
+到 [GitHub Releases](https://github.com/jiangkaiqi2005/recess/releases/latest) 下载以 `.apk` 结尾的安装包。`.aab` 用于应用分发，不能直接在手机上安装；`.apk.sha256` 是安装包校验文件。
 
 1. 安装并打开应用，在学期管理中确认开学日期和总周数。
 2. 手动添加课程，或进入导入页面，从教务系统、ICS 文件或 JSON 文件导入。
@@ -125,8 +125,8 @@ CI 使用 Flutter stable，依赖约束以 [pubspec.yaml](pubspec.yaml) 为准�
 ### 首次运行
 
 ```bash
-git clone https://github.com/Aetik-yue/hormone.git
-cd hormone
+git clone https://github.com/jiangkaiqi2005/recess.git
+cd recess
 git switch develop
 
 flutter create . --platforms=android --org com.aetikyue
@@ -235,7 +235,7 @@ flutter build appbundle --release
 
 ## 反馈与参与
 
-欢迎通过 [Issues](https://github.com/Aetik-yue/hormone/issues) 反馈问题、提出功能建议或提供学校适配信息。
+欢迎通过 [Issues](https://github.com/jiangkaiqi2005/recess/issues) 反馈问题、提出功能建议或提供学校适配信息。
 
 报告问题时，请尽量附上应用版本、Android 版本、复现步骤和截图。教务导入问题还可以提供学校名称、教务系统类型，以及脱敏后的课表页面结构；请勿提交账号密码、验证码、Cookie 或包含个人信息的页面。
 

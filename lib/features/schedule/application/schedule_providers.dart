@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:hormone/core/utils/week_calculator.dart';
-import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/data/repositories/semester_repository.dart';
+import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/data/repositories/semester_repository.dart';
 
 /// 当前展示周（1-based）。首屏根据激活学期开学日期自动定位到「本周」，
 /// 用户手动切换后不再被自动覆盖，符合课表使用直觉。

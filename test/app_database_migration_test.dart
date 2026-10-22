@@ -1,10 +1,10 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/data/app_database.dart' as db;
-import 'package:hormone/data/repositories/course_platform_repository.dart';
-import 'package:hormone/data/repositories/course_repository.dart';
-import 'package:hormone/data/repositories/semester_repository.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/data/app_database.dart' as db;
+import 'package:recess/data/repositories/course_platform_repository.dart';
+import 'package:recess/data/repositories/course_repository.dart';
+import 'package:recess/data/repositories/semester_repository.dart';
 
 void main() {
   test('数据库从版本 1 升到 2：已有学期和课程保留，课程平台表可用', () async {

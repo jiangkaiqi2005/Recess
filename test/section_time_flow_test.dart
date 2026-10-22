@@ -5,14 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/features/notification/application/reminder_scheduler.dart';
-import 'package:hormone/features/schedule/presentation/week_view.dart';
-import 'package:hormone/features/semester/application/semester_providers.dart';
-import 'package:hormone/features/settings/application/section_times_provider.dart';
-import 'package:hormone/features/settings/presentation/section_time_editor.dart';
-import 'package:hormone/features/settings/presentation/settings_screen.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/features/notification/application/reminder_scheduler.dart';
+import 'package:recess/features/schedule/presentation/week_view.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
+import 'package:recess/features/settings/presentation/section_time_editor.dart';
+import 'package:recess/features/settings/presentation/settings_screen.dart';
 
 void main() {
   final semester = Semester(
@@ -34,8 +34,8 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     PackageInfo.setMockInitialValues(
-      appName: 'Hormone',
-      packageName: 'com.aetikyue.hormone',
+      appName: 'Recess',
+      packageName: 'com.aetikyue.recess',
       version: '1.2.4',
       buildNumber: '24',
       buildSignature: 'test',

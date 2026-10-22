@@ -1,4 +1,4 @@
-# Hormone Android 发布指南
+# Recess Android 发布指南
 
 > 本项目只面向 Android。仓库不维护或构建任何 iOS 目标。
 
@@ -23,22 +23,22 @@ flutter test
 
 ## 2. Application ID
 
-当前应用包名为 `com.aetikyue.hormone`（由 `flutter create --org com.aetikyue`
-生成；`pubspec.yaml` 项目名为 `hormone`）。如需修改，在生成后的
+当前应用包名为 `com.aetikyue.recess`（由 `flutter create --org com.aetikyue`
+生成；`pubspec.yaml` 项目名为 `recess`）。如需修改，在生成后的
 `android/app/build.gradle.kts` 中同步修改：
 
 ```kotlin
 android {
-    namespace = "com.yourcompany.hormone"
+    namespace = "com.yourcompany.recess"
     defaultConfig {
-        applicationId = "com.yourcompany.hormone"
+        applicationId = "com.yourcompany.recess"
     }
 }
 ```
 
 同时修改 `CourseWidgetProvider.kt` 顶部的 Kotlin 包名和对应目录结构，
 以及 `.github/workflows/release.yml` 中 `flutter create` 的 `--org` 参数
-（否则 CI 产物包名仍是 `com.aetikyue.hormone`）。
+（否则 CI 产物包名仍是 `com.aetikyue.recess`）。
 
 > ⚠️ 包名是应用身份标识，Google Play 上架后不可更改；请提前确认未被占用。
 
@@ -51,9 +51,9 @@ release CI 必须使用长期固定的 Android 签名证书。Android 覆盖升�
 
 ```bash
 keytool -genkeypair -v \
-  -keystore hormone-release-key.jks \
+  -keystore recess-release-key.jks \
   -keyalg RSA -keysize 2048 -validity 10000 \
-  -alias hormone
+  -alias recess
 ```
 
 本地正式构建时，创建不提交到 Git 的 `android/key.properties`：
@@ -61,12 +61,12 @@ keytool -genkeypair -v \
 ```properties
 storePassword=<密码>
 keyPassword=<密码>
-keyAlias=hormone
+keyAlias=recess
 storeFile=<密钥绝对路径或相对路径>
 ```
 
-`native_templates/android/app/build.gradle.kts` 会使用该文件或 `HORMONE_KEYSTORE_PATH`、
-`HORMONE_KEYSTORE_PASSWORD`、`HORMONE_KEY_ALIAS`、`HORMONE_KEY_PASSWORD` 环境变量。
+`native_templates/android/app/build.gradle.kts` 会使用该文件或 `RECESS_KEYSTORE_PATH`、
+`RECESS_KEYSTORE_PASSWORD`、`RECESS_KEY_ALIAS`、`RECESS_KEY_PASSWORD` 环境变量。
 Release 构建缺少完整签名配置时会直接失败，不再回退到 debug 签名。
 
 已配置 Windows 加密凭据的维护者可使用以下脚本构建 APK/AAB，无需保存明文
@@ -76,7 +76,7 @@ Release 构建缺少完整签名配置时会直接失败，不再回退到 debug
 ./scripts/build_signed_android.ps1 -FlutterSdk E:/flutter
 ```
 
-脚本默认读取当前用户 `.android/hormone-release/hormone-release-key.jks` 与
+脚本默认读取当前用户 `.android/recess-release/recess-release-key.jks` 与
 `credentials.clixml`，也可通过 `-SigningDirectory` 指定目录。`credentials.clixml`
 使用 Windows 当前用户/机器加密，不能仅靠复制此文件在另一台电脑恢复密码；
 请在更换电脑前将签名文件和密码分别备份到安全离线存储与密码管理器。
@@ -84,14 +84,14 @@ Release 构建缺少完整签名配置时会直接失败，不再回退到 debug
 将 keystore 转为单行 Base64（不要提交输出文件）：
 
 ```bash
-base64 -w 0 hormone-release-key.jks
+base64 -w 0 recess-release-key.jks
 ```
 
 在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置：
 
 - `ANDROID_KEYSTORE_BASE64`：上一步的完整 Base64。
 - `ANDROID_KEYSTORE_PASSWORD`：keystore 密码。
-- `ANDROID_KEY_ALIAS`：例如 `hormone`。
+- `ANDROID_KEY_ALIAS`：例如 `recess`。
 - `ANDROID_KEY_PASSWORD`：alias 密码。
 
 密钥本体、alias 和两个密码必须安全离线备份。正式发布前先完成这一步。

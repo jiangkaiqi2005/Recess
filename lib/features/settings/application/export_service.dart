@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'package:hormone/data/providers/database_providers.dart';
+import 'package:recess/data/providers/database_providers.dart';
 
 /// 数据导出服务：将全部学期 + 课程 + 课程平台导出为 JSON，并通过系统分享面板
 /// 交给用户保存。JSON 内容由 [BackupRepository.exportJson] 生成。
@@ -21,11 +21,11 @@ class ExportService {
     // 转存（下载/云盘/微信等）。
     final dir = await getTemporaryDirectory();
     final dateStr = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    final file = File('${dir.path}/hormone_backup_$dateStr.json');
+    final file = File('${dir.path}/recess_backup_$dateStr.json');
     await file.writeAsString(json);
 
     final xFile = XFile(file.path,
-        mimeType: 'application/json', name: 'hormone_backup_$dateStr.json');
+        mimeType: 'application/json', name: 'recess_backup_$dateStr.json');
     return Share.shareXFiles([xFile]);
   }
 }

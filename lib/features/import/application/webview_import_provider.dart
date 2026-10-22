@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:hormone/features/import/data/school_adapter.dart';
-import 'package:hormone/features/import/domain/import_course.dart';
+import 'package:recess/features/import/data/school_adapter.dart';
+import 'package:recess/features/import/domain/import_course.dart';
 
 /// WebView 教务导入的阶段状态机（select -> login -> preview）。
 enum WebviewPhase { select, login, preview }

@@ -21,13 +21,13 @@ flutter pub get
 |---|---|
 | `native_templates/android/app/build.gradle.kts` | `android/app/build.gradle.kts` |
 | `native_templates/android/app/src/main/AndroidManifest.xml` | `android/app/src/main/AndroidManifest.xml` |
-| `native_templates/android/app/src/main/kotlin/com/aetikyue/hormone/MainActivity.kt` | `android/app/src/main/kotlin/com/aetikyue/hormone/MainActivity.kt` |
-| `native_templates/android/app/src/main/java/com/aetikyue/hormone/CourseWidgetProvider.kt` | `android/app/src/main/java/com/aetikyue/hormone/CourseWidgetProvider.kt` |
+| `native_templates/android/app/src/main/kotlin/com/aetikyue/recess/MainActivity.kt` | `android/app/src/main/kotlin/com/aetikyue/recess/MainActivity.kt` |
+| `native_templates/android/app/src/main/java/com/aetikyue/recess/CourseWidgetProvider.kt` | `android/app/src/main/java/com/aetikyue/recess/CourseWidgetProvider.kt` |
 | `native_templates/android/app/src/main/res/xml/course_widget_info.xml` | `android/app/src/main/res/xml/course_widget_info.xml` |
 | `native_templates/android/app/src/main/res/layout/course_widget.xml` | `android/app/src/main/res/layout/course_widget.xml` |
 | `native_templates/android/app/src/main/res/xml/filepaths.xml` | `android/app/src/main/res/xml/filepaths.xml` |
 
-模板中的 Kotlin 包名与真实包名 `com.aetikyue.hormone` 一致，复制后无需修改。
+模板中的 Kotlin 包名与真实包名 `com.aetikyue.recess` 一致，复制后无需修改。
 
 也可以在 PowerShell 中一次性覆盖复制整个原生模板：
 

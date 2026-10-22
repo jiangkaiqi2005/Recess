@@ -12,13 +12,13 @@ class UpdateManifestTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             for abi in ("android", "arm64-v8a", "armeabi-v7a", "x86_64"):
-                (root / f"hormone-v1.3.0-{abi}.apk").write_bytes(abi.encode())
+                (root / f"recess-v1.3.0-{abi}.apk").write_bytes(abi.encode())
             manifest = prepare(root, "v1.3.0", "更新内容")
             self.assertEqual(json.loads((root / "latest.json").read_text(encoding="utf-8")), manifest)
             self.assertEqual(len(manifest["assets"]), 4)
             # The old client prioritizes any APK with "android" in its filename.
             legacy = sorted(manifest["assets"], key=lambda a: "android" not in a["name"])[0]
-            self.assertEqual(legacy["name"], "hormone-v1.3.0-android.apk")
+            self.assertEqual(legacy["name"], "recess-v1.3.0-android.apk")
             for asset in manifest["assets"]:
                 data = (root / asset["name"]).read_bytes()
                 digest = hashlib.sha256(data).hexdigest()
@@ -29,7 +29,7 @@ class UpdateManifestTest(unittest.TestCase):
     def test_missing_architecture_stops_manifest_publication(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "hormone-v1.3.0-android.apk").write_bytes(b"universal")
+            (root / "recess-v1.3.0-android.apk").write_bytes(b"universal")
             with self.assertRaises(FileNotFoundError):
                 prepare(root, "v1.3.0", "")
             self.assertFalse((root / "latest.json").exists())

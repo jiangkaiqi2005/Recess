@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/features/import/domain/import_course.dart';
-import 'package:hormone/features/import/presentation/import_confirm_dialog.dart';
+import 'package:recess/features/import/domain/import_course.dart';
+import 'package:recess/features/import/presentation/import_confirm_dialog.dart';
 
 void main() {
   testWidgets('替换模式确认弹窗文案与返回 true', (tester) async {

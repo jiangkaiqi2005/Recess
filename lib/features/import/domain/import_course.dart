@@ -1,6 +1,6 @@
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/course_platform.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
 
 /// 导入过程中的单门课程中间表示。
 ///

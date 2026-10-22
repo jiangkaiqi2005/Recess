@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:hormone/features/import/domain/import_course.dart';
+import 'package:recess/features/import/domain/import_course.dart';
 
 /// 共享的导入预览列表：按星期分组，支持勾选与时间冲突标红。
 ///

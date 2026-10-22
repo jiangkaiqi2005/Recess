@@ -131,7 +131,7 @@ class _IntroCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '把教务课表带进 Hormone',
+                  '把教务课表带进 Recess',
                   style: theme.textTheme.titleLarge?.copyWith(
                     color: colors.onPrimaryContainer,
                   ),
@@ -409,7 +409,7 @@ class _PrivacyNote extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '账号、密码和验证码只需在学校教务页面中填写。Hormone 不会要求你在其他表单中提交教务账号。',
+              '账号、密码和验证码只需在学校教务页面中填写。Recess 不会要求你在其他表单中提交教务账号。',
               style: theme.textTheme.bodySmall,
             ),
           ),

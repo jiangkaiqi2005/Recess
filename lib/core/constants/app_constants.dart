@@ -1,6 +1,6 @@
 /// 应用级常量与默认节次时间表（示例，可按学校自定义）。
 class AppConstants {
-  static const appName = 'hormone';
+  static const appName = 'recess';
 
   /// 课程默认色（冷暖平衡色板的蓝色，ARGB）。
   static const int defaultCourseColor = 0xFF4399F1;

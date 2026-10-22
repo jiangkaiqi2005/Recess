@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/core/utils/week_calculator.dart';
-import 'package:hormone/features/semester/application/semester_form_provider.dart';
-import 'package:hormone/features/semester/application/semester_providers.dart';
-import 'package:hormone/data/providers/database_providers.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/features/semester/application/semester_form_provider.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
+import 'package:recess/data/providers/database_providers.dart';
 
 class SemesterScreen extends ConsumerWidget {
   const SemesterScreen({super.key});

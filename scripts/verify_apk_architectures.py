@@ -8,7 +8,7 @@ from pathlib import Path
 def verify(directory: Path, tag: str) -> None:
     abis = {"arm64-v8a", "armeabi-v7a", "x86_64"}
     for suffix in ("android", *sorted(abis)):
-        apk = directory / f"hormone-{tag}-{suffix}.apk"
+        apk = directory / f"recess-{tag}-{suffix}.apk"
         expected = abis if suffix == "android" else {suffix}
         with zipfile.ZipFile(apk) as archive:
             entries = set(archive.namelist())

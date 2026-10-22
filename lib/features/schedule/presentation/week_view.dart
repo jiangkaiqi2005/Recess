@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/utils/week_calculator.dart';
-import 'package:hormone/features/schedule/domain/schedule_helpers.dart';
-import 'package:hormone/features/semester/application/semester_providers.dart';
-import 'package:hormone/features/settings/application/section_times_provider.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/features/schedule/domain/schedule_helpers.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
 import 'course_detail_sheet.dart';
 
 /// 每节高度（px）。节次多到超出屏幕时网格区可纵向滚动。

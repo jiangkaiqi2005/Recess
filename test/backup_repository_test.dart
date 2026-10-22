@@ -2,14 +2,14 @@ import 'dart:convert';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/data/app_database.dart' as db;
-import 'package:hormone/data/repositories/backup_repository.dart';
-import 'package:hormone/data/repositories/course_platform_repository.dart';
-import 'package:hormone/data/repositories/course_repository.dart';
-import 'package:hormone/data/repositories/semester_repository.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/data/app_database.dart' as db;
+import 'package:recess/data/repositories/backup_repository.dart';
+import 'package:recess/data/repositories/course_platform_repository.dart';
+import 'package:recess/data/repositories/course_repository.dart';
+import 'package:recess/data/repositories/semester_repository.dart';
 
 void main() {
   late db.AppDatabase database;
@@ -41,6 +41,7 @@ void main() {
     }
     final exported = await backup.exportJson();
     final decoded = jsonDecode(exported) as Map<String, dynamic>;
+    expect(decoded['app'], 'recess');
     final rows = ((decoded['semesters'] as List).single as Map)['courses'] as List;
     expect(rows.map((row) => (row as Map)['colorValue']), unorderedEquals(rawColors));
     await backup.restore(exported);
@@ -50,7 +51,7 @@ void main() {
 
   String exportFixture() {
     final data = {
-      'app': 'hormone',
+      'app': 'recess',
       'version': 1,
       'exportedAt': '2026-08-26T00:00:00.000',
       'semesters': [
@@ -142,6 +143,20 @@ void main() {
     expect(c2.single.colorValue, 0xFF5B8DEF); // 无颜色时回退默认蓝
   });
 
+  test('旧 app 标识 hormone 的备份仍能恢复学期和课程', () async {
+    final data = jsonDecode(exportFixture()) as Map<String, dynamic>;
+    data['app'] = 'hormone';
+
+    final result = await backup.restore(jsonEncode(data));
+
+    expect(result.semesterCount, 2);
+    expect(result.courseCount, 2);
+    expect((await semesters.getActiveSemester())?.id, 's1');
+    expect(await semesters.getSemesters(), hasLength(2));
+    expect((await courses.getCourses('s1')).single.name, '高等数学');
+    expect((await courses.getCourses('s2')).single.name, '线性代数');
+  });
+
   test('导出再恢复：课程平台按学期原样往返', () async {
     final platforms = CoursePlatformRepository(database);
     await semesters.upsert(Semester(
@@ -223,7 +238,7 @@ void main() {
 
   test('备份中的非法平台条目被跳过，其余照常恢复', () async {
     final data = {
-      'app': 'hormone',
+      'app': 'recess',
       'semesters': [
         {
           'id': 's1',
@@ -257,10 +272,16 @@ void main() {
       totalWeeks: 10,
     ));
 
-    await expectLater(
-      backup.restore('{"foo": 1}'),
-      throwsA(isA<FormatException>()),
-    );
+    for (final invalid in ['{"foo": 1}', '{"app": "other"}']) {
+      await expectLater(
+        backup.restore(invalid),
+        throwsA(isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          '这不是 Recess 的备份文件',
+        )),
+      );
+    }
 
     // 数据未被改动。
     final allSemesters = await semesters.getSemesters();
@@ -277,7 +298,7 @@ void main() {
 
   test('含重复学期 id 的备份抛出异常', () async {
     final data = {
-      'app': 'hormone',
+      'app': 'recess',
       'semesters': [
         {'id': 'dup', 'name': 'A', 'startDate': '2026-01-01', 'totalWeeks': 18},
         {'id': 'dup', 'name': 'B', 'startDate': '2026-02-01', 'totalWeeks': 16},

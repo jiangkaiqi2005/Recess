@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/features/course/application/course_platforms_provider.dart';
-import 'package:hormone/features/schedule/presentation/course_detail_sheet.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/features/course/application/course_platforms_provider.dart';
+import 'package:recess/features/schedule/presentation/course_detail_sheet.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

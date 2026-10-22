@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  hormone logo 概念稿（SVG 预览） - Phase 9 redesign
+  recess logo 概念稿（SVG 预览） - Phase 9 redesign
   设计语义：从「课程表卡片」重构为「化学分子几何构型」—— 中心原子 + 4 配体的
   四面体 CH4 风格球棍模型（ball-and-stick），主色 PRIMARY = #5B8DEF。
   该稿为最终主视觉。最终 PNG 由 tools/generate_assets.py（仅标准库，解析 AA）落地为

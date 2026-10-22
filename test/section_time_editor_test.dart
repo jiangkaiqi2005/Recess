@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hormone/features/settings/application/section_times_provider.dart';
-import 'package:hormone/features/settings/presentation/section_time_editor.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
+import 'package:recess/features/settings/presentation/section_time_editor.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));

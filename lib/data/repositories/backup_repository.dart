@@ -1,14 +1,14 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/data/app_database.dart' as db;
-import 'package:hormone/data/mappers.dart';
-import 'package:hormone/data/repositories/course_platform_repository.dart';
-import 'package:hormone/data/repositories/course_repository.dart';
-import 'package:hormone/data/repositories/semester_repository.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/data/app_database.dart' as db;
+import 'package:recess/data/mappers.dart';
+import 'package:recess/data/repositories/course_platform_repository.dart';
+import 'package:recess/data/repositories/course_repository.dart';
+import 'package:recess/data/repositories/semester_repository.dart';
 
 /// 备份恢复的结果：恢复了多少学期、多少课程。
 class RestoreResult {
@@ -19,7 +19,7 @@ class RestoreResult {
 
 /// 备份文件解析/校验：与 [BackupRepository.exportJson] 导出的 JSON 格式对应。
 ///
-/// 顶层含 `app == 'hormone'` 校验，`semesters` 为数组。校验不通过抛
+/// 顶层 `app` 接受 `'recess'` 和旧备份标识 `'hormone'`，`semesters` 为数组。校验不通过抛
 /// [FormatException]（数据完全不改动，保证恢复失败不留半截状态）。
 class BackupFile {
   final List<Semester> semesters;
@@ -46,8 +46,8 @@ class BackupFile {
     if (decoded is! Map) {
       throw const FormatException('备份文件格式错误：顶层应为对象');
     }
-    if (decoded['app'] != 'hormone') {
-      throw const FormatException('这不是 Hormone 的备份文件');
+    if (decoded['app'] != 'recess' && decoded['app'] != 'hormone') {
+      throw const FormatException('这不是 Recess 的备份文件');
     }
     final rawSemesters = decoded['semesters'];
     if (rawSemesters is! List || rawSemesters.isEmpty) {
@@ -184,7 +184,7 @@ class BackupRepository {
     final semesters = await semesterRepo.getSemesters();
     final active = await semesterRepo.getActiveSemester();
     final data = <String, dynamic>{
-      'app': 'hormone',
+      'app': 'recess',
       'version': 1,
       'exportedAt': DateTime.now().toIso8601String(),
       'semesters': <Map<String, dynamic>>[],

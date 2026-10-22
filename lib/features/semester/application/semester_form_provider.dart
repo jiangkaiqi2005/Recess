@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/data/repositories/course_platform_repository.dart';
-import 'package:hormone/data/repositories/course_repository.dart';
-import 'package:hormone/data/repositories/semester_repository.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/data/repositories/course_platform_repository.dart';
+import 'package:recess/data/repositories/course_repository.dart';
+import 'package:recess/data/repositories/semester_repository.dart';
 
 /// 学期编辑表单状态机。新增时 id 为空，保存时生成。
 final semesterFormProvider =

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/core/theme/app_theme.dart';
-import 'package:hormone/features/import/presentation/course_capture_guide_screen.dart';
+import 'package:recess/core/theme/app_theme.dart';
+import 'package:recess/features/import/presentation/course_capture_guide_screen.dart';
 
 void main() {
   Future<void> pumpGuide(

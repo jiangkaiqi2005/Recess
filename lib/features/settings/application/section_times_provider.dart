@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hormone/core/constants/app_constants.dart';
+import 'package:recess/core/constants/app_constants.dart';
 import '../domain/section_time.dart';
 import '../domain/section_time_shift.dart';
 

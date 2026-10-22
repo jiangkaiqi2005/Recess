@@ -4,12 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:hormone/core/constants/app_constants.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/features/course/application/course_platforms_provider.dart';
-import 'package:hormone/features/course/presentation/course_platform_display.dart';
-import 'package:hormone/features/settings/application/section_times_provider.dart';
+import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/features/course/application/course_platforms_provider.dart';
+import 'package:recess/features/course/presentation/course_platform_display.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
 
 const _dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
 

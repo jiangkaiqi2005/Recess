@@ -1,4 +1,4 @@
-package com.aetikyue.hormone
+package com.aetikyue.recess
 
 import android.content.Intent
 import android.net.Uri
@@ -16,14 +16,14 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
-            "com.aetikyue.hormone/update").setMethodCallHandler { call, result ->
+            "com.aetikyue.recess/update").setMethodCallHandler { call, result ->
             if (call.method != "installApk") {
                 result.notImplemented()
                 return@setMethodCallHandler
             }
             try {
                 val path = call.argument<String>("path")
-                val allowed = File(cacheDir, "hormone_updates/update.apk").canonicalFile
+                val allowed = File(cacheDir, "recess_updates/update.apk").canonicalFile
                 val apk = path?.let { File(it).canonicalFile }
                 if (apk != allowed || !allowed.isFile) {
                     result.error("INVALID_APK", "安装包不存在，请重新下载", null)

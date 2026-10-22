@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import '../domain/app_release.dart';
 
 const _latestReleaseUrl =
-    'https://api.github.com/repos/Aetik-yue/hormone/releases/latest';
+    'https://api.github.com/repos/jiangkaiqi2005/recess/releases/latest';
 
 /// GitHub Release 响应无效、缺少 APK 或校验文件时抛出的可展示异常。
 class UpdateCheckException implements Exception {
@@ -28,7 +28,7 @@ class GitHubReleaseRepository {
     http.Client? client,
     String? abi,
     String updateBaseUrl = const String.fromEnvironment(
-      'HORMONE_UPDATE_BASE_URL',
+      'RECESS_UPDATE_BASE_URL',
     ),
   }) : _client = client ?? http.Client(),
        _abi = abi ?? _currentAbi(),
@@ -53,7 +53,7 @@ class GitHubReleaseRepository {
           headers: const {
             'Accept': 'application/vnd.github+json',
             'X-GitHub-Api-Version': '2022-11-28',
-            'User-Agent': 'Hormone-Android-Updater',
+            'User-Agent': 'Recess-Android-Updater',
           },
         )
         .timeout(Duration(seconds: mirror ? 5 : 15));
@@ -114,7 +114,7 @@ class GitHubReleaseRepository {
 
   Future<String> _fetchChecksum(Uri url, String apkName) async {
     final response = await _client
-        .get(url, headers: const {'User-Agent': 'Hormone-Android-Updater'})
+        .get(url, headers: const {'User-Agent': 'Recess-Android-Updater'})
         .timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) {
       throw UpdateCheckException('无法获取安装包校验值（${response.statusCode}）');
@@ -188,14 +188,14 @@ _ReleaseAsset _selectApk(List<_ReleaseAsset> assets, String? abi, String tag) {
   // 分架构包使用固定名称，不含 android，兼容旧版的通用包优先规则。
   if (abi != null) {
     for (final candidate in candidates) {
-      if (candidate.name == 'hormone-$tag-$abi.apk') return candidate;
+      if (candidate.name == 'recess-$tag-$abi.apk') return candidate;
     }
   }
   final universal =
       candidates
           .where(
             (asset) =>
-                asset.name == 'hormone-$tag-android.apk' ||
+                asset.name == 'recess-$tag-android.apk' ||
                 asset.name == 'app-release.apk' ||
                 asset.name == 'app.apk' ||
                 asset.name == 'fallback.apk',

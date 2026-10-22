@@ -1,4 +1,4 @@
-import 'package:hormone/features/import/data/school_adapter.dart';
+import 'package:recess/features/import/data/school_adapter.dart';
 
 /// 井冈山大学（金智智慧校园 wisedu）适配器。
 ///

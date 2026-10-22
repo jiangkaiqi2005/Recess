@@ -5,12 +5,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/features/import/domain/import_course.dart';
-import 'package:hormone/features/import/data/ics_parser.dart';
-import 'package:hormone/features/import/data/json_importer.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/features/import/domain/import_course.dart';
+import 'package:recess/features/import/data/ics_parser.dart';
+import 'package:recess/features/import/data/json_importer.dart';
 
 /// 导入流程状态机。
 enum ImportStatus {

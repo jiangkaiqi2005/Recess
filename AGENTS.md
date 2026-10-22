@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents (Claude Code, Antigravity, etc.)
 
 ## Project
 
-Hormone (课表) — a minimal Android college course-schedule app built with Flutter + Riverpod + go_router + drift. UI strings and most doc comments are in Chinese. iOS is intentionally unsupported.
+Recess (课表) — a minimal Android college course-schedule app built with Flutter + Riverpod + go_router + drift. UI strings and most doc comments are in Chinese. iOS is intentionally unsupported.
 
 ## Commands
 
@@ -60,7 +60,7 @@ go_router, declared once in `app/router.dart`. Screens `context.push` existing r
 
 ### Desktop widget bridge
 
-`features/widget/application/widget_service.dart` serializes today's courses to native via `home_widget` (App Group `group.hormone`, widget name `CourseWidget` / `CourseWidgetProvider`). Failures are swallowed — the widget is a nice-to-have and must not affect the main app. `widgetServiceProvider` is a global singleton invoked after imports/edits to refresh.
+`features/widget/application/widget_service.dart` serializes today's courses to native via `home_widget` (no App Group is configured on Android; widget provider `CourseWidgetProvider`, package `com.aetikyue.recess`). Failures are swallowed — the widget is a nice-to-have and must not affect the main app. `widgetServiceProvider` is a global singleton invoked after imports/edits to refresh.
 
 ## Conventions
 

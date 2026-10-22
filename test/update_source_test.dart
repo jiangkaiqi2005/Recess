@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/update/data/github_release_repository.dart';
+import 'package:recess/features/update/data/github_release_repository.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
@@ -9,13 +9,13 @@ const _hash =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 Map<String, dynamic> _manifest(List<String> abis) => {
   'tag_name': 'v1.3.0',
-  'html_url': 'https://github.com/Aetik-yue/hormone/releases/tag/v1.3.0',
+  'html_url': 'https://github.com/jiangkaiqi2005/recess/releases/tag/v1.3.0',
   'assets': [
     for (final abi in abis)
       {
-        'name': 'hormone-v1.3.0-$abi.apk',
+        'name': 'recess-v1.3.0-$abi.apk',
         'browser_download_url':
-            'https://github.com/Aetik-yue/hormone/releases/download/v1.3.0/hormone-v1.3.0-$abi.apk',
+            'https://github.com/jiangkaiqi2005/recess/releases/download/v1.3.0/recess-v1.3.0-$abi.apk',
         'size': 123,
         'digest': 'sha256:$_hash',
       },
@@ -40,7 +40,7 @@ void main() {
       );
       addTearDown(repository.close);
       final release = await repository.fetchLatestRelease();
-      expect(release.apkFileName, 'hormone-v1.3.0-$abi.apk');
+      expect(release.apkFileName, 'recess-v1.3.0-$abi.apk');
       expect(release.sha256, _hash);
       expect(requests, 1);
     });
@@ -58,7 +58,7 @@ void main() {
       addTearDown(repository.close);
       expect(
         (await repository.fetchLatestRelease()).apkFileName,
-        'hormone-v1.3.0-android.apk',
+        'recess-v1.3.0-android.apk',
       );
     }
   });
@@ -81,7 +81,7 @@ void main() {
     final requests = <Uri>[];
     final repository = GitHubReleaseRepository(
       abi: 'arm64-v8a',
-      updateBaseUrl: 'https://updates.example.com/hormone',
+      updateBaseUrl: 'https://updates.example.com/recess',
       client: MockClient((request) async {
         requests.add(request.url);
         return http.Response(
@@ -94,11 +94,11 @@ void main() {
     final release = await repository.fetchLatestRelease();
     expect(
       requests.single.toString(),
-      'https://updates.example.com/hormone/latest.json',
+      'https://updates.example.com/recess/latest.json',
     );
     expect(
       release.apkUrl.toString(),
-      'https://updates.example.com/hormone/v1.3.0/hormone-v1.3.0-arm64-v8a.apk',
+      'https://updates.example.com/recess/v1.3.0/recess-v1.3.0-arm64-v8a.apk',
     );
     expect(release.fallbackUrls.single.host, 'github.com');
   });
@@ -127,7 +127,7 @@ void main() {
       addTearDown(repository.close);
       expect(
         (await repository.fetchLatestRelease()).apkFileName,
-        'hormone-v1.3.0-android.apk',
+        'recess-v1.3.0-android.apk',
       );
       expect(requests.map((url) => url.host), [
         'updates.example.com',

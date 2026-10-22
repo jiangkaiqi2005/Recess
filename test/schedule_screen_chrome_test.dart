@@ -4,15 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/semester.dart';
-import 'package:hormone/data/app_database.dart' as db;
-import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/data/repositories/semester_repository.dart';
-import 'package:hormone/features/schedule/application/schedule_providers.dart';
-import 'package:hormone/features/schedule/presentation/schedule_screen.dart';
-import 'package:hormone/features/schedule/presentation/week_view.dart';
-import 'package:hormone/features/semester/application/semester_providers.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/semester.dart';
+import 'package:recess/data/app_database.dart' as db;
+import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/data/repositories/semester_repository.dart';
+import 'package:recess/features/schedule/application/schedule_providers.dart';
+import 'package:recess/features/schedule/presentation/schedule_screen.dart';
+import 'package:recess/features/schedule/presentation/week_view.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

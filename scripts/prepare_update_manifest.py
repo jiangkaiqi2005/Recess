@@ -10,11 +10,11 @@ from pathlib import Path
 def prepare(directory: Path, tag: str, notes: str) -> dict:
     if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
         raise ValueError("A stable vX.Y.Z tag is required")
-    release_url = f"https://github.com/Aetik-yue/hormone/releases"
+    release_url = f"https://github.com/jiangkaiqi2005/recess/releases"
     assets = []
     # Universal first, preserving the selection behavior of pre-optimization apps.
     for abi in ("android", "arm64-v8a", "armeabi-v7a", "x86_64"):
-        name = f"hormone-{tag}-{abi}.apk"
+        name = f"recess-{tag}-{abi}.apk"
         apk = directory / name
         with apk.open("rb") as source:
             digest = hashlib.file_digest(source, "sha256").hexdigest()
@@ -29,7 +29,7 @@ def prepare(directory: Path, tag: str, notes: str) -> dict:
         })
     manifest = {
         "tag_name": tag,
-        "name": f"Hormone {tag}",
+        "name": f"Recess {tag}",
         "html_url": f"{release_url}/tag/{tag}",
         "body": notes,
         "draft": False,

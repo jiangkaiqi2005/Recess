@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hormone/features/import/data/generic_adapter.dart';
+import 'package:recess/features/import/data/generic_adapter.dart';
 
 void main() {
   test('传统表格按逻辑网格处理 rowspan 并保持星期列对齐', () async {
@@ -63,7 +63,7 @@ void main() {
 
     final file = File(
       '${Directory.systemTemp.path}${Platform.pathSeparator}'
-      'hormone_generic_${DateTime.now().microsecondsSinceEpoch}.js',
+      'recess_generic_${DateTime.now().microsecondsSinceEpoch}.js',
     );
     await file.writeAsString(script);
     try {

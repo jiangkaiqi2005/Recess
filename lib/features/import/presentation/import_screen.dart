@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/data/providers/database_providers.dart';
-import 'package:hormone/features/import/application/import_provider.dart';
-import 'package:hormone/features/import/domain/import_course.dart';
-import 'package:hormone/features/semester/application/semester_providers.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/features/import/application/import_provider.dart';
+import 'package:recess/features/import/domain/import_course.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
 import 'import_confirm_dialog.dart';
 import 'import_preview_list.dart';
 

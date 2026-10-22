@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/data/app_database.dart' as db;
-import 'package:hormone/data/mappers.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/data/app_database.dart' as db;
+import 'package:recess/data/mappers.dart';
 
 /// 课程平台数据访问。平台按「学期 id + 课程名」归属（课程名 trim 后精确
 /// 匹配），同一学期内同名课程共享一组平台，见 docs/adr/0001。

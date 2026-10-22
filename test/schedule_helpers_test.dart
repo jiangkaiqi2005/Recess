@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/features/schedule/domain/schedule_helpers.dart';
-import 'package:hormone/features/settings/application/section_times_provider.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/features/schedule/domain/schedule_helpers.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
 
 void main() {
   final sectionTimes = {

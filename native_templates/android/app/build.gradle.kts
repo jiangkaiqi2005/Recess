@@ -18,20 +18,20 @@ fun signingValue(property: String, environment: String): String? =
     providers.environmentVariable(environment).orNull
         ?: keystoreProperties.getProperty(property)
 
-val signingStoreFile = signingValue("storeFile", "HORMONE_KEYSTORE_PATH")
-val signingStorePassword = signingValue("storePassword", "HORMONE_KEYSTORE_PASSWORD")
-val signingKeyAlias = signingValue("keyAlias", "HORMONE_KEY_ALIAS")
-val signingKeyPassword = signingValue("keyPassword", "HORMONE_KEY_PASSWORD")
+val signingStoreFile = signingValue("storeFile", "RECESS_KEYSTORE_PATH")
+val signingStorePassword = signingValue("storePassword", "RECESS_KEYSTORE_PASSWORD")
+val signingKeyAlias = signingValue("keyAlias", "RECESS_KEY_ALIAS")
+val signingKeyPassword = signingValue("keyPassword", "RECESS_KEY_PASSWORD")
 val hasReleaseSigning = listOf(
     signingStoreFile, signingStorePassword, signingKeyAlias, signingKeyPassword
 ).all { !it.isNullOrBlank() }
 if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
     && !hasReleaseSigning) {
-    throw GradleException("Release signing is required. Configure key.properties or HORMONE signing environment variables.")
+    throw GradleException("Release signing is required. Configure key.properties or RECESS signing environment variables.")
 }
 
 android {
-    namespace = "com.aetikyue.hormone"
+    namespace = "com.aetikyue.recess"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -44,7 +44,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.aetikyue.hormone"
+        applicationId = "com.aetikyue.recess"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // 当前 Flutter stable 的实际构建基线为 API 24。

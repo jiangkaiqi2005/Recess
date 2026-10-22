@@ -1,4 +1,4 @@
-import 'package:hormone/core/constants/app_constants.dart';
+import 'package:recess/core/constants/app_constants.dart';
 
 /// 单门课程。周次以 [weeks] 列表表示（如 [1,2,3,5,6,..18]）。
 class Course {

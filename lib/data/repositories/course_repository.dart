@@ -1,9 +1,9 @@
 import 'package:drift/drift.dart';
-import 'package:hormone/core/models/course.dart';
-import 'package:hormone/core/models/course_platform.dart';
-import 'package:hormone/data/app_database.dart' as db;
-import 'package:hormone/data/mappers.dart';
-import 'package:hormone/data/repositories/course_platform_repository.dart';
+import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/data/app_database.dart' as db;
+import 'package:recess/data/mappers.dart';
+import 'package:recess/data/repositories/course_platform_repository.dart';
 
 /// 课程数据访问。所有方法以领域模型 [Course] 与外界交互，
 /// 内部使用 drift 实体与流式监听，支撑离线优先与实时 UI 更新。

@@ -17,10 +17,10 @@
 
 | 文件 | 用途 |
 |---|---|
-| `hormone-vX.Y.Z-android.apk` | 通用包，供旧版更新器和未知架构使用 |
-| `hormone-vX.Y.Z-arm64-v8a.apk` | ARM 64 位 |
-| `hormone-vX.Y.Z-armeabi-v7a.apk` | ARM 32 位 |
-| `hormone-vX.Y.Z-x86_64.apk` | x86 64 位 |
+| `recess-vX.Y.Z-android.apk` | 通用包，供旧版更新器和未知架构使用 |
+| `recess-vX.Y.Z-arm64-v8a.apk` | ARM 64 位 |
+| `recess-vX.Y.Z-armeabi-v7a.apk` | ARM 32 位 |
+| `recess-vX.Y.Z-x86_64.apk` | x86 64 位 |
 
 分架构文件名不含 `android`，以兼容旧版更新器对该词的优先选择规则。不要删除或重命名通用包。
 
@@ -30,7 +30,7 @@
 
 本地签名构建还会自动检查四份 APK 的包名、版本号、版本代码和固定签名证书。也可单独运行 `scripts/verify_signed_apks.ps1`，不匹配时直接报错。
 
-原生安装入口保存在 `native_templates/android/app/src/main/kotlin/com/aetikyue/hormone/MainActivity.kt`。重建 Android 平台目录时，须连同 Manifest 与 `res/xml/filepaths.xml` 一并应用；发布流程和本地签名脚本均已包含这一步。
+原生安装入口保存在 `native_templates/android/app/src/main/kotlin/com/aetikyue/recess/MainActivity.kt`。重建 Android 平台目录时，须连同 Manifest 与 `res/xml/filepaths.xml` 一并应用；发布流程和本地签名脚本均已包含这一步。
 
 ## 接入自有下载源
 
@@ -39,13 +39,13 @@
 目录示例：
 
 ```text
-https://updates.example.com/hormone/
+https://updates.example.com/recess/
   latest.json
   vX.Y.Z/
-    hormone-vX.Y.Z-android.apk
-    hormone-vX.Y.Z-arm64-v8a.apk
-    hormone-vX.Y.Z-armeabi-v7a.apk
-    hormone-vX.Y.Z-x86_64.apk
+    recess-vX.Y.Z-android.apk
+    recess-vX.Y.Z-arm64-v8a.apk
+    recess-vX.Y.Z-armeabi-v7a.apk
+    recess-vX.Y.Z-x86_64.apk
     ...各 APK 的 .sha256 文件
 ```
 
@@ -57,23 +57,23 @@ https://updates.example.com/hormone/
 
 | 类型 | 名称 | 内容 |
 |---|---|---|
-| Variable | `HORMONE_UPDATE_BASE_URL` | 公开 HTTPS 下载目录，例如 `https://updates.example.com/hormone/` |
-| Variable | `HORMONE_UPDATE_S3_URI` | 对应上传目录，例如 `s3://your-bucket/hormone` |
-| Variable | `HORMONE_UPDATE_S3_ENDPOINT` | 服务商 S3 兼容接口地址；AWS S3 可留空 |
-| Variable | `HORMONE_UPDATE_S3_REGION` | 服务商要求的 region；默认 `us-east-1` |
-| Secret | `HORMONE_UPDATE_S3_ACCESS_KEY_ID` | 仅允许写入该发布目录的访问密钥 ID |
-| Secret | `HORMONE_UPDATE_S3_SECRET_ACCESS_KEY` | 对应访问密钥 |
+| Variable | `RECESS_UPDATE_BASE_URL` | 公开 HTTPS 下载目录，例如 `https://updates.example.com/recess/` |
+| Variable | `RECESS_UPDATE_S3_URI` | 对应上传目录，例如 `s3://your-bucket/recess` |
+| Variable | `RECESS_UPDATE_S3_ENDPOINT` | 服务商 S3 兼容接口地址；AWS S3 可留空 |
+| Variable | `RECESS_UPDATE_S3_REGION` | 服务商要求的 region；默认 `us-east-1` |
+| Secret | `RECESS_UPDATE_S3_ACCESS_KEY_ID` | 仅允许写入该发布目录的访问密钥 ID |
+| Secret | `RECESS_UPDATE_S3_SECRET_ACCESS_KEY` | 对应访问密钥 |
 
 公开下载目录必须映射到该 S3 URI，且允许用户通过 HTTPS 读取文件。某些对象存储需要额外启用 S3 兼容接口；不支持该协议时，保留相同目录布局，使用服务商上传工具替换 workflow 的上传步骤。
 
-只有设置 `HORMONE_UPDATE_BASE_URL` 才启用自动镜像上传。GitHub Release 发布完成后上传镜像；重建旧标签时，不覆盖新版本的 `latest.json`。上传失败会使发布任务报错；应用仍能回退到 GitHub。
+只有设置 `RECESS_UPDATE_BASE_URL` 才启用自动镜像上传。GitHub Release 发布完成后上传镜像；重建旧标签时，不覆盖新版本的 `latest.json`。上传失败会使发布任务报错；应用仍能回退到 GitHub。
 
 带 CDN 时，让 `latest.json` 不缓存或每次重新验证，版本文件可长期缓存。已发布的版本文件应保持不变，修复请发新版本，以免客户端清单与缓存中的 APK 校验不一致。
 
 本地构建注入同一地址：
 
 ```powershell
-powershell -NoProfile -File scripts/build_signed_android.ps1 -UpdateBaseUrl 'https://updates.example.com/hormone/'
+powershell -NoProfile -File scripts/build_signed_android.ps1 -UpdateBaseUrl 'https://updates.example.com/recess/'
 ```
 
 以上域名只是示例，不是已部署服务。首次启用本功能需要先把含新更新器的版本送到用户设备，之后的更新才会自动选择小包与镜像。旧版本仍按原逻辑下载通用包。

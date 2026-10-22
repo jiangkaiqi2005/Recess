@@ -3,7 +3,7 @@
 /// 约定：dayOfWeek 1=周一 .. 7=周日，与 [DateTime.weekday] 一致。
 library;
 
-import 'package:hormone/core/models/semester.dart';
+import 'package:recess/core/models/semester.dart';
 
 /// 根据开学日期与今天推算当前周（1-based）。早于开学返回 0。
 int computeCurrentWeek(DateTime startDate, DateTime today) {
