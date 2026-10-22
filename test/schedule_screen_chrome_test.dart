@@ -150,18 +150,58 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('拖动翻页中途不对周视图应用透明度', (tester) async {
+  testWidgets('翻页用缩放和背景色遮罩淡化，静止页不加效果', (tester) async {
     await pumpSchedule(tester);
+    final background = Theme.of(tester.element(find.byType(PageView)))
+        .scaffoldBackgroundColor;
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+    final currentPage = find.descendant(
+      of: find.byType(PageView),
+      matching: find.byWidgetPredicate((widget) =>
+          widget is AnimatedBuilder &&
+          widget.child is WeekView &&
+          (widget.child as WeekView).selectedWeek == 3),
+    );
+    final scale = find.descendant(
+      of: currentPage,
+      matching: find.ancestor(
+        of: find.byKey(const ValueKey(3)),
+        matching: find.byType(Transform),
+      ),
+    );
+    final mask = find.descendant(
+      of: currentPage,
+      matching: find.byType(ColoredBox),
+    );
+    expect(scale, findsNothing);
+    expect(mask, findsNothing);
 
     await tester.drag(find.byType(PageView), const Offset(-120, 0));
     await tester.pump(const Duration(milliseconds: 16));
 
+    expect(currentPage, findsOneWidget);
+    final distance = (pageView.controller!.page! - 2).abs();
+    expect(distance, inExclusiveRange(0, 1));
+    final transform = tester.widget<Transform>(scale).transform;
+    expect(transform.entry(0, 0), closeTo(1 - distance * 0.012, 0.000001));
+    expect(transform.entry(1, 1), closeTo(1 - distance * 0.012, 0.000001));
+    final color = tester.widget<ColoredBox>(mask).color;
+    expect(color.withValues(alpha: 1), background.withValues(alpha: 1));
+    expect(color.a, closeTo(distance * 0.08, 0.000001));
+    final ignorePointer = find.ancestor(
+      of: mask,
+      matching: find.byType(IgnorePointer),
+    );
+    expect(tester.widget<IgnorePointer>(ignorePointer.first).ignoring, isTrue);
     expect(find.byType(WeekView), findsWidgets);
     expect(
       find.ancestor(of: find.byType(WeekView), matching: find.byType(Opacity)),
       findsNothing,
     );
     await tester.pumpAndSettle();
+    expect(currentPage, findsOneWidget);
+    expect(scale, findsNothing);
+    expect(mask, findsNothing);
     expect(tester.takeException(), isNull);
   });
 

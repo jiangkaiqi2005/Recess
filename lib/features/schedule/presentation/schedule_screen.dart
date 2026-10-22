@@ -229,11 +229,45 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         },
         itemBuilder: (context, index) {
           final week = index + 1;
-          return WeekView(
-            key: ValueKey(week),
-            selectedWeek: week,
-            onImport: () => context.push('/import'),
-            onWebViewImport: () => context.push('/import/webview'),
+          // 用背景色遮罩淡化页面，避免 Opacity 给整页开离屏图层。
+          // WeekView 作为 child 复用，不随手势每帧重建。
+          return AnimatedBuilder(
+            animation: _pageController,
+            child: WeekView(
+              key: ValueKey(week),
+              selectedWeek: week,
+              onImport: () => context.push('/import'),
+              onWebViewImport: () => context.push('/import/webview'),
+            ),
+            builder: (context, child) {
+              var currentPage = index.toDouble();
+              if (_pageController.hasClients &&
+                  _pageController.position.hasContentDimensions) {
+                currentPage = _pageController.page ?? currentPage;
+              }
+              final distance =
+                  (currentPage - index).abs().clamp(0.0, 1.0).toDouble();
+              if (distance == 0) return child!;
+              return Transform.scale(
+                scale: 1 - distance * 0.012,
+                alignment: Alignment.center,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    child!,
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: ColoredBox(
+                          color: Theme.of(context)
+                              .scaffoldBackgroundColor
+                              .withValues(alpha: distance * 0.08),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           );
         },
       ),
