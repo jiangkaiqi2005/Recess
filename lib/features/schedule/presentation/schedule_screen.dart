@@ -79,8 +79,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72 * textScale,
-        titleSpacing: 12,
+        toolbarHeight: 56 * textScale,
+        titleSpacing: 8,
         title: PopupMenuButton<_WeekMenuAction>(
           key: const Key('schedule-week-menu'),
           tooltip: '周操作',
@@ -133,24 +133,23 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             ),
           ],
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   '${now.year}/${now.month}/${now.day}',
-                  style: theme.textTheme.headlineSmall?.copyWith(
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
-                    height: 1.15,
+                    height: 1.1,
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
                   isViewingCurrentWeek
                       ? '第 $selectedWeek 周'
                       : '第 $selectedWeek 周   当前为第 $currentWeek 周',
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),

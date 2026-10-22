@@ -51,7 +51,12 @@ void main() {
     final section12 = find.byKey(const ValueKey('section-axis-12'));
     final mondayHeader = find.text('周一');
     expect(scrollView, findsOneWidget);
-    expect(tester.getSize(timeAxis).width, 44);
+    expect(tester.getSize(timeAxis).width, 36);
+    // 月份在时间轴那一格里水平居中。
+    final monthLabel = find.byKey(const Key('week-view-month-label'));
+    expect(tester.widget<Text>(monthLabel).data, '8月');
+    expect(tester.getCenter(monthLabel).dx,
+        moreOrLessEquals(tester.getCenter(timeAxis).dx, epsilon: 0.5));
     expect(section12, findsOneWidget);
     // 默认时间表只给 1-12 节设了时间，课程也都在 12 节以内。
     expect(find.byKey(const ValueKey('section-axis-13')), findsNothing);

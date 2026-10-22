@@ -18,7 +18,7 @@ const double _sectionHeight = 56.0;
 const double _cardInset = 2.0;
 
 /// 左侧时间轴宽度。
-const double _timeAxisWidth = 44.0;
+const double _timeAxisWidth = 36.0;
 
 /// 表格底部在系统导航条之外额外留出的空白。
 const double _bottomGap = 24.0;
@@ -169,29 +169,23 @@ class _DayHeaderRow extends StatelessWidget {
           ]
         : <DateTime>[];
     final hasDates = dates.isNotEmpty;
-    // 跨月时显示 "7-8月"，否则 "7月"。
-    final monthLabel = hasDates
-        ? (dates.first.month == dates.last.month
-            ? '${dates.first.month}月'
-            : '${dates.first.month}-${dates.last.month}月')
-        : null;
+    // 跨月周与 WakeUp 一致只显示周一所在月，窄时间轴放不下 "7-8月"。
+    final monthLabel = hasDates ? '${dates.first.month}月' : null;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 4),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: _timeAxisWidth,
             child: monthLabel != null
-                ? Padding(
-                    padding: const EdgeInsets.only(left: 2),
-                    child: Text(
-                      monthLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.hintColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                ? Text(
+                    monthLabel,
+                    key: const Key('week-view-month-label'),
+                    textAlign: TextAlign.center,
+                    softWrap: false,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
                   )
                 : null,
@@ -254,7 +248,10 @@ class _TimeAxis extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // 36 宽的时间轴放不下 11sp 的 "08:00"，起止时间是全页唯一降到 10sp 的文字。
     final timeStyle = theme.textTheme.labelSmall?.copyWith(
+      fontSize: 10,
+      letterSpacing: -0.2,
       color: theme.colorScheme.onSurfaceVariant,
       height: 1.15,
     );

@@ -85,7 +85,7 @@ void main() {
   testWidgets('顶栏标题是今天日期和查看周，右侧依次为添加、搜索、更多', (tester) async {
     await pumpSchedule(tester);
 
-    expect(tester.getSize(find.byType(AppBar)).height, 72);
+    expect(tester.getSize(find.byType(AppBar)).height, 56);
     expect(find.text('${today.year}/${today.month}/${today.day}'),
         findsOneWidget);
     expect(find.text('第 3 周'), findsOneWidget);
