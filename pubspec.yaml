@@ -1,7 +1,7 @@
 name: recess
 description: A pure, minimal college course schedule app for Android.
 publish_to: 'none'
-version: 1.2.5+25
+version: 1.3.0+26
 
 environment:
   sdk: '>=3.7.0 <4.0.0'
