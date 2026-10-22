@@ -52,9 +52,126 @@ void main() {
       expect(courses, hasLength(1));
       expect(courses.single['name'], '边缘计算');
       expect(courses.single['dayOfWeek'], DateTime.monday);
+      expect(courses.single['teacher'], '汪成亮');
       final (imported, skipped) = importCoursesFromDecoded(courses);
       expect(imported, hasLength(1));
+      expect(imported.single.teacher, '汪成亮');
       expect(skipped, 0);
+    });
+
+    test('多教师去重并兼容中英文分号、等价周次和规范化教室', () async {
+      final courses = await _runExtractor(r'''
+        const lecture = new FakeElement(
+          '本科 - 操作系统[000373-004]\n[4-6周] [6-9节] D S1401（机房）',
+          380, 40, {'data-day': '4'});
+        const detail = new FakeElement(
+          '何静媛-06074[主讲]； 袁金凤-32123[主讲]; 何静媛-06074[主讲]; DS1401(语音教室) [6,4-5,4周] [6,7-9节]',
+          -9492, 141);
+        const outer = new FakeElement(detail.innerText, -9500, 200, {}, [detail]);
+        const sameTeachers = new FakeElement(
+          '何静媛-06074[主讲]; 袁金凤-32123[主讲]; DS1401 [4-6周] [6-9节]',
+          -9492, 141);
+        installDocument([detail, outer, lecture, sameTeachers]);
+      ''');
+
+      expect(courses, hasLength(1));
+      expect(courses.single['teacher'], '何静媛、袁金凤');
+    });
+
+    test('详情没有教室时按周次节次为不同教室的课程补全教师', () async {
+      final courses = await _runExtractor(r'''
+        const lecture = new FakeElement(
+          '本科 - 课程甲[000373-001]\n[1-3周] [10-13节] D1210',
+          380, 40, {'data-day': '4'});
+        const other = new FakeElement(
+          '本科 - 课程乙[000373-002]\n[1-3周] [10-13节] DS1401',
+          480, 40, {'data-day': '5'});
+        const detail = new FakeElement(
+          '葛亮-30651[主讲]; [1-3周] [10-13节]', -9492, 141);
+        installDocument([lecture, other, detail]);
+      ''');
+
+      expect(courses, hasLength(2));
+      expect(courses.map((c) => c['teacher']), ['葛亮', '葛亮']);
+    });
+
+    test('相同周次节次教室匹配到不同教师时两门课均保持空教师', () async {
+      final courses = await _runExtractor(r'''
+        const courses = ['课程甲', '课程乙'].map(function(name, index) {
+          return new FakeElement(
+            '本科 - ' + name + '[000373-001]\n[4-6周] [1-2节] D1210',
+            380, 40, {'data-day': String(index + 1)});
+        });
+        const details = [
+          '汪成亮-30470[主讲]; D1210 [4-6周] [1-2节]',
+          '葛亮-30651[主讲]; D1210 [4-6周] [1-2节]'
+        ].map(text => new FakeElement(text, -9492, 141));
+        installDocument(courses.concat(details));
+      ''');
+
+      expect(courses, hasLength(2));
+      expect(courses.map((c) => c['teacher']), [null, null]);
+    });
+
+    test('无教室详情与指定教室详情的教师冲突时保持空教师', () async {
+      final courses = await _runExtractor(r'''
+        installDocument([
+          new FakeElement(
+            '本科 - 边缘计算[992499-001]\n[4-6周] [1-2节] D1210',
+            380, 40, {'data-day': '4'}),
+          new FakeElement('汪成亮-30470[主讲]; D1210 [4-6周] [1-2节]', -9492, 141),
+          new FakeElement('葛亮-30651[主讲]; [4-6周] [1-2节]', -9492, 141)
+        ]);
+      ''');
+
+      expect(courses, hasLength(1));
+      expect(courses.single['teacher'], isNull);
+    });
+
+    test('周次、起止节次或教室不匹配的详情不能补全教师', () async {
+      final courses = await _runExtractor(r'''
+        const lecture = new FakeElement(
+          '本科 - 边缘计算[992499-001]\n[4-6周] [1-2节] D1210',
+          380, 40, {'data-day': '4'});
+        const details = [
+          '汪成亮-30470[主讲]; D1210 [4-5周] [1-2节]',
+          '汪成亮-30470[主讲]; D1210 [4-6周] [2节]',
+          '汪成亮-30470[主讲]; D1210 [4-6周] [1-3节]',
+          '汪成亮-30470[主讲]; DS1401 [4-6周] [1-2节]'
+        ].map(text => new FakeElement(text, -9492, 141));
+        installDocument([lecture].concat(details));
+      ''');
+
+      expect(courses, hasLength(1));
+      expect(courses.single['teacher'], isNull);
+    });
+
+    test('无编号实验课有匹配详情时补全教师', () async {
+      final courses = await _runExtractor(r'''
+        installDocument([
+          new FakeElement(
+            '操作系统[FUSE 用户空间文件系统管理 ]\n[13周] [6-9节] DS1401',
+            380, 40, {'data-day': '4'}),
+          new FakeElement(
+            '何静媛-06074[主讲]; DS1401 [13周] [6-9节]', -9492, 141)
+        ]);
+      ''');
+
+      expect(courses, hasLength(1));
+      expect(courses.single['teacher'], '何静媛');
+    });
+
+    test('纯文本兜底仍保持空教师', () async {
+      final courses = await _runExtractor(r'''
+        installDocument([
+          new FakeElement('汪成亮-30470[主讲]; D1210 [4-6周] [1-2节]', -9492, 141)
+        ]);
+        document.body.innerText = '周四\n[992499-001]\n[4-6周] [1-2节] D1210\n本科 - 边缘计算';
+      ''');
+
+      expect(courses, hasLength(1));
+      expect(courses.single['name'], '边缘计算');
+      expect(courses.single['teacher'], isNull);
     });
 
     test('多教师和无教室的教师详情在网格内外均不生成课程', () async {
@@ -109,6 +226,7 @@ void main() {
         expect(course.startSection, 6);
         expect(course.endSection, 9);
         expect(course.location, 'DS1401');
+        expect(course.teacher, isNull);
       }
     });
 

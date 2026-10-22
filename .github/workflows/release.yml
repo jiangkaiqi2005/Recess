@@ -145,7 +145,7 @@ jobs:
           for APK in build/release/*.apk; do
             "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/recess-apk-signature.txt"
             grep -Fq 'Number of signers: 1' "$RUNNER_TEMP/recess-apk-signature.txt"
-            grep -Fq 'certificate SHA-256 digest: 7206848b62105dcc9ea3e62a7a2f11158f14b6705849e10441dcf68fae52a6f6' \
+            grep -Fq 'certificate SHA-256 digest: dc1e286920a75d872d67ae3cfce1c38895837b26add743e07a3f487536b3febd' \
               "$RUNNER_TEMP/recess-apk-signature.txt"
             "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/recess-apk-badging.txt"
             grep -Fq "versionCode='${APP_VERSION##*+}'" "$RUNNER_TEMP/recess-apk-badging.txt"

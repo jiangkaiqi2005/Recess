@@ -71,11 +71,19 @@ class CquAdapter extends SchoolAdapter {
   // 普通课带课程编号，实验课可能只有「课程名[实验项目]」。
   var allEls = document.body.querySelectorAll('*');
   var candidates = [];
+  var teacherDetails = [];
+  var seenDetails = {};
 
   for (var i = 0; i < allEls.length; i++) {
     var el = allEls[i];
     // 只看直接文本内容较长的元素（课程卡片）
     var t = (el.innerText || el.textContent || '').trim();
+    // 教师详情常在屏外且命中多层容器，按文本收集，不参与课程及星期推断。
+    var detail = parseTeacherDetail(t);
+    if (detail) {
+      if (!seenDetails[t]) { seenDetails[t] = true; teacherDetails.push(detail); }
+      continue;
+    }
     if (t.length < 10 || t.length > 500) continue;
     // 无编号课程必须有完整标题，不能把仅含时间/教室的子元素当成卡片。
     if (!/\[\d{4,}-\d{2,}/.test(t) && !uncodedTitle(t)) continue;
@@ -187,7 +195,7 @@ class CquAdapter extends SchoolAdapter {
 
     results.push({
       name: name,
-      teacher: null,
+      teacher: matchTeacher(weeks, startSec, endSec, location),
       location: location,
       dayOfWeek: day,
       startSection: startSec,
@@ -249,6 +257,47 @@ class CquAdapter extends SchoolAdapter {
   }
 
   return JSON.stringify(results);
+
+  function normalizeLocation(location) {
+    return (location || '').replace(/\([^)]*\)|（[^）]*）/g, '').replace(/\s+/g, '');
+  }
+
+  function parseTeacherDetail(text) {
+    var names = [];
+    var rest = text;
+    var teacherMatch;
+    while ((teacherMatch = rest.match(/^([^\s;；\[\]]+)-\d+\[[^\[\]]+\]\s*(?:[;；]\s*)?/))) {
+      if (names.indexOf(teacherMatch[1]) === -1) names.push(teacherMatch[1]);
+      rest = rest.slice(teacherMatch[0].length);
+    }
+    if (names.length === 0) return null;
+    var info = rest.match(/^([^\[\]]*)\[((?:\d+(?:\s*[-–~]\s*\d+)?)(?:\s*[,，、]\s*\d+(?:\s*[-–~]\s*\d+)?)*)\s*周\]\s*\[((?:\d+(?:\s*[-–~]\s*\d+)?)(?:\s*[,，、]\s*\d+(?:\s*[-–~]\s*\d+)?)*)\s*节\]\s*$/);
+    if (!info) return null;
+    var weeks = parseRange(info[2]);
+    var sections = parseRange(info[3]);
+    return {
+      teacher: names.join('、'),
+      weeks: weeks.join(','),
+      startSection: sections[0],
+      endSection: sections[sections.length - 1],
+      location: normalizeLocation(info[1])
+    };
+  }
+
+  function matchTeacher(weeks, startSec, endSec, location) {
+    var teacher = null;
+    var normalizedLocation = normalizeLocation(location);
+    for (var i = 0; i < teacherDetails.length; i++) {
+      var detail = teacherDetails[i];
+      if (detail.weeks !== weeks.join(',') || detail.startSection !== startSec ||
+          detail.endSection !== endSec) continue;
+      // 详情无教室时只约束周次与节次；匹配到的教师必须全部一致。
+      if (detail.location && detail.location !== normalizedLocation) continue;
+      if (teacher !== null && teacher !== detail.teacher) return null;
+      teacher = detail.teacher;
+    }
+    return teacher;
+  }
 
   function uncodedTitle(text) {
     if (/\[\d{4,}-\d{2,}/.test(text)) return '';

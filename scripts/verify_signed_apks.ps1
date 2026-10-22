@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $expectedPackage = 'io.github.jiangkaiqi2005.recess'
-$expectedCertificate = '7206848b62105dcc9ea3e62a7a2f11158f14b6705849e10441dcf68fae52a6f6'
+$expectedCertificate = 'dc1e286920a75d872d67ae3cfce1c38895837b26add743e07a3f487536b3febd'
 
 $pubspec = Get-Content -LiteralPath (Join-Path $projectRoot 'pubspec.yaml') -Raw
 $versions = [regex]::Matches($pubspec, '(?m)^version:[ \t]*(\d+\.\d+\.\d+)\+([1-9]\d*)[ \t]*(?:#[^\r\n]*)?\r?$')
