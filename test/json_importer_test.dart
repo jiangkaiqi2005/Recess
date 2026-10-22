@@ -5,6 +5,20 @@ import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/features/import/data/json_importer.dart';
 
 void main() {
+  test('显式 JSON 颜色保留旧色和自定义 ARGB，不替换为显示色', () {
+    const rawColors = ['#C08CE8', '#F08C7C', '#E3753F', '#80123456'];
+    final result = JsonCourseImporter.parse(jsonEncode({
+      'courses': [
+        for (var i = 0; i < rawColors.length; i++) {
+          'name': '课程$i', 'dayOfWeek': 1, 'startSection': 1,
+          'endSection': 2, 'weeks': [1], 'color': rawColors[i],
+        },
+      ],
+    }), totalWeeks: 18);
+    expect(result.courses.map((c) => c.colorValue),
+        [0xFFC08CE8, 0xFFF08C7C, 0xFFE3753F, 0x80123456]);
+  });
+
   group('JsonCourseImporter - 合法模板', () {
     final json = jsonEncode({
       'courses': [

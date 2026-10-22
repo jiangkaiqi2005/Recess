@@ -351,15 +351,21 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
         Wrap(
           spacing: 10,
           children: AppConstants.coursePalette.map((c) {
-            final selected = course.colorValue == c;
+            final selected =
+                AppConstants.courseDisplayColor(course.colorValue) == c;
             return InkWell(
-              onTap: () =>
-                  ref.read(courseFormProvider.notifier).setColor(c),
+              onTap: () {
+                ref.read(courseFormProvider.notifier).setColor(c);
+                widget.onChanged?.call();
+              },
               child: Container(
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: Color(c),
+                  color: Color(AppConstants.courseDisplayColor(
+                    c,
+                    dark: theme.brightness == Brightness.dark,
+                  )),
                   shape: BoxShape.circle,
                   border: selected
                       ? Border.all(

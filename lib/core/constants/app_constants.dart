@@ -2,8 +2,8 @@
 class AppConstants {
   static const appName = 'hormone';
 
-  /// 课程卡片默认主题色（应用主蓝，ARGB）。
-  static const int defaultCourseColor = 0xFF5B8DEF;
+  /// 课程默认色（冷暖平衡色板的蓝色，ARGB）。
+  static const int defaultCourseColor = 0xFF4399F1;
 
   /// 默认节次 -> 开始时间（24h），用于时间轴展示。
   static const Map<int, String> sectionStartTimes = {
@@ -27,9 +27,31 @@ class AppConstants {
   /// 默认每节课时长（分钟）。
   static const int defaultSectionDuration = 45;
 
-  /// 课程卡片可选配色（柔和马卡龙色系，彼此可区分且深浅主题协调）。
+  /// 冷暖平衡、20% 柔化后的浅色色板，也是持久化的颜色标识。
   /// 编辑页色板、导入自动配色、ICS 解析配色共用这一份，保证全 App 一致。
   static const List<int> coursePalette = [
+    0xFF4399F1,
+    0xFF4BA89A,
+    0xFFE3753F,
+    0xFF7C83E7,
+    0xFFE36679,
+    0xFF46A4C1,
+    0xFFB28C6D,
+    0xFF53A88D,
+  ];
+
+  static const List<int> _courseDarkPalette = [
+    0xFF217BD1,
+    0xFF298B7E,
+    0xFFC3581D,
+    0xFF6266C7,
+    0xFFC2485D,
+    0xFF2287A3,
+    0xFF947052,
+    0xFF348B72,
+  ];
+
+  static const List<int> _legacyCoursePalette = [
     0xFF5B8DEF,
     0xFF3FBFA8,
     0xFFF2A25C,
@@ -41,6 +63,22 @@ class AppConstants {
     0xFFC08CE8,
     0xFFF08C7C,
   ];
+
+  /// 新旧色板共用的索引；旧十色仅在显示时按原索引循环映射到八色。
+  /// 自定义颜色返回 null，不更改数据库或备份里的原始值。
+  static int? coursePaletteIndex(int value) {
+    final index = coursePalette.indexOf(value);
+    if (index >= 0) return index;
+    final legacyIndex = _legacyCoursePalette.indexOf(value);
+    return legacyIndex < 0 ? null : legacyIndex % coursePalette.length;
+  }
+
+  /// 解析主题下的最终显示色；冻结色值不再二次柔化，自定义颜色原样返回。
+  static int courseDisplayColor(int value, {bool dark = false}) {
+    final index = coursePaletteIndex(value);
+    if (index == null) return value;
+    return (dark ? _courseDarkPalette : coursePalette)[index];
+  }
 
   /// 按序取色：导入课表时给相邻课程分配不同的柔和色。
   static int courseAutoColor(int index) =>

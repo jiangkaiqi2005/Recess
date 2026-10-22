@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
+import 'package:hormone/core/constants/app_constants.dart';
 import 'package:hormone/core/models/course.dart';
 import 'package:hormone/core/utils/week_calculator.dart';
 import 'package:hormone/data/providers/database_providers.dart';
@@ -80,7 +81,7 @@ class WidgetService {
                 'name': c.name,
                 'time': _timeRange(c),
                 'location': c.location ?? '',
-                'color': c.colorValue,
+                'color': AppConstants.courseDisplayColor(c.colorValue),
               })
           .toList();
 

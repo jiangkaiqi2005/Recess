@@ -28,6 +28,26 @@ void main() {
     await database.close();
   });
 
+  test('新旧色板与自定义 ARGB 在备份导出恢复后保持原始值', () async {
+    const rawColors = [0xFFC08CE8, 0xFFF08C7C, 0xFFE3753F, 0x80123456];
+    await semesters.upsert(Semester(
+      id: 's1', name: '学期', startDate: DateTime(2026, 9, 1), totalWeeks: 18,
+    ));
+    for (var i = 0; i < rawColors.length; i++) {
+      await courses.upsert(Course(
+        id: 'color-$i', semesterId: 's1', name: '课程$i', dayOfWeek: 1,
+        startSection: 1, endSection: 2, weeks: [1], colorValue: rawColors[i],
+      ));
+    }
+    final exported = await backup.exportJson();
+    final decoded = jsonDecode(exported) as Map<String, dynamic>;
+    final rows = ((decoded['semesters'] as List).single as Map)['courses'] as List;
+    expect(rows.map((row) => (row as Map)['colorValue']), unorderedEquals(rawColors));
+    await backup.restore(exported);
+    expect((await courses.getCourses('s1')).map((c) => c.colorValue),
+        unorderedEquals(rawColors));
+  });
+
   String exportFixture() {
     final data = {
       'app': 'hormone',

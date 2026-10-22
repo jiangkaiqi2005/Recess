@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:hormone/core/constants/app_constants.dart';
 import 'package:hormone/core/models/course.dart';
 import 'package:hormone/core/models/course_platform.dart';
 import 'package:hormone/features/course/application/course_platforms_provider.dart';
@@ -21,8 +22,11 @@ void showCourseDetailSheet(
   Map<int, SectionTime> sectionTimes, {
   VoidCallback? onJumpToWeek,
 }) {
-  final color = Color(course.colorValue);
   final theme = Theme.of(context);
+  final color = Color(AppConstants.courseDisplayColor(
+    course.colorValue,
+    dark: theme.brightness == Brightness.dark,
+  ));
   showModalBottomSheet(
     context: context,
     useSafeArea: true,

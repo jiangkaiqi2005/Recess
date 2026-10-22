@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:hormone/core/constants/app_constants.dart';
 import 'package:hormone/core/models/course.dart';
 import 'package:hormone/features/schedule/domain/schedule_helpers.dart';
 import 'package:hormone/features/semester/application/semester_providers.dart';
@@ -88,7 +89,10 @@ class _ResultTile extends StatelessWidget {
         width: 12,
         height: 12,
         decoration: BoxDecoration(
-          color: Color(course.colorValue),
+          color: Color(AppConstants.courseDisplayColor(
+            course.colorValue,
+            dark: theme.brightness == Brightness.dark,
+          )),
           borderRadius: BorderRadius.circular(3),
         ),
       ),

@@ -53,8 +53,7 @@ void main() {
         matching: find.byType(Material),
       ),
     );
-    expect(material.color, courseCardColor(const Color(0xFF5B8DEF),
-        Brightness.light));
+    expect(material.color, const Color(0xFF4399F1));
     expect(material.borderRadius, BorderRadius.circular(6));
     expect(material.shape, isNull);
 
@@ -87,33 +86,88 @@ void main() {
     final tall = tester.widget<Text>(find.byKey(const Key('course-card-text')));
 
     await pumpCard(tester, size: const Size(42, 48));
-    final short = tester.widget<Text>(find.byKey(const Key('course-card-text')));
+    final short = tester.widget<Text>(
+      find.byKey(const Key('course-card-text')),
+    );
 
     expect(short.maxLines, greaterThanOrEqualTo(1));
     expect(tall.maxLines, greaterThan(short.maxLines!));
     expect(tester.takeException(), isNull);
   });
 
-  test('色板中每种颜色推导出的底色与白字对比度不低于 3:1（浅色与深色）', () {
-    for (final value in AppConstants.coursePalette) {
+  testWidgets('新旧色板的最终 Material 色值遵循浅深主题，不再二次压暗', (tester) async {
+    const legacy = [
+      0xFF5B8DEF,
+      0xFF3FBFA8,
+      0xFFF2A25C,
+      0xFF9B8AFB,
+      0xFFEF6E8D,
+      0xFF4FA3E3,
+      0xFFE8BE50,
+      0xFF63C98D,
+      0xFFC08CE8,
+      0xFFF08C7C,
+    ];
+    const dark = [
+      0xFF217BD1,
+      0xFF298B7E,
+      0xFFC3581D,
+      0xFF6266C7,
+      0xFFC2485D,
+      0xFF2287A3,
+      0xFF947052,
+      0xFF348B72,
+    ];
+    for (final value in [...legacy, ...AppConstants.coursePalette]) {
       for (final brightness in Brightness.values) {
-        final background = courseCardColor(Color(value), brightness);
-        expect(
-          _contrastRatio(Colors.white, background),
-          greaterThanOrEqualTo(3.0),
-          reason: '${value.toRadixString(16)} 在 $brightness 下白字对比度不足',
+        final index = AppConstants.coursePaletteIndex(value)!;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(brightness: brightness),
+            themeAnimationDuration: Duration.zero,
+            home: SizedBox(
+              width: 42,
+              height: 104,
+              child: CourseCard(
+                course: course.copyWith(colorValue: value),
+                onTap: _noop,
+                onLongPress: _noop,
+              ),
+            ),
+          ),
         );
+        await tester.pump();
+        final material = tester.widget<Material>(
+          find.descendant(
+            of: find.byType(CourseCard),
+            matching: find.byType(Material),
+          ),
+        );
+        expect(
+          material.color,
+          Color(
+            brightness == Brightness.dark
+                ? dark[index]
+                : AppConstants.coursePalette[index],
+          ),
+        );
+        final text = tester.widget<Text>(
+          find.byKey(const Key('course-card-text')),
+        );
+        expect(text.style?.color, Colors.white);
+        expect(tester.takeException(), isNull);
       }
     }
   });
 
-  test('底色保留色相，深色模式下更暗', () {
-    const base = Color(0xFFF2A25C);
+  test('自定义颜色保留色相、白字可读性处理及深色压暗', () {
+    const base = Color(0xFFFFCC88);
     final light = courseCardColor(base, Brightness.light);
     final dark = courseCardColor(base, Brightness.dark);
 
     final baseHsl = HSLColor.fromColor(base);
     expect(HSLColor.fromColor(light).hue, closeTo(baseHsl.hue, 1));
+    expect(_contrastRatio(Colors.white, light), greaterThanOrEqualTo(3));
     expect(
       HSLColor.fromColor(dark).lightness,
       lessThan(HSLColor.fromColor(light).lightness),
@@ -122,10 +176,7 @@ void main() {
 
   test('本身已足够深的颜色不再压暗', () {
     const deep = Color(0xFF1A237E);
-    expect(
-      courseCardColor(deep, Brightness.light).toARGB32(),
-      deep.toARGB32(),
-    );
+    expect(courseCardColor(deep, Brightness.light).toARGB32(), deep.toARGB32());
   });
 }
 
@@ -134,11 +185,13 @@ void _noop() {}
 double _contrastRatio(Color foreground, Color background) {
   final foregroundLuminance = foreground.computeLuminance();
   final backgroundLuminance = background.computeLuminance();
-  final lighter = foregroundLuminance > backgroundLuminance
-      ? foregroundLuminance
-      : backgroundLuminance;
-  final darker = foregroundLuminance > backgroundLuminance
-      ? backgroundLuminance
-      : foregroundLuminance;
+  final lighter =
+      foregroundLuminance > backgroundLuminance
+          ? foregroundLuminance
+          : backgroundLuminance;
+  final darker =
+      foregroundLuminance > backgroundLuminance
+          ? backgroundLuminance
+          : foregroundLuminance;
   return (lighter + 0.05) / (darker + 0.05);
 }

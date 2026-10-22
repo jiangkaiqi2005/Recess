@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:hormone/core/constants/app_constants.dart';
 import 'package:hormone/core/models/course.dart';
 import 'package:hormone/core/utils/week_calculator.dart';
 import 'package:hormone/features/schedule/domain/schedule_helpers.dart';
@@ -429,9 +430,15 @@ class CourseCard extends StatelessWidget {
   }
 }
 
-/// 由课程色推导卡片底色：保留色相与饱和度，只降低亮度，直到白字对比度
-/// 达到 3:1；深色模式下亮度再乘以 0.82，避免色块在深底上发亮刺眼。
+/// 色板使用已确认的主题色值；自定义颜色保留原来的白字可读性处理。
 Color courseCardColor(Color base, Brightness brightness) {
+  final value = base.toARGB32();
+  if (AppConstants.coursePaletteIndex(value) != null) {
+    return Color(AppConstants.courseDisplayColor(
+      value,
+      dark: brightness == Brightness.dark,
+    ));
+  }
   var hsl = HSLColor.fromColor(base);
   var color = base;
   while (_contrastWithWhite(color) < 3.0 && hsl.lightness > 0) {
