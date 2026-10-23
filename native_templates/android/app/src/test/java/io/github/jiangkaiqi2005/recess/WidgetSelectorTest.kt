@@ -39,10 +39,14 @@ class WidgetSelectorTest {
 
     private fun teachingDays(week: Int = 7) = listOf(WidgetDay(thursday, week))
 
+    private fun midnightAfter(date: LocalDate = thursday): LocalDateTime =
+        date.plusDays(1).atStartOfDay()
+
     @Test
     fun `正在上课时保留当前课次并显示教学周标题`() {
+        val now = LocalDateTime.of(2026, 10, 22, 9, 0)
         val selection = WidgetSelector.select(
-            now = LocalDateTime.of(2026, 10, 22, 9, 0),
+            now = now,
             occurrences = listOf(occurrence("高等数学", "08:00", "09:40")),
             days = teachingDays(),
             loaded = true
@@ -51,12 +55,14 @@ class WidgetSelectorTest {
         assertEquals("第 7 周 · 周四", selection.title)
         assertEquals(WidgetDisplayMode.TODAY, selection.mode)
         assertEquals(listOf("高等数学"), selection.occurrences.map { it.name })
+        assertEquals(LocalDateTime.of(2026, 10, 22, 9, 40), selection.nextRefresh)
     }
 
     @Test
     fun `两节课之间只显示尚未结束的课次`() {
+        val now = LocalDateTime.of(2026, 10, 22, 10, 0)
         val selection = WidgetSelector.select(
-            now = LocalDateTime.of(2026, 10, 22, 10, 0),
+            now = now,
             occurrences = listOf(
                 occurrence("上午课", "08:00", "09:40"),
                 occurrence("下午课", "14:00", "15:40", startSection = 5, endSection = 6)
@@ -67,6 +73,7 @@ class WidgetSelectorTest {
 
         assertEquals(WidgetDisplayMode.TODAY, selection.mode)
         assertEquals(listOf("下午课"), selection.occurrences.map { it.name })
+        assertEquals(LocalDateTime.of(2026, 10, 22, 14, 0), selection.nextRefresh)
     }
 
     @Test
@@ -83,6 +90,7 @@ class WidgetSelectorTest {
 
         assertTrue(selection.occurrences.isEmpty())
         assertEquals(WidgetDisplayMode.SEMESTER_ENDED, selection.mode)
+        assertEquals(midnightAfter(), selection.nextRefresh)
     }
 
     @Test
@@ -96,6 +104,7 @@ class WidgetSelectorTest {
 
         assertTrue(selection.occurrences.isEmpty())
         assertEquals(WidgetDisplayMode.SEMESTER_ENDED, selection.mode)
+        assertEquals(midnightAfter(), selection.nextRefresh)
     }
 
     @Test
@@ -117,6 +126,7 @@ class WidgetSelectorTest {
             listOf("只缺结束", "缺钟点前", "缺钟点后"),
             selection.occurrences.map { it.name }
         )
+        assertEquals(midnightAfter(), selection.nextRefresh)
     }
 
     @Test
@@ -297,6 +307,7 @@ class WidgetSelectorTest {
         assertEquals(WidgetDisplayMode.SEMESTER_ENDED, selection.mode)
         assertTrue(selection.occurrences.isEmpty())
         assertNull(selection.capsule)
+        assertEquals(midnightAfter(LocalDate.of(2026, 10, 30)), selection.nextRefresh)
     }
 
     @Test
@@ -312,6 +323,7 @@ class WidgetSelectorTest {
         assertTrue(selection.occurrences.isEmpty())
         assertNull(selection.capsule)
         assertEquals("第 7 周 · 周四", selection.title)
+        assertEquals(midnightAfter(), selection.nextRefresh)
     }
 
     @Test
@@ -362,5 +374,118 @@ class WidgetSelectorTest {
         assertEquals(WidgetDisplayMode.TODAY, selection.mode)
         assertEquals(listOf("今天稍后"), selection.occurrences.map { it.name })
         assertNull(selection.capsule)
+        assertEquals(LocalDateTime.of(2026, 10, 22, 10, 0), selection.nextRefresh)
+    }
+
+    @Test
+    fun `上课前的下一次刷新是上课时刻`() {
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 7, 0),
+            occurrences = listOf(occurrence("高等数学", "08:00", "09:40")),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        assertEquals(WidgetDisplayMode.TODAY, selection.mode)
+        assertEquals(LocalDateTime.of(2026, 10, 22, 8, 0), selection.nextRefresh)
+    }
+
+    @Test
+    fun `两节课之间的下一次刷新是下一节开始时刻`() {
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 10, 0),
+            occurrences = listOf(
+                occurrence("上午课", "08:00", "09:40"),
+                occurrence("下一节", "10:30", "12:00", startSection = 3, endSection = 4)
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        assertEquals(WidgetDisplayMode.TODAY, selection.mode)
+        assertEquals(LocalDateTime.of(2026, 10, 22, 10, 30), selection.nextRefresh)
+    }
+
+    @Test
+    fun `今天剩余课次与零点取较早者`() {
+        val lateClass = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 23, 0),
+            occurrences = listOf(
+                occurrence("晚课", "23:30", "23:50", startSection = 13, endSection = 14)
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+        assertEquals(LocalDateTime.of(2026, 10, 22, 23, 30), lateClass.nextRefresh)
+
+        // 今天已无剩余课次时，即使明天的课在早上，下一次刷新也是零点。
+        val tomorrow = thursday.plusDays(1)
+        val noClassToday = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 22, 0),
+            occurrences = listOf(
+                occurrence("明天的课", "08:00", "09:40", date = tomorrow)
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+        assertEquals(midnightAfter(), noClassToday.nextRefresh)
+    }
+
+    @Test
+    fun `没有课次时下一次刷新是次日零点`() {
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 10, 0),
+            occurrences = emptyList(),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        assertEquals(WidgetDisplayMode.SEMESTER_ENDED, selection.mode)
+        assertEquals(midnightAfter(), selection.nextRefresh)
+    }
+
+    @Test
+    fun `缺少两端钟点的课次不产生刷新候选`() {
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 10, 0),
+            occurrences = listOf(
+                occurrence("缺钟点", null, null, startSection = 11, endSection = 12)
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        assertEquals(WidgetDisplayMode.TODAY, selection.mode)
+        assertEquals(midnightAfter(), selection.nextRefresh)
+    }
+
+    @Test
+    fun `只有结束时刻的课次按下课时刻刷新`() {
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 10, 0),
+            occurrences = listOf(
+                occurrence("只缺开始", null, "10:30", startSection = 3, endSection = 4)
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        assertEquals(WidgetDisplayMode.TODAY, selection.mode)
+        assertEquals(LocalDateTime.of(2026, 10, 22, 10, 30), selection.nextRefresh)
+    }
+
+    @Test
+    fun `只有开始时刻的课次按上课时刻刷新`() {
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 10, 0),
+            occurrences = listOf(
+                occurrence("只缺结束", "10:30", null, startSection = 3, endSection = 4)
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        assertEquals(WidgetDisplayMode.TODAY, selection.mode)
+        assertEquals(LocalDateTime.of(2026, 10, 22, 10, 30), selection.nextRefresh)
     }
 }

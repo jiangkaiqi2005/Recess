@@ -3,7 +3,8 @@ package io.github.jiangkaiqi2005.recess
 // Android 桌面小组件（App Widget）。读取 home_widget 共享的
 // SharedPreferences 中由 Flutter 侧写入的课次数据，按当前本地时间挑选
 // 今天还没结束的课次；今天没有剩余课次时改为显示一条带日期胶囊的
-// 下一节课，两种空状态分别提示加载课表与学期结束。
+// 下一节课，两种空状态分别提示加载课表与学期结束。每次渲染后用不精确
+// 闹钟安排下一次上课、下课或零点的刷新。
 //
 // 注意：此文件位于 native_templates/android/...，请复制到
 // android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt
@@ -12,6 +13,7 @@ package io.github.jiangkaiqi2005.recess
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.view.View
@@ -19,6 +21,25 @@ import android.widget.RemoteViews
 import java.time.LocalDateTime
 
 class CourseWidgetProvider : AppWidgetProvider() {
+
+    /**
+     * 不精确闹钟到点后用显式广播回到这里，对全部小组件重走 [onUpdate]；
+     * 渲染结束后会重新计算并安排下一次闹钟，形成自维持链。
+     * 不注册开机广播：重启后系统照常发出 APPWIDGET_UPDATE，onUpdate 重新挂上闹钟。
+     */
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == WidgetRefreshScheduler.ACTION_REFRESH) {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(
+                ComponentName(context, CourseWidgetProvider::class.java)
+            )
+            if (appWidgetIds.isNotEmpty()) {
+                onUpdate(context, appWidgetManager, appWidgetIds)
+            }
+            return
+        }
+        super.onReceive(context, intent)
+    }
 
     override fun onUpdate(
         context: Context,
@@ -97,6 +118,9 @@ class CourseWidgetProvider : AppWidgetProvider() {
             intArrayOf(appWidgetId),
             R.id.widget_list
         )
+        // 每次渲染后安排下一次上下课/零点刷新；上面已显式通知数据变化，
+        // 闹钟触发时 onReceive 会重新渲染并再次安排，不会越积越多。
+        WidgetRefreshScheduler.schedule(context, selection.nextRefresh)
     }
 
     /** 兜底条目与列表条目同构：色条 + 课程名 / 时间段 / 地点，不能滚动。 */

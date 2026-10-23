@@ -49,11 +49,13 @@ enum class WidgetDisplayMode {
  * [occurrences] 在 [WidgetDisplayMode.TODAY] 下是今天剩余的课次，在
  * [WidgetDisplayMode.NEXT] 下只有一条下一节课；两种空状态下为空。
  * [capsule] 只在 [WidgetDisplayMode.NEXT] 下有值。
+ * [nextRefresh] 是下一次需要刷新小组件的本地时刻，一定晚于传入的现在。
  */
 data class WidgetSelection(
     val title: String,
     val mode: WidgetDisplayMode,
     val occurrences: List<WidgetOccurrence>,
+    val nextRefresh: LocalDateTime,
     val capsule: String? = null
 )
 
@@ -65,7 +67,9 @@ data class WidgetSelection(
  * - 今天的列表：日期为今天且结束时刻晚于现在；结束时刻缺失时当天一直保留；
  * - 下一节课：今天之后最早的那一天里的第一节课，今天已结束的课次不参与；
  * - 胶囊文字：明天写「明天 · 周X」，本周内写「周X」，下一周写「下周X」，
- *   更远写「M月D日」。
+ *   更远写「M月D日」；
+ * - 下一次刷新：今天剩余课次中最近的开始或结束时刻，与下一个零点取较早者；
+ *   今天没有剩余课次、没有数据或学期结束时就是下一个零点。
  *
  * 测试见 `src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt`。
  */
@@ -89,11 +93,13 @@ object WidgetSelector {
     ): WidgetSelection {
         val today = now.toLocalDate()
         val title = titleFor(today, days)
+        val midnight = today.plusDays(1).atStartOfDay()
         if (!loaded) {
             return WidgetSelection(
                 title = title,
                 mode = WidgetDisplayMode.NOT_LOADED,
-                occurrences = emptyList()
+                occurrences = emptyList(),
+                nextRefresh = midnight
             )
         }
 
@@ -104,7 +110,8 @@ object WidgetSelector {
             return WidgetSelection(
                 title = title,
                 mode = WidgetDisplayMode.TODAY,
-                occurrences = todayOccurrences
+                occurrences = todayOccurrences,
+                nextRefresh = nextRefreshAt(now, occurrences, midnight)
             )
         }
 
@@ -112,14 +119,41 @@ object WidgetSelector {
             ?: return WidgetSelection(
                 title = title,
                 mode = WidgetDisplayMode.SEMESTER_ENDED,
-                occurrences = emptyList()
+                occurrences = emptyList(),
+                nextRefresh = midnight
             )
         return WidgetSelection(
             title = title,
             mode = WidgetDisplayMode.NEXT,
             occurrences = listOf(next),
+            nextRefresh = nextRefreshAt(now, occurrences, midnight),
             capsule = capsuleFor(today, next.date)
         )
+    }
+
+    /**
+     * 下一次刷新时刻：今天剩余课次中最近的开始或结束时刻，与下一个零点取较早者。
+     *
+     * 今天已结束的课次不会产生晚于现在的时刻，因此不必再判断是否剩余；缺少任意
+     * 一端时只按已知的另一端参与，两端都缺失的课次不产生候选。结果一定晚于现在。
+     */
+    private fun nextRefreshAt(
+        now: LocalDateTime,
+        occurrences: List<WidgetOccurrence>,
+        midnight: LocalDateTime
+    ): LocalDateTime {
+        val today = now.toLocalDate()
+        val nextMoment = occurrences
+            .filter { it.date == today }
+            .flatMap { listOf(it.start, it.end) }
+            .filterNotNull()
+            .filter { it.isAfter(now) }
+            .minOrNull()
+        return if (nextMoment != null && nextMoment.isBefore(midnight)) {
+            nextMoment
+        } else {
+            midnight
+        }
     }
 
     /**

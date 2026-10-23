@@ -26,6 +26,7 @@ flutter pub get
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetService.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetService.kt` |
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetData.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetData.kt` |
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetSelector.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetSelector.kt` |
+| `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetRefreshScheduler.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetRefreshScheduler.kt` |
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetText.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetText.kt` |
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetRender.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetRender.kt` |
 | `native_templates/android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt` | `android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt` |
@@ -70,6 +71,11 @@ Android 上 `home_widget` 将数据写入 `HomeWidgetSharedPreferences`；
 `WidgetText` 为两处共用的颜色与时间行格式），表面色、文字色与胶囊色见
 `values/colors.xml` 与 `values-night/colors.xml`。
 
+`WidgetSelector` 同时算出下一次需要刷新的时刻（今天剩余课次中最近的上课或
+下课时刻，与下一个零点取较早者）。`CourseWidgetProvider` 每次渲染后调用
+`WidgetRefreshScheduler`，用不精确闹钟在该时刻触发一次显式广播，回到
+`onReceive` 重新渲染并安排下一次；闹钟触发后形成自维持链。
+
 ## 3. 验证
 
 ```bash
@@ -93,11 +99,18 @@ Windows 下如 `gradlew` 不可执行，可用 `cmd //c gradlew.bat :app:testDeb
 
 ## 4. 已知限制
 
-- 小组件刷新集中由应用根部的 `_AppEffects` 驱动：监听学期/课程/节次变化（防抖）
-  与回到前台、跨过午夜时补刷；App 未在后台运行时不刷新。原生侧尚未在
-  上下课时刻自行安排刷新（后续票处理）。
-- 尚未接入 Android 后台定时任务（如需整点自定义，可加 `WorkManager` 或
-  `home_widget` 的 background callback）。
+- App 不在前台时不会重新计算课表；跨天、上课和下课后的更新由原生端的不精确
+  闹钟触发。`WidgetSelector` 算出的下一次刷新时刻交给
+  `WidgetRefreshScheduler`，每次安排前先取消旧闹钟；到点后重新渲染并重新
+  安排，形成自维持链。App 仍在课表、节次、学期变化或回到前台时主动写入并刷新。
+- 不申请 `SCHEDULE_EXACT_ALARM`，也不使用 `setExact*`。闹钟使用
+  `AlarmManager.setAndAllowWhileIdle(AlarmManager.RTC, ...)`，系统在 Doze
+  或省电策略下可能延迟几分钟才更新。
+- 保留 `course_widget_info.xml` 的 `updatePeriodMillis="1800000"`（30 分钟）
+  系统周期更新作为兜底；若系统限制后台广播，最坏情况下要等下一次 30 分钟更新。
+- 不注册开机广播（`BOOT_COMPLETED`）。手机重启后，系统发出的
+  `APPWIDGET_UPDATE` 会让 `CourseWidgetProvider.onUpdate` 重新挂上闹钟，
+  不需要打开 App。
 - 小组件为 2×2 的可滚动课次列表（`CourseWidgetService` 提供条目），可以拉伸、
   不能缩到 2×2 以下；今天没有剩余课次时改为一条不可滚动的下一节课，上方用
   主题色胶囊标注日期；从未加载时显示「打开 Recess 加载课表」，本学期剩余
