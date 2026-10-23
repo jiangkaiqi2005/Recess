@@ -26,11 +26,15 @@ flutter pub get
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetService.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetService.kt` |
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetData.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetData.kt` |
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetSelector.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetSelector.kt` |
+| `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetText.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetText.kt` |
+| `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetRender.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetRender.kt` |
 | `native_templates/android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt` | `android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt` |
+| `native_templates/android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetTextTest.kt` | `android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetTextTest.kt` |
 | `native_templates/android/app/src/main/res/xml/course_widget_info.xml` | `android/app/src/main/res/xml/course_widget_info.xml` |
 | `native_templates/android/app/src/main/res/layout/course_widget.xml` | `android/app/src/main/res/layout/course_widget.xml` |
 | `native_templates/android/app/src/main/res/layout/course_widget_item.xml` | `android/app/src/main/res/layout/course_widget_item.xml` |
 | `native_templates/android/app/src/main/res/drawable/course_widget_background.xml` | `android/app/src/main/res/drawable/course_widget_background.xml` |
+| `native_templates/android/app/src/main/res/drawable/course_widget_capsule.xml` | `android/app/src/main/res/drawable/course_widget_capsule.xml` |
 | `native_templates/android/app/src/main/res/values/colors.xml` | `android/app/src/main/res/values/colors.xml` |
 | `native_templates/android/app/src/main/res/values-night/colors.xml` | `android/app/src/main/res/values-night/colors.xml` |
 | `native_templates/android/app/src/main/res/xml/filepaths.xml` | `android/app/src/main/res/xml/filepaths.xml` |
@@ -55,11 +59,16 @@ FileProvider/安装权限；`AndroidManifest.receiver.xml` 仅作为 Receiver �
 
 Android 上 `home_widget` 将数据写入 `HomeWidgetSharedPreferences`；
 `CourseWidgetProvider` 与 `CourseWidgetService` 通过 `WidgetData` 读取其中的
-`occurrences`（从今天到学期结束的课次列表）、`semester_days`（逐日教学周映射）。
-周次、钟点都由 Dart 侧算好，原生端的 `WidgetSelector` 只按当前本地时间
-挑选今天还没结束的课次并生成标题栏；`CourseWidgetService` 把挑选结果填充到
-小组件里的 `ListView`，条目颜色取自 Dart 写入的 `color` / `color_dark`，
-表面色与文字色见 `values/colors.xml` 与 `values-night/colors.xml`。
+`occurrences`（从今天到学期结束的课次列表）、`semester_days`（逐日教学周映射）
+与 `widget_loaded`（是否成功写入过数据）。周次、钟点都由 Dart 侧算好，原生端的
+`WidgetSelector` 只按当前本地时间挑选：今天还有剩余课次时显示列表；今天没有
+剩余课次时显示一条下一节课，并用主题色胶囊标注「明天 · 周五」「周六」
+「下周一」或「11月3日」；`widget_loaded` 为 false 时提示加载课表，已加载但
+剩余时间没有课次时提示学期结束。`CourseWidgetService` 把今天的课次填充到
+小组件里的 `ListView`，`CourseWidgetProvider` 直接渲染不能滚动的兜底条目；
+条目颜色取自 Dart 写入的 `color` / `color_dark`（`WidgetRender` 与
+`WidgetText` 为两处共用的颜色与时间行格式），表面色、文字色与胶囊色见
+`values/colors.xml` 与 `values-night/colors.xml`。
 
 ## 3. 验证
 
@@ -90,8 +99,9 @@ Windows 下如 `gradlew` 不可执行，可用 `cmd //c gradlew.bat :app:testDeb
 - 尚未接入 Android 后台定时任务（如需整点自定义，可加 `WorkManager` 或
   `home_widget` 的 background callback）。
 - 小组件为 2×2 的可滚动课次列表（`CourseWidgetService` 提供条目），可以拉伸、
-  不能缩到 2×2 以下；下一节课兜底与两种空状态尚未实现（后续票处理），
-  今天没有剩余课次时只显示一条临时文案。
+  不能缩到 2×2 以下；今天没有剩余课次时改为一条不可滚动的下一节课，上方用
+  主题色胶囊标注日期；从未加载时显示「打开 Recess 加载课表」，本学期剩余
+  时间没有课次时显示「本学期课程已结束」。
 - `native_templates/android/app/src/test/` 下的 Kotlin 单测只在本地复制模板后
   用 Gradle 运行，CI 不执行。
 - ICS 时间按学校本地时间处理，忽略 `TZID`/UTC 偏移。

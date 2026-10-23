@@ -13,11 +13,9 @@ package io.github.jiangkaiqi2005.recess
 
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import java.time.LocalDateTime
-import java.util.Locale
 
 /** 供小组件 ListView 使用的 RemoteViewsService。 */
 class CourseWidgetService : RemoteViewsService() {
@@ -54,17 +52,16 @@ private class CourseWidgetFactory(private val context: Context) :
     override fun getViewAt(position: Int): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.course_widget_item)
         val occurrence = occurrences.getOrNull(position) ?: return views
-        val night = isNightMode()
 
         views.setTextViewText(R.id.widget_item_name, occurrence.name)
-        views.setTextViewText(R.id.widget_item_time, timeLine(occurrence))
+        views.setTextViewText(R.id.widget_item_time, WidgetText.timeLine(occurrence))
         // 地点始终占一行（没有地点时留空），保证色条在三条文字之间拉伸、
         // 且不同课次的行高一致。
         views.setTextViewText(R.id.widget_item_location, occurrence.location)
         views.setInt(
             R.id.widget_item_bar,
             "setBackgroundColor",
-            if (night) occurrence.colorDark else occurrence.colorLight
+            widgetBarColor(context, occurrence)
         )
         // 条目只提供 fill-in Intent，真正的启动动作来自 Provider 设置的点击模板。
         views.setOnClickFillInIntent(
@@ -84,32 +81,19 @@ private class CourseWidgetFactory(private val context: Context) :
 
     private fun reload() {
         val data = WidgetData.load(context)
-        occurrences = WidgetSelector.select(
+        val selection = WidgetSelector.select(
             now = LocalDateTime.now(),
             occurrences = data.occurrences,
-            days = data.days
-        ).occurrences
-    }
-
-    private fun isNightMode(): Boolean {
-        val uiMode = context.resources.configuration.uiMode and
-            Configuration.UI_MODE_NIGHT_MASK
-        return uiMode == Configuration.UI_MODE_NIGHT_YES
-    }
-
-    /** 完整起止时刻写「08:00-09:40」；缺少任意一端时写「第 11-12 节」。 */
-    private fun timeLine(occurrence: WidgetOccurrence): String {
-        val start = occurrence.start
-        val end = occurrence.end
-        return if (start != null && end != null) {
-            "${formatClock(start)}-${formatClock(end)}"
+            days = data.days,
+            loaded = data.loaded
+        )
+        // 列表只负责今天的课次；下一节课兜底由 Provider 直接渲染，不进入列表。
+        occurrences = if (selection.mode == WidgetDisplayMode.TODAY) {
+            selection.occurrences
         } else {
-            "第 ${occurrence.startSection}-${occurrence.endSection} 节"
+            emptyList()
         }
     }
-
-    private fun formatClock(time: LocalDateTime): String =
-        String.format(Locale.ROOT, "%02d:%02d", time.hour, time.minute)
 
     private companion object {
         const val EXTRA_POSITION = "widget_item_position"

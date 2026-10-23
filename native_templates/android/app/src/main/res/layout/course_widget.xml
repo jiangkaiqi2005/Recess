@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  小组件布局：标题栏 + 可滚动课次列表。
-  列表由 CourseWidgetService 提供，条目布局见 course_widget_item.xml。
+  小组件布局：标题栏 + 三种互斥内容。
+  - widget_list：今天还有课时的可滚动列表，由 CourseWidgetService 提供条目。
+  - widget_fallback：今天没有剩余课次时的下一节课，主题色胶囊 + 一条与列表
+    同构、不能滚动的课次。
+  - widget_empty：尚未加载 / 本学期已结束的空状态。
+  三者由 CourseWidgetProvider 按挑选结果切换可见性。
   复制到 android/app/src/main/res/layout/course_widget.xml
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -34,13 +38,43 @@
         android:overScrollMode="never"
         android:scrollbars="none" />
 
-    <!-- 临时空文案：下一节课兜底与两种空状态由后续票实现。 -->
+    <LinearLayout
+        android:id="@+id/widget_fallback"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/widget_capsule"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/course_widget_capsule"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="3dp"
+            android:textColor="@color/widget_capsule_text"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <include
+            layout="@layout/course_widget_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+
     <TextView
         android:id="@+id/widget_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="今天没有课"
+        android:ellipsize="end"
+        android:maxLines="2"
         android:textColor="@color/widget_text_muted"
         android:textSize="12sp"
         android:visibility="gone" />

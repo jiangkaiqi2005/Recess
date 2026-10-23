@@ -1,6 +1,6 @@
 package io.github.jiangkaiqi2005.recess
 
-// 读取 home_widget 写入 SharedPreferences 的课次与逐日教学周。
+// 读取 home_widget 写入 SharedPreferences 的课次、逐日教学周与加载标记。
 //
 // Provider 与 RemoteViewsService 共用这一份解析，避免两处各写一遍 JSON；
 // 这里只做格式解析，挑选逻辑仍然只在纯 Kotlin 的 WidgetSelector 里。
@@ -14,22 +14,30 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import org.json.JSONArray
 
-/** 一次读取得到的原生侧数据快照。 */
+/**
+ * 一次读取得到的原生侧数据快照。
+ *
+ * [loaded] 对应 Dart 侧写入的 `widget_loaded`：缺失或为 false 表示从未成功
+ * 写入过数据，用来区分「尚未加载」与「已加载但本学期没有课次」。
+ */
 internal data class WidgetData(
     val occurrences: List<WidgetOccurrence>,
-    val days: List<WidgetDay>
+    val days: List<WidgetDay>,
+    val loaded: Boolean
 ) {
     companion object {
         // home_widget 在 Android 上将数据写入名为 HomeWidgetSharedPreferences 的偏好表。
         private const val PREFS_NAME = "HomeWidgetSharedPreferences"
         private const val KEY_OCCURRENCES = "occurrences"
         private const val KEY_SEMESTER_DAYS = "semester_days"
+        private const val KEY_LOADED = "widget_loaded"
 
         fun load(context: Context): WidgetData {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             return WidgetData(
                 occurrences = parseOccurrences(prefs.getString(KEY_OCCURRENCES, null)),
-                days = parseDays(prefs.getString(KEY_SEMESTER_DAYS, null))
+                days = parseDays(prefs.getString(KEY_SEMESTER_DAYS, null)),
+                loaded = prefs.getBoolean(KEY_LOADED, false)
             )
         }
 

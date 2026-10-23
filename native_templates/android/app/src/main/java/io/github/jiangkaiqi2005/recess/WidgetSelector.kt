@@ -1,7 +1,9 @@
 package io.github.jiangkaiqi2005.recess
 
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.temporal.TemporalAdjusters
 
 /**
  * 一条课次。由 Flutter 侧预先算好并写入 home_widget 的 SharedPreferences。
@@ -26,25 +28,50 @@ data class WidgetDay(
     val week: Int?
 )
 
-/** 挑选结果：标题栏文字 + 今天还没结束的课次。 */
+/** 小组件当前要显示的内容。 */
+enum class WidgetDisplayMode {
+    /** 今天还有结束时刻晚于现在的课次（或结束时刻缺失）。 */
+    TODAY,
+
+    /** 今天没有剩余课次，但今天之后还有课次。 */
+    NEXT,
+
+    /** 已加载过数据，但本学期剩余时间里已经没有课次。 */
+    SEMESTER_ENDED,
+
+    /** 从未成功写入过数据。 */
+    NOT_LOADED
+}
+
+/**
+ * 挑选结果。
+ *
+ * [occurrences] 在 [WidgetDisplayMode.TODAY] 下是今天剩余的课次，在
+ * [WidgetDisplayMode.NEXT] 下只有一条下一节课；两种空状态下为空。
+ * [capsule] 只在 [WidgetDisplayMode.NEXT] 下有值。
+ */
 data class WidgetSelection(
     val title: String,
-    val occurrences: List<WidgetOccurrence>
+    val mode: WidgetDisplayMode,
+    val occurrences: List<WidgetOccurrence>,
+    val capsule: String? = null
 )
 
 /**
  * 纯 Kotlin 挑选类，不依赖 Android 框架。
  *
- * 周次与课次都由 Dart 侧算好，这里只按传入的当前本地时间做筛选：
+ * 周次与课次都由 Dart 侧算好，这里只按传入的当前本地时间挑选：
  * - 标题栏：教学周内显示「第 8 周 · 周四」，否则显示「10月23日 周四」；
- * - 今天的列表：日期为今天且结束时刻晚于现在；结束时刻缺失时当天一直保留。
- * - 时间冲突的课次全部保留，按开始时刻、开始节次、结束节次、课程名排序。
+ * - 今天的列表：日期为今天且结束时刻晚于现在；结束时刻缺失时当天一直保留；
+ * - 下一节课：今天之后最早的那一天里的第一节课，今天已结束的课次不参与；
+ * - 胶囊文字：明天写「明天 · 周X」，本周内写「周X」，下一周写「下周X」，
+ *   更远写「M月D日」。
  *
  * 测试见 `src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt`。
  */
 object WidgetSelector {
 
-    private val weekdayLabels = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+    private val weekdayNames = listOf("一", "二", "三", "四", "五", "六", "日")
 
     private val occurrenceOrder = compareBy<WidgetOccurrence>(
         { it.start == null },
@@ -57,20 +84,83 @@ object WidgetSelector {
     fun select(
         now: LocalDateTime,
         occurrences: List<WidgetOccurrence>,
-        days: List<WidgetDay>
+        days: List<WidgetDay>,
+        loaded: Boolean
     ): WidgetSelection {
         val today = now.toLocalDate()
+        val title = titleFor(today, days)
+        if (!loaded) {
+            return WidgetSelection(
+                title = title,
+                mode = WidgetDisplayMode.NOT_LOADED,
+                occurrences = emptyList()
+            )
+        }
+
         val todayOccurrences = occurrences
             .filter { it.date == today && (it.end == null || it.end.isAfter(now)) }
             .sortedWith(occurrenceOrder)
+        if (todayOccurrences.isNotEmpty()) {
+            return WidgetSelection(
+                title = title,
+                mode = WidgetDisplayMode.TODAY,
+                occurrences = todayOccurrences
+            )
+        }
+
+        val next = nextAfter(today, occurrences)
+            ?: return WidgetSelection(
+                title = title,
+                mode = WidgetDisplayMode.SEMESTER_ENDED,
+                occurrences = emptyList()
+            )
         return WidgetSelection(
-            title = titleFor(today, days),
-            occurrences = todayOccurrences
+            title = title,
+            mode = WidgetDisplayMode.NEXT,
+            occurrences = listOf(next),
+            capsule = capsuleFor(today, next.date)
         )
     }
 
+    /**
+     * 今天之后最早的一天里的第一节课。
+     *
+     * 同一天内先按开始时刻排序，缺少开始时刻的课次排在后面并按节次排序；
+     * 因此当天所有课次都没有开始时刻时，取节次最靠前的那一节。
+     */
+    private fun nextAfter(
+        today: LocalDate,
+        occurrences: List<WidgetOccurrence>
+    ): WidgetOccurrence? {
+        val nextDate = occurrences
+            .asSequence()
+            .map { it.date }
+            .filter { it.isAfter(today) }
+            .minOrNull()
+            ?: return null
+        return occurrences
+            .filter { it.date == nextDate }
+            .sortedWith(occurrenceOrder)
+            .firstOrNull()
+    }
+
+    private fun capsuleFor(today: LocalDate, next: LocalDate): String {
+        val weekday = weekdayNames[next.dayOfWeek.value - 1]
+        // 明天优先于「下周X」：即使明天是下周一，也写「明天 · 周一」。
+        if (next == today.plusDays(1)) {
+            return "明天 · 周$weekday"
+        }
+        val thisMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val nextMonday = next.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        return when (nextMonday) {
+            thisMonday -> "周$weekday"
+            thisMonday.plusWeeks(1) -> "下周$weekday"
+            else -> "${next.monthValue}月${next.dayOfMonth}日"
+        }
+    }
+
     private fun titleFor(today: LocalDate, days: List<WidgetDay>): String {
-        val weekday = weekdayLabels[today.dayOfWeek.value - 1]
+        val weekday = "周${weekdayNames[today.dayOfWeek.value - 1]}"
         val week = days.firstOrNull { it.date == today }?.week
         return if (week != null && week > 0) {
             "第 $week 周 · $weekday"

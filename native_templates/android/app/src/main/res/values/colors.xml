@@ -7,4 +7,7 @@
     <color name="widget_surface">#FFFFFFFF</color>
     <color name="widget_text">#FF182033</color>
     <color name="widget_text_muted">#FF69758A</color>
+    <!-- 下一节课日期胶囊：AppColors.primaryLight + 白色文字。 -->
+    <color name="widget_capsule_background">#FF3568D4</color>
+    <color name="widget_capsule_text">#FFFFFFFF</color>
 </resources>

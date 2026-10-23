@@ -2,7 +2,8 @@ package io.github.jiangkaiqi2005.recess
 
 // Android 桌面小组件（App Widget）。读取 home_widget 共享的
 // SharedPreferences 中由 Flutter 侧写入的课次数据，按当前本地时间挑选
-// 今天还没结束的课次，交给 CourseWidgetService 填充 2×2 可滚动列表。
+// 今天还没结束的课次；今天没有剩余课次时改为显示一条带日期胶囊的
+// 下一节课，两种空状态分别提示加载课表与学期结束。
 //
 // 注意：此文件位于 native_templates/android/...，请复制到
 // android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt
@@ -38,7 +39,8 @@ class CourseWidgetProvider : AppWidgetProvider() {
         val selection = WidgetSelector.select(
             now = LocalDateTime.now(),
             occurrences = data.occurrences,
-            days = data.days
+            days = data.days,
+            loaded = data.loaded
         )
 
         val views = RemoteViews(context.packageName, R.layout.course_widget)
@@ -52,18 +54,41 @@ class CourseWidgetProvider : AppWidgetProvider() {
         // 模板是不可变 PendingIntent，系统会忽略 fill-in Intent 的附加数据，
         // 但条目点击依然会执行模板；这一票不需要深链，所以不改用 FLAG_MUTABLE。
         views.setPendingIntentTemplate(R.id.widget_list, launchAppIntent(context))
-        views.setOnClickPendingIntent(R.id.widget_root, launchAppIntent(context))
+        // 根布局、兜底条目与空状态点击都拉起 App 的课表页。
+        val launchIntent = launchAppIntent(context)
+        views.setOnClickPendingIntent(R.id.widget_root, launchIntent)
+        views.setOnClickPendingIntent(R.id.widget_item_root, launchIntent)
+        views.setOnClickPendingIntent(R.id.widget_empty, launchIntent)
 
-        val hasOccurrences = selection.occurrences.isNotEmpty()
-        views.setViewVisibility(
-            R.id.widget_list,
-            if (hasOccurrences) View.VISIBLE else View.GONE
-        )
-        // 临时空文案：下一节课兜底与两种空状态由后续票实现。
-        views.setViewVisibility(
-            R.id.widget_empty,
-            if (hasOccurrences) View.GONE else View.VISIBLE
-        )
+        when (selection.mode) {
+            WidgetDisplayMode.TODAY -> {
+                views.setViewVisibility(R.id.widget_list, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_fallback, View.GONE)
+                views.setViewVisibility(R.id.widget_empty, View.GONE)
+            }
+
+            WidgetDisplayMode.NEXT -> {
+                views.setViewVisibility(R.id.widget_list, View.GONE)
+                views.setViewVisibility(R.id.widget_fallback, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_empty, View.GONE)
+                renderNextOccurrence(context, views, selection)
+            }
+
+            WidgetDisplayMode.SEMESTER_ENDED,
+            WidgetDisplayMode.NOT_LOADED -> {
+                views.setViewVisibility(R.id.widget_list, View.GONE)
+                views.setViewVisibility(R.id.widget_fallback, View.GONE)
+                views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
+                views.setTextViewText(
+                    R.id.widget_empty,
+                    if (selection.mode == WidgetDisplayMode.SEMESTER_ENDED) {
+                        "本学期课程已结束"
+                    } else {
+                        "打开 Recess 加载课表"
+                    }
+                )
+            }
+        }
 
         appWidgetManager.updateAppWidget(appWidgetId, views)
         // RemoteViewsService 的列表有独立缓存，渲染后必须显式通知数据变化，
@@ -71,6 +96,24 @@ class CourseWidgetProvider : AppWidgetProvider() {
         appWidgetManager.notifyAppWidgetViewDataChanged(
             intArrayOf(appWidgetId),
             R.id.widget_list
+        )
+    }
+
+    /** 兜底条目与列表条目同构：色条 + 课程名 / 时间段 / 地点，不能滚动。 */
+    private fun renderNextOccurrence(
+        context: Context,
+        views: RemoteViews,
+        selection: WidgetSelection
+    ) {
+        val occurrence = selection.occurrences.first()
+        views.setTextViewText(R.id.widget_capsule, selection.capsule.orEmpty())
+        views.setTextViewText(R.id.widget_item_name, occurrence.name)
+        views.setTextViewText(R.id.widget_item_time, WidgetText.timeLine(occurrence))
+        views.setTextViewText(R.id.widget_item_location, occurrence.location)
+        views.setInt(
+            R.id.widget_item_bar,
+            "setBackgroundColor",
+            widgetBarColor(context, occurrence)
         )
     }
 
