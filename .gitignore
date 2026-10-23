@@ -71,3 +71,6 @@ release-artifacts/
 # Agent skills (local tooling)
 .claude/
 skills-lock.json
+
+# Local tickets (to-tickets)
+.scratch/
