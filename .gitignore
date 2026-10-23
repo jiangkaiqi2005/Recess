@@ -74,3 +74,6 @@ skills-lock.json
 
 # Local tickets (to-tickets)
 .scratch/
+
+# Qoder CLI local state
+.qoder/
