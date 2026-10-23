@@ -55,12 +55,16 @@ cp native_templates/android/app/build.gradle.kts android/app/build.gradle.kts
 mkdir -p android/app/src/test
 cp -R native_templates/android/app/src/main/. android/app/src/main/
 cp -R native_templates/android/app/src/test/. android/app/src/test/
+: "${ANDROID_HOME:?请先设置 ANDROID_HOME 指向 Android SDK}"
 NDK_VERSION=$(ls "$ANDROID_HOME/ndk" | sort -V | tail -1)
+: "${NDK_VERSION:?未在 $ANDROID_HOME/ndk 找到 NDK，请先用 sdkmanager 安装}"
 sed "s/__NDK_VERSION__/$NDK_VERSION/g" native_templates/android/build.gradle > android/build.gradle
 ```
 
 根目录 `build.gradle` 含 `__NDK_VERSION__` 占位符，不能直接复制；上面的
 `sed` 从 `$ANDROID_HOME/ndk` 取版本号排序后的最新一个填入，也可以手工替换。
+`ANDROID_HOME` 未设置或该目录下没有 NDK 时，上面的命令会直接报错退出，
+不会生成空 `ndkVersion` 的 `build.gradle`。
 
 Gradle 模板包含 API 24 最低版本、通知等依赖所需的 desugaring 版本、架构过滤和固定签名配置。
 若旧的本地工程仍有 `android/app/build.gradle`，请先备份并合并其中的自定义配置，
