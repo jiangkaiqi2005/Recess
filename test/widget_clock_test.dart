@@ -19,7 +19,8 @@ void main() {
   late db.AppDatabase database;
   late ProviderContainer container;
   late Map<String, Object?> saved;
-  String? widgetName;
+  late Set<String> widgetNames;
+  String? failingWidgetName;
   late DateTime now;
   const channel = MethodChannel('home_widget');
   const updates = MethodChannel('home_widget/updates');
@@ -34,7 +35,8 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     saved = {};
-    widgetName = null;
+    widgetNames = {};
+    failingWidgetName = null;
     // 2026-09-17 是第 2 周周四。学期只跨 9 月，避免测试依赖运行机器的夏令时。
     now = DateTime(2026, 9, 17, 10, 0);
     binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
@@ -45,7 +47,11 @@ void main() {
       if (call.method == 'saveWidgetData') {
         saved[arguments['id'] as String] = arguments['data'];
       } else if (call.method == 'updateWidget') {
-        widgetName = arguments['android'] as String?;
+        final name = arguments['android'] as String;
+        widgetNames.add(name);
+        if (name == failingWidgetName) {
+          throw PlatformException(code: 'widget_update_failed');
+        }
       }
       return true;
     });
@@ -139,7 +145,13 @@ void main() {
       'widget_loaded',
     });
     expect(saved['widget_loaded'], true);
-    expect(widgetName, 'CourseWidgetProvider');
+    expect(widgetNames, {
+      'CourseWidgetProvider',
+      'CourseWidget3x2Provider',
+      'CourseWidget2x3Provider',
+      'CourseWidget4x2Provider',
+      'CourseWidget4x4Provider',
+    });
 
     final items = occurrences();
     expect(items.map((item) => item['name']), ['今天', '最后一周']);
@@ -183,6 +195,22 @@ void main() {
         1,
       );
     }
+  });
+
+  test('一个尺寸刷新失败时仍通知其余尺寸', () async {
+    failingWidgetName = 'CourseWidgetProvider';
+
+    await upsertAndUpdate([course('今天')]);
+
+    expect(widgetNames, {
+      'CourseWidgetProvider',
+      'CourseWidget3x2Provider',
+      'CourseWidget2x3Provider',
+      'CourseWidget4x2Provider',
+      'CourseWidget4x4Provider',
+    });
+    expect(saved['widget_loaded'], true);
+    expect(occurrencesByName(), contains('今天'));
   });
 
   test('课程自带钟点优先，缺失的一端回退到节次时间', () async {
@@ -276,7 +304,7 @@ void main() {
     expect(jsonDecode(saved['occurrences'] as String), isEmpty);
     expect(jsonDecode(saved['semester_days'] as String), isEmpty);
     expect(saved['widget_loaded'], true);
-    expect(widgetName, 'CourseWidgetProvider');
+    expect(widgetNames, contains('CourseWidgetProvider'));
   });
 
   test('时间冲突的课次全部保留，按开始时刻、节次与名称稳定排序', () async {

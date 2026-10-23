@@ -46,6 +46,54 @@
                 android:resource="@xml/course_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".CourseWidget3x2Provider"
+            android:exported="true"
+            android:label="今日课程 3×2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/course_widget_3x2_info" />
+        </receiver>
+
+        <receiver
+            android:name=".CourseWidget2x3Provider"
+            android:exported="true"
+            android:label="今日课程 2×3">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/course_widget_2x3_info" />
+        </receiver>
+
+        <receiver
+            android:name=".CourseWidget4x2Provider"
+            android:exported="true"
+            android:label="今日课程 4×2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/course_widget_4x2_info" />
+        </receiver>
+
+        <receiver
+            android:name=".CourseWidget4x4Provider"
+            android:exported="true"
+            android:label="今日课程 4×4">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/course_widget_4x4_info" />
+        </receiver>
+
         <!-- 小组件列表数据源，仅由系统（持有 BIND_REMOTEVIEWS）绑定。 -->
         <service
             android:name=".CourseWidgetService"
