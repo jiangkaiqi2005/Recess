@@ -1,6 +1,7 @@
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
 
 /// 一条待安排的课前提醒。
@@ -39,7 +40,7 @@ List<PendingReminder> computeReminders({
   var id = 0;
 
   for (final course in courses) {
-    final clock = _courseStartClock(course, sectionTimes);
+    final clock = CourseClock(course, sectionTimes).start;
     if (clock == null) continue; // 无钟点信息的课（未填时间且节次未设置）不提醒
     final (hour, minute) = clock;
 
@@ -60,22 +61,6 @@ List<PendingReminder> computeReminders({
 
   reminders.sort((a, b) => a.trigger.compareTo(b.trigger));
   return reminders;
-}
-
-/// 返回课程的开始钟点 (时, 分)；无钟点信息返回 null。
-(int, int)? _courseStartClock(
-  Course course,
-  Map<int, SectionTime> sectionTimes,
-) {
-  final raw = course.startTime ??
-      (course.startSection > 0 ? sectionTimes[course.startSection]?.startTime : null);
-  if (raw == null || raw.isEmpty) return null;
-  final parts = raw.split(':');
-  if (parts.length != 2) return null;
-  final h = int.tryParse(parts[0]);
-  final m = int.tryParse(parts[1]);
-  if (h == null || m == null) return null;
-  return (h, m);
 }
 
 String _body(Course course) {

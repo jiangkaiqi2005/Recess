@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/semester/application/semester_mutations.dart';
 import 'package:recess/features/schedule/domain/schedule_helpers.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
@@ -517,8 +518,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 
   String _slotClock(Course c, Map<int, SectionTime> sectionTimes) {
-    final start = c.startTime ?? sectionTimes[c.startSection]?.startTime;
-    final end = c.endTime ?? sectionTimes[c.endSection]?.endTime;
+    final clock = CourseClock(c, sectionTimes);
+    final start = clock.startTime;
+    final end = clock.endTime;
     if (start != null && end != null) return '$start-$end';
     return '第${c.startSection}-${c.endSection}节';
   }
