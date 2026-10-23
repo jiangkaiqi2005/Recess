@@ -1,6 +1,6 @@
 # Spec：集中课程钟点读取规则，统一详情、今日、提醒与小组件
 
-> 状态：本地草稿，尚未实施；不发布 GitHub。
+> 状态：已实施，整体标准轴与规格轴复审通过；仅本地提交，未推送或发布。见[实施与评审记录](../2026-10-22-six-spec-implementation-review.md)。
 
 ## Problem Statement
 

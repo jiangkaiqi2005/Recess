@@ -1,6 +1,6 @@
 # Spec：集中导入提交规则，课程与课程平台完整提交
 
-> 状态：本地草稿，尚未实施；不发布 GitHub。
+> 状态：已实施，整体标准轴与规格轴复审通过；仅本地提交，未推送或发布。见[实施与评审记录](../2026-10-22-six-spec-implementation-review.md)。
 
 ## Problem Statement
 
