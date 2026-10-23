@@ -46,12 +46,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final totalWeeks = semester?.totalWeeks ?? 18;
     final now = DateTime.now();
     // 开学前或学期已结束时没有可翻到的「本周」，不显示后缀与「回到本周」。
-    final computedWeek = semester == null ? null : currentWeekOf(semester, now);
-    final currentWeek = computedWeek != null &&
-            computedWeek >= 1 &&
-            computedWeek <= totalWeeks
-        ? computedWeek
-        : null;
+    final currentWeek = semester == null ? null : teachingWeekOf(semester, now);
     final theme = Theme.of(context);
     // 顶栏高度随系统字号缩放，避免两行标题在大字号下被挤压。
     final textScale =
@@ -422,13 +417,16 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         ref.read(scheduleCoursesProvider).value ?? const <Course>[];
     final sectionTimes = ref.read(sectionTimesProvider);
     final now = DateTime.now();
-    final currentWeek = semester == null ? 0 : currentWeekOf(semester, now);
-    final slots = todayCourseSlots(
-      courses: courses,
-      currentWeek: currentWeek,
-      now: now,
-      sectionTimes: sectionTimes,
-    );
+    final currentWeek = semester == null ? null : teachingWeekOf(semester, now);
+    final beforeStart = semester == null || currentWeekOf(semester, now) < 1;
+    final slots = currentWeek == null
+        ? const <TodayCourseSlot>[]
+        : todayCourseSlots(
+            courses: courses,
+            currentWeek: currentWeek,
+            now: now,
+            sectionTimes: sectionTimes,
+          );
 
     final theme = Theme.of(context);
     final todayLabel = _dayLabels[now.weekday - 1];
@@ -454,7 +452,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                     Text('今日课程', style: theme.textTheme.titleLarge),
                     const Spacer(),
                     Text(
-                      currentWeek >= 1 ? '第 $currentWeek 周 · 周$todayLabel $dateLabel' : '尚未开学',
+                      currentWeek != null
+                          ? '第 $currentWeek 周 · 周$todayLabel $dateLabel'
+                          : (beforeStart ? '尚未开学' : '学期已结束'),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -467,7 +467,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      currentWeek >= 1 ? '今天没有课程' : '开学后再来看看',
+                      currentWeek != null
+                          ? '今天没有课程'
+                          : (beforeStart ? '开学后再来看看' : '本学期课程已结束'),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
 import 'package:recess/core/models/semester.dart';
+import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/data/repositories/course_platform_repository.dart';
@@ -40,6 +41,113 @@ void main() {
     container.listen(semesterFormProvider, (_, __) {});
     return container.read(semesterFormProvider.notifier)..init(semester);
   }
+
+  test('缩短总周数同步调整手动当前周并在保存重读后保留手动模式', () async {
+    final database = db.AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final semesters = SemesterRepository(database);
+    final original = Semester(
+      id: 'manual',
+      name: '学期',
+      startDate: DateTime(2026, 9, 7),
+      totalWeeks: 18,
+      currentWeekOverride: 12,
+    );
+    await semesters.upsert(original, activate: true);
+    final form = formFor(database, original)..setTotalWeeks(8);
+    expect(form.state.totalWeeks, 8);
+    expect(form.state.currentWeekOverride, 8);
+    await form.save();
+    final saved = (await semesters.getActiveSemester())!;
+    expect(saved.totalWeeks, 8);
+    expect(saved.currentWeekOverride, 8);
+  });
+
+  test('直接保存入口也维护总周数与手动覆盖，不依赖表单步进操作', () async {
+    final database = db.AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final semesters = SemesterRepository(database);
+    await semesters.upsert(Semester(
+      id: 'manual',
+      name: '学期',
+      startDate: DateTime(2026, 9, 7),
+      totalWeeks: 8,
+      currentWeekOverride: 12,
+    ), activate: true);
+    expect((await semesters.getActiveSemester())!.currentWeekOverride, 8);
+  });
+
+  test('旧非法覆盖进入表单即为合法手动值，保存后重读一致', () async {
+    final database = db.AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final original = Semester(
+      id: 'legacy', name: '旧学期', startDate: DateTime(2026, 9, 7),
+      totalWeeks: 8, currentWeekOverride: -3,
+    );
+    final form = formFor(database, original);
+    expect(form.state.currentWeekOverride, 1);
+    await form.save();
+    expect((await SemesterRepository(database).getSemesters()).single.currentWeekOverride, 1);
+  });
+
+  test('表单设置越界覆盖后保存状态与持久化一致，清空仍为自动模式', () async {
+    final database = db.AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final form = formFor(database, Semester(
+      id: 'manual', name: '学期', startDate: DateTime(2026, 9, 7), totalWeeks: 8,
+    ))..setCurrentWeekOverride(12);
+    await form.save();
+    expect(form.state.currentWeekOverride, 8);
+    expect((await SemesterRepository(database).getSemesters()).single.currentWeekOverride, 8);
+    form.setCurrentWeekOverride(null);
+    await form.save();
+    expect(form.state.currentWeekOverride, isNull);
+    expect((await SemesterRepository(database).getSemesters()).single.currentWeekOverride, isNull);
+  });
+
+  for (final sample in [
+    (name: '合法覆盖缩短后不变', total: 18, manual: 5, target: 8, expectedTotal: 8, expected: 5),
+    (name: '扩大学期保留手动周', total: 8, manual: 5, target: 20, expectedTotal: 20, expected: 5),
+    (name: '缩到最小总周数', total: 18, manual: 12, target: 1, expectedTotal: 1, expected: 1),
+    (name: '旧低值保持手动模式', total: 18, manual: -3, target: 8, expectedTotal: 8, expected: 1),
+    (name: '旧高值保持手动模式', total: 18, manual: 40, target: 8, expectedTotal: 8, expected: 8),
+    (name: '无覆盖缩短仍为自动模式', total: 18, manual: null, target: 8, expectedTotal: 8, expected: null),
+    (name: '总周数沿用既有上界', total: 18, manual: 12, target: 40, expectedTotal: 30, expected: 12),
+    (name: '总周数沿用既有下界', total: 18, manual: 12, target: 0, expectedTotal: 1, expected: 1),
+  ]) {
+    test('${sample.name}，表单与保存重读一致', () async {
+      final database = db.AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final form = formFor(database, Semester(
+        id: 's', name: '学期', startDate: DateTime(2026, 9, 7),
+        totalWeeks: sample.total, currentWeekOverride: sample.manual,
+      ))..setTotalWeeks(sample.target);
+      expect(form.state.totalWeeks, sample.expectedTotal);
+      expect(form.state.currentWeekOverride, sample.expected);
+      await form.save();
+      final saved = (await SemesterRepository(database).getSemesters()).single;
+      expect(saved.totalWeeks, sample.expectedTotal);
+      expect(saved.currentWeekOverride, sample.expected);
+    });
+  }
+
+  test('旧非法手动周读取有效但不修库，仅既有保存持久化修正', () async {
+    final database = db.AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repo = SemesterRepository(database);
+    await repo.upsert(Semester(
+      id: 'legacy', name: '旧学期', startDate: DateTime(2026, 9, 7),
+      totalWeeks: 8, currentWeekOverride: 8,
+    ), activate: true);
+    // 模拟保存规则加入前留下的数据，不通过新保存入口生成异常值。
+    await database.customStatement('UPDATE semesters SET current_week_override = 12 WHERE id = ?', ['legacy']);
+    final read = (await repo.getActiveSemester())!;
+    expect(read.currentWeekOverride, 12);
+    expect(currentWeekOf(read, DateTime(2026, 9, 7)), 8);
+    expect((await repo.getSemesters()).single.currentWeekOverride, 12);
+    await formFor(database, read).save();
+    expect((await repo.getActiveSemester())!.currentWeekOverride, 8);
+  });
 
   test('表单保存并激活后已加载的列表激活学期和课表同步刷新', () async {
     final database = db.AppDatabase(NativeDatabase.memory());

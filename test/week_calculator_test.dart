@@ -102,6 +102,28 @@ void main() {
   });
 
   group('currentWeekOf', () {
+    test('自动周保留非周一开学的周一对齐和学期前后原始周数', () {
+      final semester = Semester(
+        id: 's', name: '学期', startDate: DateTime(2024, 9, 4), totalWeeks: 8,
+      );
+      expect(currentWeekOf(semester, DateTime(2024, 9, 1)), 0);
+      expect(currentWeekOf(semester, DateTime(2024, 9, 2)), 1);
+      expect(currentWeekOf(semester, DateTime(2024, 9, 4)), 1);
+      expect(currentWeekOf(semester, DateTime(2024, 10, 27)), 8);
+      expect(currentWeekOf(semester, DateTime(2024, 10, 28)), 9);
+      expect(semester.currentWeekOverride, isNull);
+    });
+    test('读取旧越界手动当前周时调整到最近合法周', () {
+      final semester = Semester(
+        id: 's', name: '学期', startDate: monday, totalWeeks: 8,
+        currentWeekOverride: 12,
+      );
+      expect(currentWeekOf(semester, monday), 8);
+      expect(currentWeekOf(semester.copyWith(currentWeekOverride: 0), monday), 1);
+      expect(currentWeekOf(semester.copyWith(currentWeekOverride: -3), monday), 1);
+      expect(semester.currentWeekOverride, 12);
+    });
+
     test('没有手动修改时按开学日期推算', () {
       final semester = Semester(
         id: 's',

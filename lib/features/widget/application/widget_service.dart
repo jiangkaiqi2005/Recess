@@ -68,13 +68,14 @@ class WidgetService {
       final all = await courseRepo.getCourses(semester.id);
 
       final now = DateTime.now();
-      final currentWeek = semester.currentWeekOverride ??
-          computeCurrentWeek(semester.startDate, now);
+      final currentWeek = teachingWeekOf(semester, now);
       final todayWeekday = now.weekday;
 
       final todayCourses = all
           .where((c) =>
-              c.dayOfWeek == todayWeekday && c.weeks.contains(currentWeek))
+              currentWeek != null &&
+              c.dayOfWeek == todayWeekday &&
+              c.weeks.contains(currentWeek))
           .toList()
         ..sort((a, b) => a.startSection.compareTo(b.startSection));
 
@@ -88,7 +89,7 @@ class WidgetService {
               })
           .toList();
 
-      final title = currentWeek >= 1 ? '今天 · 第$currentWeek周' : '今天';
+      final title = currentWeek != null ? '今天 · 第$currentWeek周' : '今天';
 
       await HomeWidget.saveWidgetData(_keyTitle, title);
       await HomeWidget.saveWidgetData(_keyCourses, jsonEncode(items));

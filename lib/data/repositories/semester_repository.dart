@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:recess/core/models/semester.dart';
+import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/mappers.dart';
 
@@ -72,7 +73,9 @@ class SemesterRepository {
     await _db.transaction(() async {
       await _db
           .into(_db.semesters)
-          .insertOnConflictUpdate(semester.toCompanion());
+          .insertOnConflictUpdate(
+            normalizeSemesterWeeks(semester).toCompanion(),
+          );
       if (activate) await setActive(semester.id);
     });
   }

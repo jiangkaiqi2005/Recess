@@ -86,6 +86,23 @@ void main() {
     endTime: endTime,
   );
 
+  test('自动学期结束后小组件不标成教学周，也不显示越界周课程', () async {
+    final now = DateTime.now();
+    final monday = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    await container.read(semesterRepositoryProvider).upsert(Semester(
+      id: 's', name: '结束学期',
+      startDate: monday.subtract(const Duration(days: 56)), totalWeeks: 8,
+    ));
+    await container.read(courseRepositoryProvider).upsert(
+      course('越界周课程').copyWith(weeks: const [9]),
+    );
+    await container.read(widgetServiceProvider).updateTodayWidget();
+    expect(saved['widget_title'], '今天');
+    expect(jsonDecode(saved['courses'] as String), isEmpty);
+    expect(widgetName, 'CourseWidgetProvider');
+  });
+
   test('小组件实际payload逐端使用当前节次回退并保留显式钟点', () async {
     for (final c in [
       course('无显式'),

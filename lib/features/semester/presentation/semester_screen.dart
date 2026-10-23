@@ -87,10 +87,11 @@ class _SemesterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final week = computeCurrentWeek(semester.startDate, DateTime.now());
-    final weekLabel = week < 1
-        ? '未开学'
-        : (week > semester.totalWeeks ? '已结束' : '第 $week 周');
+    final now = DateTime.now();
+    final week = teachingWeekOf(semester, now);
+    final weekLabel = week != null
+        ? '第 $week 周'
+        : (currentWeekOf(semester, now) < 1 ? '未开学' : '已结束');
     final end = semester.startDate
         .add(Duration(days: semester.totalWeeks * 7 - 1));
     final range =
