@@ -60,7 +60,7 @@ go_router, declared once in `app/router.dart`. Screens `context.push` existing r
 
 ### Desktop widget bridge
 
-`features/widget/application/widget_service.dart` serializes today's courses to native via `home_widget` (no App Group is configured on Android; widget provider `CourseWidgetProvider`, package `io.github.jiangkaiqi2005.recess`). Failures are swallowed — the widget is a nice-to-have and must not affect the main app. `widgetServiceProvider` is a global singleton invoked after imports/edits to refresh.
+`features/widget/application/widget_service.dart` serializes every occurrence from today through the end of the semester to native via `home_widget`, together with a per-date teaching-week map (`semester_days`) and a `widget_loaded` marker (no App Group is configured on Android; widget provider `CourseWidgetProvider`, package `io.github.jiangkaiqi2005.recess`). Native `WidgetSelector` picks what to show from the current local time; `WidgetRefreshScheduler` re-renders at the next class boundary or midnight with an inexact alarm. Failures are swallowed — the widget is a nice-to-have and must not affect the main app. `widgetServiceProvider` is a global singleton invoked after imports/edits to refresh.
 
 ## Conventions
 

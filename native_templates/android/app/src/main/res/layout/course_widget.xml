@@ -1,28 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 小组件布局。复制到 android/app/src/main/res/layout/course_widget.xml -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+<!--
+  小组件布局：标题栏 + 三种互斥内容。
+  - widget_list：今天还有课时的可滚动列表，由 CourseWidgetService 提供条目；
+    按条目高度收起，最多占剩余高度，下方空白交给卡片点击。
+    条目间隔由条目自己的上内边距提供，间隔内也能点击。
+  - widget_fallback：今天没有剩余课次时的下一节课，主题色胶囊 + 一条与列表
+    同构、不能滚动的课次。
+  - widget_empty：尚未加载 / 本学期已结束的空状态。
+  三者由 CourseWidgetProvider 按挑选结果切换可见性。
+  卡片保持正方形：透明的 widget_square 缩成桌面分配区域的短边 × 短边，
+  内容四边对齐它；外层透明，卡片在格子里居中，与系统 2×2 小组件等高。
+  复制到 android/app/src/main/res/layout/course_widget.xml
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="12dp"
-    android:background="@android:color/white">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/widget_title"
+    <RelativeLayout
+        android:id="@android:id/background"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="今天"
-        android:textStyle="bold"
-        android:textSize="14sp"
-        android:textColor="#222222" />
+        android:layout_gravity="center"
+        android:background="@drawable/course_widget_background">
 
-    <TextView
-        android:id="@+id/widget_courses"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textSize="13sp"
-        android:textColor="#444444"
-        android:text="今天没有课 🎉" />
-</LinearLayout>
+        <ImageView
+            android:id="@+id/widget_square"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:importantForAccessibility="no"
+            android:src="@drawable/course_widget_square" />
+
+        <include
+            layout="@layout/course_widget_content"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_alignBottom="@id/widget_square"
+            android:layout_alignLeft="@id/widget_square"
+            android:layout_alignRight="@id/widget_square"
+            android:layout_alignTop="@id/widget_square" />
+    </RelativeLayout>
+</FrameLayout>

@@ -47,5 +47,24 @@ DateTime dateForWeekday(DateTime semesterStart, int week, int weekday) {
   return firstMonday.add(Duration(days: (week - 1) * 7 + (weekday - 1)));
 }
 
+/// 学期最后一个教学周的周日。
+///
+/// 与 [computeCurrentWeek] 一样把开学日所在周对齐到周一；随后按日历日
+/// 向前推算，避免夏令时下 24 小时时长把日期挪到前一天。
+DateTime lastSemesterDay(Semester semester) {
+  final normalized = normalizeSemesterWeeks(semester);
+  final start = normalized.startDate;
+  final firstMonday = DateTime(
+    start.year,
+    start.month,
+    start.day - (start.weekday - 1),
+  );
+  return DateTime(
+    firstMonday.year,
+    firstMonday.month,
+    firstMonday.day + normalized.totalWeeks * 7 - 1,
+  );
+}
+
 /// 判断课程在指定周是否上课。
 bool courseOnWeek(List<int> weeks, int week) => weeks.contains(week);

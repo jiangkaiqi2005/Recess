@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  小组件正方形垫片：透明、固有尺寸足够大的正方形。配合 ImageView 的
+  adjustViewBounds，会缩成桌面分给小组件区域的「短边 × 短边」。
+  复制到 android/app/src/main/res/drawable/course_widget_square.xml
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+    <size
+        android:width="1000dp"
+        android:height="1000dp" />
+</shape>

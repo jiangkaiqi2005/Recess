@@ -71,20 +71,8 @@ jobs:
           cp native_templates/android/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
           # app 模块启用 desugaring、固定签名、小组件和应用内更新原生配置。
           cp native_templates/android/app/build.gradle.kts android/app/build.gradle.kts
-          cp native_templates/android/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
-          mkdir -p android/app/src/main/java/io/github/jiangkaiqi2005/recess
-          mkdir -p android/app/src/main/res/layout android/app/src/main/res/xml
-          cp native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt \
-            android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt
-          cp native_templates/android/app/src/main/res/layout/course_widget.xml \
-            android/app/src/main/res/layout/course_widget.xml
-          cp native_templates/android/app/src/main/res/xml/course_widget_info.xml \
-            android/app/src/main/res/xml/course_widget_info.xml
-          mkdir -p android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess
-          cp native_templates/android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt \
-            android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt
-          cp native_templates/android/app/src/main/res/xml/filepaths.xml \
-            android/app/src/main/res/xml/filepaths.xml
+          # 整个 src/main 目录一起复制：新增 Kotlin 文件、布局或资源时不会漏拷。
+          cp -R native_templates/android/app/src/main/. android/app/src/main/
 
       - name: Configure stable release signing
         env:

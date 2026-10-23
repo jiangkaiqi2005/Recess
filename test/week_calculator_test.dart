@@ -79,6 +79,43 @@ void main() {
     });
   });
 
+  group('lastSemesterDay', () {
+    test('周一开学时取总周数最后一周的周日', () {
+      final semester = Semester(
+        id: 's',
+        name: '学期',
+        startDate: monday,
+        totalWeeks: 3,
+      );
+      expect(lastSemesterDay(semester), DateTime(2024, 9, 22));
+      expect(lastSemesterDay(semester), dateForWeekday(monday, 3, 7));
+    });
+
+    test('非周一开学时按开学日所在周的周一计算', () {
+      final semester = Semester(
+        id: 's',
+        name: '学期',
+        startDate: DateTime(2024, 9, 4),
+        totalWeeks: 8,
+      );
+      expect(lastSemesterDay(semester), DateTime(2024, 10, 27));
+    });
+
+    test('忽略开始日期的时间部分，并把总周数调整到合法范围', () {
+      final zero = Semester(
+        id: 's',
+        name: '学期',
+        startDate: DateTime(2024, 9, 2, 23, 30),
+        totalWeeks: 0,
+      );
+      expect(lastSemesterDay(zero), DateTime(2024, 9, 8));
+      expect(
+        lastSemesterDay(zero.copyWith(totalWeeks: 99)),
+        DateTime(2025, 3, 30),
+      );
+    });
+  });
+
   group('computeCurrentWeek 与 dateForWeekday 一致性', () {
     test('非周一开学时两函数对同一日期的周次判定一致', () {
       final wednesday = DateTime(2024, 9, 4);
