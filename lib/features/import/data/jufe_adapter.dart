@@ -49,10 +49,10 @@ class JufeAdapter extends SchoolAdapter {
 
   function parseSections(text) {
     var match = String(text || '').match(
-        /第?\s*(\d+)\s*[-–~至]\s*(\d+)\s*节/);
-    if (match) return [schoolInteger(match[1]), schoolInteger(match[2])];
-    match = String(text || '').match(/第?\s*(\d+)\s*节/);
-    return match ? [schoolInteger(match[1]), schoolInteger(match[1])] : [];
+        /第([^节\r\n]*)节|(?:^|[\s(（])([+\-.\d][^节\r\n]*)节/);
+    if (!match) return [];
+    var values = schoolWeekNumbers(match[1] || match[2], true);
+    return [values[0], values[values.length - 1]];
   }
 
   function parseDay(text) {
@@ -152,6 +152,15 @@ class JufeAdapter extends SchoolAdapter {
           '[data-start-section]');
       for (var c = 0; c < cells.length; c++) {
         var cell = cells[c];
+        var dataFields = ['data-week', 'data-day', 'data-weekday',
+            'data-begin-unit', 'data-start-section', 'data-section-start',
+            'data-end-unit', 'data-end-section', 'data-section-end',
+            'data-section', 'data-sections'];
+        // 无 data 结构标记的单元格交给传统表格策略；标记值无效仍保留诊断。
+        if (!dataFields.some(function(name) {
+          return (cell.getAttribute && cell.getAttribute(name) !== null) ||
+              (row.getAttribute && row.getAttribute(name) !== null);
+        })) continue;
         var day = parseDay(attr(cell, ['data-week', 'data-day', 'data-weekday']) ||
             attr(row, ['data-week', 'data-day', 'data-weekday']));
         var start = schoolInteger(attr(cell, ['data-begin-unit', 'data-start-section',

@@ -187,8 +187,8 @@ class BackupRepository {
     final courseRepo = CourseRepository(_db);
     final platformRepo = CoursePlatformRepository(_db);
 
-    final semesters = await semesterRepo.getSemesters();
     final active = await semesterRepo.getActiveSemester();
+    final semesters = await semesterRepo.getSemesters();
     final data = <String, dynamic>{
       'app': 'recess',
       'version': 1,

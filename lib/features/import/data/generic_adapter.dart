@@ -334,7 +334,8 @@ class GenericAdapter extends SchoolAdapter {
       }
     } else {
       // 单行：尝试用分隔符拆分
-      var parts = text.split(/[;；\s]+/).filter(Boolean);
+      // 周次片段先作为整体取出，内部列表逗号及紧邻的单双条件不作字段分隔。
+      var parts = text.match(/(?:第\s*)?[+\-.\d][\d,，、.\s\-–~至]*[^,，;；\s]*周(?:\s*[,，]?\s*[（(]?[单双奇偶]周?[)）]?)?|[^,，;；\s]+/g) || [];
       var weekParts = [];
       name = parts[0] || '';
       for (var pi = 1; pi < parts.length; pi++) {

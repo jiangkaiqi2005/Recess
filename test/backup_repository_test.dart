@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,32 @@ void main() {
 
   tearDown(() async {
     await database.close();
+  });
+
+  test('首次空库导出的实际字节文件包含默认激活学期并能恢复', () async {
+    final directory = await Directory.systemTemp.createTemp('recess_first_backup_');
+    try {
+      final file = File('${directory.path}/backup.json');
+      await file.writeAsBytes(await backup.exportBytes());
+      final parsed = BackupFile.parseBytes(await file.readAsBytes());
+      final source = await semesters.getSemesters();
+      expect(source, hasLength(1));
+      expect(parsed.semesters.single.id, source.single.id);
+      expect(parsed.activeSemesterId, source.single.id);
+      expect(parsed.semesters.single.totalWeeks, 18);
+      expect(parsed.semesters.single.startDate.weekday, DateTime.monday);
+
+      final restored = await backup.restoreBackup(parsed);
+      expect(restored.semesterCount, 1);
+      expect(restored.courseCount, 0);
+      final active = await semesters.getActiveSemester();
+      expect(active?.id, source.single.id);
+      expect(active?.name, source.single.name);
+      expect(active?.startDate, source.single.startDate);
+      expect(active?.totalWeeks, 18);
+    } finally {
+      await directory.delete(recursive: true);
+    }
   });
 
   test('新旧色板与自定义 ARGB 在备份导出恢复后保持原始值', () async {
