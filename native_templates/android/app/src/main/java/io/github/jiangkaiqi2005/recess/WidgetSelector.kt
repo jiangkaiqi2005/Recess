@@ -65,8 +65,7 @@ data class WidgetSelection(
  * 周次与课次都由 Dart 侧算好，这里只按传入的当前本地时间挑选：
  * - 标题栏：教学周内显示「第 8 周 · 周四」，否则显示「10月23日 周四」；
  * - 今天的列表：日期为今天且结束时刻晚于现在；任一端钟点缺失时整个当天
- *   一直保留。有完整钟点的课次排在前，按开始时刻、节次、课程名排序；缺钟点
- *   的课次排在后，按节次、课程名排序；
+ *   一直保留。列表统一按开始节次、结束节次、课程名排序，不比较开始时刻；
  * - 下一节课：今天之后最早的那一天里的第一节课，今天已结束的课次不参与；
  *   按节次优先，取开始节次、结束节次、课程名最靠前的一节，不比较开始时刻；
  * - 胶囊文字：明天写「明天 · 周X」，本周内写「周X」，下一周写「下周X」，
@@ -80,16 +79,10 @@ object WidgetSelector {
 
     private val weekdayNames = listOf("一", "二", "三", "四", "五", "六", "日")
 
-    /** 今天的列表：完整钟点在前（按开始时刻、节次、课程名），缺钟点在后（按节次、课程名）。 */
-    private val todayOrder = compareBy<WidgetOccurrence>(
-        { it.start == null || it.end == null },
-        { if (it.start != null && it.end != null) it.start else null },
-        { it.startSection },
-        { it.endSection },
-        { it.name }
-    )
-
-    /** 下一节课：按开始节次、结束节次、课程名排序，不比较开始时刻。 */
+    /**
+     * 今天的列表与下一节课共用的排序：按开始节次、结束节次、课程名，
+     * 不比较开始时刻，也不按是否缺钟点分组。
+     */
     private val sectionOrder = compareBy<WidgetOccurrence>(
         { it.startSection },
         { it.endSection },
@@ -119,7 +112,7 @@ object WidgetSelector {
                 it.date == today &&
                     (it.start == null || it.end == null || it.end.isAfter(now))
             }
-            .sortedWith(todayOrder)
+            .sortedWith(sectionOrder)
         if (todayOccurrences.isNotEmpty()) {
             return WidgetSelection(
                 title = title,

@@ -130,7 +130,7 @@ class WidgetSelectorTest {
     }
 
     @Test
-    fun `完整钟点的课次排在缺钟点课次之前`() {
+    fun `今天的列表统一按节次排序不比较开始时刻`() {
         val selection = WidgetSelector.select(
             now = LocalDateTime.of(2026, 10, 22, 7, 0),
             occurrences = listOf(
@@ -145,9 +145,30 @@ class WidgetSelectorTest {
 
         assertEquals(WidgetDisplayMode.TODAY, selection.mode)
         assertEquals(
-            listOf("早课", "下午课", "缺钟点前", "缺钟点后"),
+            listOf("早课", "缺钟点前", "下午课", "缺钟点后"),
             selection.occurrences.map { it.name }
         )
+    }
+
+    @Test
+    fun `缺钟点的第1-2节排在有钟点的第5-6节之前`() {
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 7, 30),
+            occurrences = listOf(
+                occurrence("第5-6节有钟点", "14:00", "15:40", startSection = 5, endSection = 6),
+                occurrence("第1-2节无钟点", null, null, startSection = 1, endSection = 2)
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        assertEquals(WidgetDisplayMode.TODAY, selection.mode)
+        assertEquals(
+            listOf("第1-2节无钟点", "第5-6节有钟点"),
+            selection.occurrences.map { it.name }
+        )
+        // nextRefresh 仍按时刻计算，与列表顺序无关。
+        assertEquals(LocalDateTime.of(2026, 10, 22, 14, 0), selection.nextRefresh)
     }
 
     @Test
@@ -195,7 +216,7 @@ class WidgetSelectorTest {
     }
 
     @Test
-    fun `时间冲突的课次全部保留并按开始时刻与节次排序`() {
+    fun `时间冲突的课次全部保留并按节次排序`() {
         val selection = WidgetSelector.select(
             now = LocalDateTime.of(2026, 10, 22, 7, 0),
             occurrences = listOf(
