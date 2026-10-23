@@ -20,7 +20,20 @@ import android.view.View
 import android.widget.RemoteViews
 import java.time.LocalDateTime
 
-class CourseWidgetProvider : AppWidgetProvider() {
+open class CourseWidgetProvider : AppWidgetProvider() {
+
+    protected open val layoutId = R.layout.course_widget
+
+    companion object {
+        // 闹钟统一发给原有 Receiver，再按各自布局刷新所有尺寸。
+        private fun providers() = listOf(
+            CourseWidgetProvider(),
+            CourseWidget3x2Provider(),
+            CourseWidget2x3Provider(),
+            CourseWidget4x2Provider(),
+            CourseWidget4x4Provider()
+        )
+    }
 
     /**
      * 不精确闹钟到点后用显式广播回到这里，对全部小组件重走 [onUpdate]；
@@ -30,11 +43,13 @@ class CourseWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == WidgetRefreshScheduler.ACTION_REFRESH) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(
-                ComponentName(context, CourseWidgetProvider::class.java)
-            )
-            if (appWidgetIds.isNotEmpty()) {
-                onUpdate(context, appWidgetManager, appWidgetIds)
+            for (provider in providers()) {
+                val appWidgetIds = appWidgetManager.getAppWidgetIds(
+                    ComponentName(context, provider.javaClass)
+                )
+                if (appWidgetIds.isNotEmpty()) {
+                    provider.onUpdate(context, appWidgetManager, appWidgetIds)
+                }
             }
             return
         }
@@ -64,7 +79,7 @@ class CourseWidgetProvider : AppWidgetProvider() {
             loaded = data.loaded
         )
 
-        val views = RemoteViews(context.packageName, R.layout.course_widget)
+        val views = RemoteViews(context.packageName, layoutId)
         views.setTextViewText(R.id.widget_title, selection.title)
         views.setRemoteAdapter(
             appWidgetId,

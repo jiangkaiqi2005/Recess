@@ -27,7 +27,13 @@ import 'package:recess/features/settings/application/section_times_provider.dart
 /// 旧键 `widget_title` / `courses` 不再写入。原生侧模板见仓库
 /// `native_templates/`，整合步骤见 `WIDGET_SETUP.md`。
 class WidgetService {
-  static const _androidWidgetName = 'CourseWidgetProvider';
+  static const _androidWidgetNames = [
+    'CourseWidgetProvider',
+    'CourseWidget3x2Provider',
+    'CourseWidget2x3Provider',
+    'CourseWidget4x2Provider',
+    'CourseWidget4x4Provider',
+  ];
   static const _keyOccurrences = 'occurrences';
   static const _keySemesterDays = 'semester_days';
   static const _keyLoaded = 'widget_loaded';
@@ -153,7 +159,13 @@ class WidgetService {
       );
       await HomeWidget.saveWidgetData(_keySemesterDays, jsonEncode(days));
       await HomeWidget.saveWidgetData(_keyLoaded, true);
-      await HomeWidget.updateWidget(androidName: _androidWidgetName);
+      for (final name in _androidWidgetNames) {
+        try {
+          await HomeWidget.updateWidget(androidName: name);
+        } catch (_) {
+          // 一个尺寸刷新失败时，继续通知其余尺寸。
+        }
+      }
     } catch (_) {
       // 忽略：小组件刷新失败不影响主 App。
     }

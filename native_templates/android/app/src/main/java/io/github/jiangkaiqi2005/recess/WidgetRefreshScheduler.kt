@@ -26,7 +26,7 @@ import java.time.ZoneId
 /** 在下一次上课、下课或零点用不精确闹钟触发小组件更新。 */
 internal object WidgetRefreshScheduler {
 
-    /** 闹钟触发的显式广播 action；只发给 [CourseWidgetProvider]，不经过隐式广播。 */
+    /** 闹钟只显式发给 [CourseWidgetProvider]，由它刷新全部尺寸，共用一条闹钟链。 */
     const val ACTION_REFRESH = "io.github.jiangkaiqi2005.recess.action.REFRESH_WIDGET"
 
     // 固定 requestCode + 固定 action：每次拿到的都是同一个 PendingIntent。
