@@ -100,6 +100,66 @@ void main() {
     return const JsonEncoder().convert(data);
   }
 
+  test('最终激活失败时旧学期课程平台和激活状态整体保留', () async {
+    await semesters.upsert(Semester(
+      id: 'old-s', name: '旧学期', startDate: DateTime(2020), totalWeeks: 10,
+    ));
+    await semesters.setActive('old-s');
+    await courses.upsert(const Course(
+      id: 'old-c', semesterId: 'old-s', name: '旧课程', dayOfWeek: 1,
+      startSection: 1, endSection: 2, weeks: [1, 2], notes: '旧备注 📚',
+    ));
+    await CoursePlatformRepository(database).replacePlatforms(
+      'old-s', '旧课程', const [
+        CoursePlatform(purpose: CoursePlatformPurpose.lab, name: '旧平台'),
+      ],
+    );
+    final before = jsonDecode(await backup.exportJson()) as Map;
+    before.remove('exportedAt');
+    await database.customStatement('''
+      CREATE TRIGGER fail_restore_activation BEFORE UPDATE OF is_active ON semesters
+      BEGIN SELECT RAISE(ABORT, 'forced activation failure'); END;
+    ''');
+
+    await expectLater(backup.restore(exportFixture()), throwsA(anything));
+    expect((await semesters.getSemesters()).map((s) => s.id), ['old-s']);
+    await database.customStatement('DROP TRIGGER fail_restore_activation');
+
+    final after = jsonDecode(await backup.exportJson()) as Map;
+    after.remove('exportedAt');
+    expect(after, before);
+    expect((await semesters.getActiveSemester())?.id, 'old-s');
+  });
+
+  test('课程插入失败时全部替换回滚', () async {
+    await backup.restore(exportFixture());
+    final before = jsonDecode(await backup.exportJson()) as Map;
+    before.remove('exportedAt');
+    await database.customStatement('''
+      CREATE TRIGGER fail_course_insert BEFORE INSERT ON courses
+      WHEN NEW.id = 'c2'
+      BEGIN SELECT RAISE(ABORT, 'forced course insert failure'); END;
+    ''');
+
+    await expectLater(backup.restore(exportFixture()), throwsA(anything));
+
+    final after = jsonDecode(await backup.exportJson()) as Map;
+    after.remove('exportedAt');
+    expect(after, before);
+  });
+
+  test('旧备份没有激活标记时选定文件中的第一个学期', () async {
+    final data = jsonDecode(exportFixture()) as Map<String, dynamic>;
+    for (final semester in data['semesters'] as List) {
+      (semester as Map).remove('isActive');
+    }
+
+    await backup.restore(jsonEncode(data));
+
+    expect((await semesters.getActiveSemester())?.id, 's1');
+    expect(await courses.getCourses('s2'), hasLength(1));
+  });
+
   test('恢复备份后数据与备份一致，激活学期与周次覆盖被保留', () async {
     // 先写入一些旧数据，确保被覆盖。
     await semesters.upsert(Semester(

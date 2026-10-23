@@ -36,6 +36,9 @@ class BackupFile {
     this.activeSemesterId,
   });
 
+  /// 严格按 UTF-8 读取文件；非法字节在覆盖确认之前拒绝。
+  static BackupFile parseBytes(List<int> bytes) => parse(utf8.decode(bytes));
+
   static BackupFile parse(String jsonText) {
     final dynamic decoded;
     try {
@@ -175,6 +178,9 @@ class BackupRepository {
 
   BackupRepository(this._db);
 
+  /// 导出供文件 adapter 直接写入的 UTF-8 内容。
+  Future<List<int>> exportBytes() async => utf8.encode(await exportJson());
+
   /// 把全部学期、课程与课程平台导出为备份 JSON（格式与 [BackupFile] 对应）。
   Future<String> exportJson() async {
     final semesterRepo = SemesterRepository(_db);
@@ -228,8 +234,11 @@ class BackupRepository {
   /// 解析并恢复备份。成功返回恢复统计；失败抛异常且数据库保持原样
   /// （全部写入在单个事务内，任一步失败即回滚）。
   Future<RestoreResult> restore(String jsonText) async {
-    final backup = BackupFile.parse(jsonText);
+    return restoreBackup(BackupFile.parse(jsonText));
+  }
 
+  /// 恢复覆盖确认时已经校验的同一份备份内容。
+  Future<RestoreResult> restoreBackup(BackupFile backup) async {
     var courseCount = 0;
     await _db.transaction(() async {
       // 1. 清空现有数据
@@ -262,31 +271,31 @@ class BackupRepository {
           }
         }
       });
-    });
 
-    // 3. 恢复激活学期（若备份标记了，且仍存在）
-    if (backup.activeSemesterId != null) {
-      await _db.batch((batch) {
-        batch.update(
-          _db.semesters,
-          const db.SemestersCompanion(isActive: Value(false)),
-        );
-        batch.update(
-          _db.semesters,
-          const db.SemestersCompanion(isActive: Value(true)),
-          where: (s) => s.id.equals(backup.activeSemesterId!),
-        );
-      });
-    } else {
-      // 无激活标记：将第一个学期设为激活，避免零激活态。
-      await _db.batch((batch) {
-        batch.update(
-          _db.semesters,
-          const db.SemestersCompanion(isActive: Value(true)),
-          where: (s) => s.id.equals(backup.semesters.first.id),
-        );
-      });
-    }
+      // 3. 恢复激活学期（若备份标记了，且仍存在）
+      if (backup.activeSemesterId != null) {
+        await _db.batch((batch) {
+          batch.update(
+            _db.semesters,
+            const db.SemestersCompanion(isActive: Value(false)),
+          );
+          batch.update(
+            _db.semesters,
+            const db.SemestersCompanion(isActive: Value(true)),
+            where: (s) => s.id.equals(backup.activeSemesterId!),
+          );
+        });
+      } else {
+        // 无激活标记：将第一个学期设为激活，避免零激活态。
+        await _db.batch((batch) {
+          batch.update(
+            _db.semesters,
+            const db.SemestersCompanion(isActive: Value(true)),
+            where: (s) => s.id.equals(backup.semesters.first.id),
+          );
+        });
+      }
+    });
     return RestoreResult(
       semesterCount: backup.semesters.length,
       courseCount: courseCount,

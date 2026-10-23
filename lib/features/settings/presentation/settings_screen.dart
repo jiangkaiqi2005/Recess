@@ -5,16 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/data/repositories/backup_repository.dart';
 import 'package:recess/features/notification/application/notification_service.dart';
 import 'package:recess/features/notification/application/reminder_settings_provider.dart';
-import 'package:recess/features/semester/application/semester_providers.dart';
 import 'package:recess/features/update/application/app_update_controller.dart';
 import 'package:recess/features/update/presentation/update_dialog.dart';
 import '../application/theme_mode_provider.dart';
 import 'section_time_editor.dart';
-import '../application/export_service.dart';
+import '../application/backup_service.dart';
 
 /// 项目 GitHub 仓库地址（支持我们）。
 const String _githubUrl = 'https://github.com/jiangkaiqi2005/recess';
@@ -292,7 +290,7 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _exportData(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(exportServiceProvider).exportToJson();
+      await ref.read(backupServiceProvider).exportToJson();
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('导出失败：$e')));
     }
@@ -316,12 +314,11 @@ class SettingsScreen extends ConsumerWidget {
 
     if (!context.mounted) return;
     // 解析校验：先确认这是合法备份，再询问是否覆盖（避免覆盖后才发现文件无效）。
-    final String jsonText;
+    final BackupFile backup;
     final int previewSemesters;
     try {
-      jsonText = String.fromCharCodes(bytes);
-      final parsed = BackupFile.parse(jsonText);
-      previewSemesters = parsed.semesters.length;
+      backup = BackupFile.parseBytes(bytes);
+      previewSemesters = backup.semesters.length;
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('备份文件无效：$e')));
       return;
@@ -351,14 +348,7 @@ class SettingsScreen extends ConsumerWidget {
     if (confirm != true || !context.mounted) return;
 
     try {
-      final result2 = await ref
-          .read(backupRepositoryProvider)
-          .restore(jsonText);
-      // 刷新依赖学期/课程数据的全部 Provider（桌面小组件由 _AppEffects
-      // 监听这些 provider 集中触发刷新）。
-      ref.invalidate(activeSemesterProvider);
-      ref.invalidate(scheduleCoursesProvider);
-      ref.invalidate(semestersProvider);
+      final result2 = await ref.read(backupServiceProvider).restore(backup);
       messenger.showSnackBar(
         SnackBar(
           content: Text(
