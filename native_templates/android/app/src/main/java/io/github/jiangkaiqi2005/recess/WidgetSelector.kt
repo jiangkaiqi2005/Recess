@@ -65,9 +65,10 @@ data class WidgetSelection(
  * 周次与课次都由 Dart 侧算好，这里只按传入的当前本地时间挑选：
  * - 标题栏：教学周内显示「第 8 周 · 周四」，否则显示「10月23日 周四」；
  * - 今天的列表：日期为今天且结束时刻晚于现在；任一端钟点缺失时整个当天
- *   一直保留，其中缺少开始时刻的排在有钟点者之后，再按节次排序；
+ *   一直保留。有完整钟点的课次排在前，按开始时刻、节次、课程名排序；缺钟点
+ *   的课次排在后，按节次、课程名排序；
  * - 下一节课：今天之后最早的那一天里的第一节课，今天已结束的课次不参与；
- *   同一天先按开始时刻排序，只有当天所有课次都缺少开始时刻时才按节次取第一节；
+ *   按节次优先，取开始节次、结束节次、课程名最靠前的一节，不比较开始时刻；
  * - 胶囊文字：明天写「明天 · 周X」，本周内写「周X」，下一周写「下周X」，
  *   更远写「M月D日」；
  * - 下一次刷新：今天剩余课次中最近的开始或结束时刻，与下一个零点取较早者；
@@ -79,9 +80,17 @@ object WidgetSelector {
 
     private val weekdayNames = listOf("一", "二", "三", "四", "五", "六", "日")
 
-    private val occurrenceOrder = compareBy<WidgetOccurrence>(
-        { it.start == null },
-        { it.start },
+    /** 今天的列表：完整钟点在前（按开始时刻、节次、课程名），缺钟点在后（按节次、课程名）。 */
+    private val todayOrder = compareBy<WidgetOccurrence>(
+        { it.start == null || it.end == null },
+        { if (it.start != null && it.end != null) it.start else null },
+        { it.startSection },
+        { it.endSection },
+        { it.name }
+    )
+
+    /** 下一节课：按开始节次、结束节次、课程名排序，不比较开始时刻。 */
+    private val sectionOrder = compareBy<WidgetOccurrence>(
         { it.startSection },
         { it.endSection },
         { it.name }
@@ -110,7 +119,7 @@ object WidgetSelector {
                 it.date == today &&
                     (it.start == null || it.end == null || it.end.isAfter(now))
             }
-            .sortedWith(occurrenceOrder)
+            .sortedWith(todayOrder)
         if (todayOccurrences.isNotEmpty()) {
             return WidgetSelection(
                 title = title,
@@ -164,11 +173,9 @@ object WidgetSelector {
     /**
      * 今天之后最早的一天里的第一节课。
      *
-     * 规格中的「今天之后最早的那个课次」按课次数据契约排序：先按开始时刻，
-     * 同一时刻再按节次；缺少开始时刻的课次排在有钟点者之后。因此只要当天有
-     * 带开始时刻的课次，就取其中最早的一节；只有当天所有课次都缺少开始时刻
-     * 时，才退回按开始节次取第一节。这个规则由单测固定，见
-     * `WidgetSelectorTest` 的下一节课用例。
+     * 按节次优先：先取最早的日期，再按开始节次、结束节次、课程名排序取第一节，
+     * 不比较开始时刻。因此第 1-2 节没有钟点、第 5-6 节有钟点时，仍取第 1-2 节。
+     * 这个规则由单测固定，见 `WidgetSelectorTest` 的下一节课用例。
      */
     private fun nextAfter(
         today: LocalDate,
@@ -182,7 +189,7 @@ object WidgetSelector {
             ?: return null
         return occurrences
             .filter { it.date == nextDate }
-            .sortedWith(occurrenceOrder)
+            .sortedWith(sectionOrder)
             .firstOrNull()
     }
 

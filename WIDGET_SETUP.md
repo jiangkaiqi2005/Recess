@@ -46,18 +46,21 @@ flutter pub get
 
 模板中的 Kotlin 包名与真实包名 `io.github.jiangkaiqi2005.recess` 一致，复制后无需修改。
 
-也可以在 PowerShell 中一次性覆盖复制整个原生模板：
+也可以在 Git Bash 中一次性覆盖复制整个原生模板：
 
-```powershell
-Copy-Item native_templates/android/settings.gradle android/settings.gradle -Force
-Copy-Item native_templates/android/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties -Force
-Copy-Item native_templates/android/app/build.gradle.kts android/app/build.gradle.kts -Force
-Copy-Item native_templates/android/app/src/main/* android/app/src/main/ -Recurse -Force
-Copy-Item native_templates/android/app/src/test android/app/src/ -Recurse -Force
+```bash
+cp native_templates/android/settings.gradle android/settings.gradle
+cp native_templates/android/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
+cp native_templates/android/app/build.gradle.kts android/app/build.gradle.kts
+mkdir -p android/app/src/test
+cp -R native_templates/android/app/src/main/. android/app/src/main/
+cp -R native_templates/android/app/src/test/. android/app/src/test/
+NDK_VERSION=$(ls "$ANDROID_HOME/ndk" | sort -V | tail -1)
+sed "s/__NDK_VERSION__/$NDK_VERSION/g" native_templates/android/build.gradle > android/build.gradle
 ```
 
-根目录 `build.gradle` 含 `__NDK_VERSION__` 占位符，不能直接复制；用
-`sed "s/__NDK_VERSION__/$(ls $ANDROID_HOME/ndk | sort -V | tail -1)/g"` 或手工替换。
+根目录 `build.gradle` 含 `__NDK_VERSION__` 占位符，不能直接复制；上面的
+`sed` 从 `$ANDROID_HOME/ndk` 取版本号排序后的最新一个填入，也可以手工替换。
 
 Gradle 模板包含 API 24 最低版本、通知等依赖所需的 desugaring 版本、架构过滤和固定签名配置。
 若旧的本地工程仍有 `android/app/build.gradle`，请先备份并合并其中的自定义配置，

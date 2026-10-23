@@ -123,10 +123,31 @@ class WidgetSelectorTest {
 
         assertEquals(WidgetDisplayMode.TODAY, selection.mode)
         assertEquals(
-            listOf("只缺结束", "缺钟点前", "缺钟点后"),
+            listOf("缺钟点前", "只缺结束", "缺钟点后"),
             selection.occurrences.map { it.name }
         )
         assertEquals(midnightAfter(), selection.nextRefresh)
+    }
+
+    @Test
+    fun `完整钟点的课次排在缺钟点课次之前`() {
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 7, 0),
+            occurrences = listOf(
+                occurrence("缺钟点前", null, null, startSection = 3, endSection = 4),
+                occurrence("下午课", "14:00", "15:40", startSection = 7, endSection = 8),
+                occurrence("缺钟点后", null, null, startSection = 11, endSection = 12),
+                occurrence("早课", "08:00", "09:40", startSection = 1, endSection = 2)
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        assertEquals(WidgetDisplayMode.TODAY, selection.mode)
+        assertEquals(
+            listOf("早课", "下午课", "缺钟点前", "缺钟点后"),
+            selection.occurrences.map { it.name }
+        )
     }
 
     @Test
@@ -359,7 +380,7 @@ class WidgetSelectorTest {
     }
 
     @Test
-    fun `下一节课先按开始时刻取最早，缺开始时刻的课次排在有钟点者之后`() {
+    fun `下一节课按最早一天的节次取第一节`() {
         val friday = thursday.plusDays(1)
         val selection = WidgetSelector.select(
             now = LocalDateTime.of(2026, 10, 22, 21, 0),
@@ -385,11 +406,10 @@ class WidgetSelectorTest {
             loaded = true
         )
 
-        // 规格：下一节课是「今天之后最早的那个课次」，按数据契约先比开始时刻；
-        // 只有当天全部课次都缺少开始时刻时，才退回按节次取第一节。
+        // 按节次优先：不比较开始时刻，缺钟点不会把第 1-2 节排到第 5-6 节之后。
         assertEquals(WidgetDisplayMode.NEXT, selection.mode)
         assertEquals("明天 · 周五", selection.capsule)
-        assertEquals(listOf("第5-6节有钟点"), selection.occurrences.map { it.name })
+        assertEquals(listOf("第1-2节无钟点"), selection.occurrences.map { it.name })
     }
 
     @Test
