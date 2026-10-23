@@ -16,6 +16,7 @@ import android.content.Intent
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import java.time.LocalDateTime
+import kotlin.math.roundToInt
 
 /** 供小组件 ListView 使用的 RemoteViewsService。 */
 class CourseWidgetService : RemoteViewsService() {
@@ -27,7 +28,8 @@ class CourseWidgetService : RemoteViewsService() {
  * 列表条目工厂。
  *
  * 数据来自 [WidgetData] + [WidgetSelector]，渲染只用到 RemoteViews 支持的
- * 方法（setTextViewText / setInt(setBackgroundColor) / setOnClickFillInIntent）。
+ * 方法（setTextViewText / setInt(setBackgroundColor) / setViewPadding /
+ * setOnClickFillInIntent）。
  */
 private class CourseWidgetFactory(private val context: Context) :
     RemoteViewsService.RemoteViewsFactory {
@@ -53,6 +55,14 @@ private class CourseWidgetFactory(private val context: Context) :
         val views = RemoteViews(context.packageName, R.layout.course_widget_item)
         val occurrence = occurrences.getOrNull(position) ?: return views
 
+        // 间隔属于条目本身，点击它也能执行列表模板；首条不留间隔。
+        // 每次显式设置，避免复用条目时把第二条的内边距带到首条。
+        val topPadding = if (position > 0) {
+            (8 * context.resources.displayMetrics.density).roundToInt()
+        } else {
+            0
+        }
+        views.setViewPadding(R.id.widget_item_root, 0, topPadding, 0, 0)
         views.setTextViewText(R.id.widget_item_name, occurrence.name)
         views.setTextViewText(R.id.widget_item_time, WidgetText.timeLine(occurrence))
         // 地点始终占一行（没有地点时留空），保证色条在三条文字之间拉伸、

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   小组件布局：标题栏 + 三种互斥内容。
-  - widget_list：今天还有课时的可滚动列表，由 CourseWidgetService 提供条目。
+  - widget_list：今天还有课时的可滚动列表，由 CourseWidgetService 提供条目；
+    按条目高度收起，最多占剩余高度，下方空白交给卡片点击。
+    条目间隔由条目自己的上内边距提供，间隔内也能点击。
   - widget_fallback：今天没有剩余课次时的下一节课，主题色胶囊 + 一条与列表
     同构、不能滚动的课次。
   - widget_empty：尚未加载 / 本学期已结束的空状态。
@@ -53,11 +55,10 @@
             <ListView
                 android:id="@+id/widget_list"
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:layout_weight="1"
-                android:divider="@android:color/transparent"
-                android:dividerHeight="8dp"
+                android:divider="@null"
+                android:dividerHeight="0dp"
                 android:overScrollMode="never"
                 android:scrollbars="none" />
 
