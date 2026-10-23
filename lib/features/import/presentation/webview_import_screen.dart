@@ -3,11 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/features/import/application/import_commit.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/application/course_capture_orientation.dart';
@@ -748,27 +747,6 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
   }
 
   Future<void> _confirmAndImport(WebviewImportState state) async {
-    // 二次确认：替换/合并都先向用户说明影响面。
-    final existing = await _existingCourseCount();
-    if (!mounted) return;
-    final ok = await showImportConfirmDialog(
-      context,
-      mode: state.mode,
-      importCount: state.selectedCount,
-      existingCount: existing,
-    );
-    if (ok && mounted) await _importSelected();
-  }
-
-  Future<int> _existingCourseCount() async {
-    final repo = ref.read(courseRepositoryProvider);
-    final semester =
-        await ref.read(semesterRepositoryProvider).getActiveSemester();
-    if (semester == null) return 0;
-    return (await repo.getCourses(semester.id)).length;
-  }
-
-  Future<void> _importSelected() async {
     final semester = ref.read(activeSemesterProvider).value;
     if (semester == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -776,51 +754,43 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
       );
       return;
     }
+    final submission = ImportSubmission.webview(
+      semesterId: semester.id,
+      mode: state.mode,
+      courses: state.courses,
+      sectionTimes: ref.read(sectionTimesProvider),
+    );
+    if (submission.courses.isEmpty) return;
+    final existing = (await ref.read(courseRepositoryProvider)
+        .getCourses(submission.semesterId)).length;
+    if (!mounted) return;
+    final ok = await showImportConfirmDialog(
+      context,
+      mode: submission.mode,
+      importCount: submission.courses.length,
+      existingCount: existing,
+    );
+    if (ok && mounted) await _importSelected(submission);
+  }
 
-    final repo = ref.read(courseRepositoryProvider);
-    final sectionTimes = ref.read(sectionTimesProvider);
-    final uuid = const Uuid();
-    final state = ref.read(webviewImportProvider);
-    final replacements = <Course>[];
-    for (final c in state.courses.where((c) => c.selected)) {
-      if (c.name.isEmpty || c.weeks.isEmpty) continue;
-      // 教案上没有直接的时间，但节次时间表已知：startSection 对应开始时间，
-      // endSection 对应结束时间，补上后桌面小组件才能显示具体钟点。
-      final startTime = sectionTimes[c.startSection]?.startTime;
-      final endTime = sectionTimes[c.endSection]?.endTime;
-      replacements.add(Course(
-        id: uuid.v4(),
-        semesterId: semester.id,
-        name: c.name,
-        teacher: c.teacher,
-        location: c.location,
-        dayOfWeek: c.dayOfWeek,
-        startSection: c.startSection,
-        endSection: c.endSection,
-        startTime: startTime,
-        endTime: endTime,
-        weeks: c.weeks,
-        colorValue: AppConstants.courseAutoColor(replacements.length),
-      ));
-    }
-
-    if (replacements.isEmpty) return;
-    if (state.mode == ImportMode.merge) {
-      await repo.addCourses(semester.id, replacements);
-    } else {
-      await repo.replaceForSemester(semester.id, replacements);
-    }
-    final count = replacements.length;
-
-    if (mounted) {
+  Future<void> _importSelected(ImportSubmission submission) async {
+    try {
+      final count = await ref.read(importCommitProvider).commit(submission);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(state.mode == ImportMode.merge
+          content: Text(submission.mode == ImportMode.merge
               ? '已在现有课表中追加 $count 门课程'
               : '已用 $count 门课程替换当前课表'),
         ),
       );
       context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导入失败：$e')),
+      );
     }
   }
 }

@@ -15,6 +15,15 @@ class ImportScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(importProvider, (previous, next) {
+      if (next.status == ImportStatus.preview &&
+          next.errorMessage != null &&
+          previous?.status == ImportStatus.importing) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.errorMessage!)),
+        );
+      }
+    });
     final state = ref.watch(importProvider);
     final theme = Theme.of(context);
 
@@ -71,7 +80,7 @@ class ImportScreen extends ConsumerWidget {
     final notifier = ref.read(importProvider.notifier);
     return FloatingActionButton.extended(
       onPressed: state.selectedCount > 0
-          ? () => _confirmAndImport(context, ref, state, notifier)
+          ? () => _confirmAndImport(context, ref, notifier)
           : null,
       icon: const Icon(Icons.download_done),
       label: Text('导入 ${state.selectedCount} 门'),
@@ -82,27 +91,21 @@ class ImportScreen extends ConsumerWidget {
   Future<void> _confirmAndImport(
     BuildContext context,
     WidgetRef ref,
-    ImportState state,
     ImportNotifier notifier,
   ) async {
-    final existing = await _existingCourseCount(ref);
+    final submission = await notifier.prepareImport();
+    if (submission == null || submission.courses.isEmpty) return;
+    final existing = (await ref.read(courseRepositoryProvider)
+        .getCourses(submission.semesterId)).length;
     if (!context.mounted) return;
     final ok = await showImportConfirmDialog(
       context,
-      mode: state.mode,
-      importCount: state.selectedCount,
+      mode: submission.mode,
+      importCount: submission.courses.length,
       existingCount: existing,
     );
-    if (ok) await notifier.confirmImport();
+    if (ok) await notifier.confirmImport(submission);
   }
-}
-
-/// 当前激活学期已有的课程数（用于确认弹窗展示）。
-Future<int> _existingCourseCount(WidgetRef ref) async {
-  final repo = ref.read(courseRepositoryProvider);
-  final semester = await ref.read(semesterRepositoryProvider).getActiveSemester();
-  if (semester == null) return 0;
-  return (await repo.getCourses(semester.id)).length;
 }
 
 /// 空闲/选择文件视图。
