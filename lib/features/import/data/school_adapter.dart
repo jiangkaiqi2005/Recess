@@ -58,6 +58,13 @@ abstract class SchoolAdapter {
   /// ```
   String get extractJs;
 
+  /// 用本次预览的目标学期展开没有明确范围的单双周。
+  String extractForSemester(int totalWeeks) {
+    if (totalWeeks < 1) throw ArgumentError.value(totalWeeks, 'totalWeeks');
+    return '(function() { var recessTotalWeeks = $totalWeeks; '
+        'return ${extractJs.trim()}; })()';
+  }
+
   /// 适配方式，用于向用户准确说明当前规则的可靠程度。
   AdapterSupportLevel get supportLevel => AdapterSupportLevel.schoolVerified;
 
@@ -92,24 +99,47 @@ class ExtractedCourse {
   });
 
   factory ExtractedCourse.fromJson(Map<String, dynamic> json) {
-    final dayOfWeek = json['dayOfWeek'] as int? ?? 1;
-    final startSection = json['startSection'] as int? ?? 1;
-    final endSection = json['endSection'] as int? ?? 1;
-    assert(
-        dayOfWeek >= 1 && dayOfWeek <= 7, 'dayOfWeek out of range: $dayOfWeek');
-    assert(startSection >= 1 && startSection <= 20,
-        'startSection out of range: $startSection');
-    assert(endSection >= startSection,
-        'endSection ($endSection) < startSection ($startSection)');
+    final name = json['name'];
+    if (name is! String || name.trim().isEmpty) {
+      throw const FormatException('课程名为空或无效');
+    }
+    final dayOfWeek = json['dayOfWeek'];
+    if (dayOfWeek is! int || dayOfWeek < 1 || dayOfWeek > 7) {
+      throw const FormatException('星期缺失或无效');
+    }
+    final startSection = json['startSection'];
+    final endSection = json['endSection'];
+    if (startSection is! int || endSection is! int) {
+      throw const FormatException('节次缺失或无效');
+    }
+    if (startSection < 1 ||
+        startSection > 16 ||
+        endSection < 1 ||
+        endSection > 16) {
+      throw const FormatException('节次超出第1–16节');
+    }
+    if (endSection < startSection) {
+      throw const FormatException('结束节次早于开始节次');
+    }
+    final rawWeeks = json['weeks'];
+    if (rawWeeks is! List ||
+        rawWeeks.isEmpty ||
+        rawWeeks.any((w) => w is! int || w < 1)) {
+      throw const FormatException('周次缺失或无效');
+    }
+    final weeks = rawWeeks.cast<int>().toSet().toList()..sort();
+    if ((json['teacher'] != null && json['teacher'] is! String) ||
+        (json['location'] != null && json['location'] is! String)) {
+      throw const FormatException('教师或教室格式无效');
+    }
     return ExtractedCourse(
-      name: json['name'] as String? ?? '',
+      name: name.trim(),
       teacher: json['teacher'] as String?,
       location: json['location'] as String?,
       dayOfWeek: dayOfWeek,
       startSection: startSection,
       endSection: endSection,
-      weeks: (json['weeks'] as List<dynamic>?)?.map((e) => e as int).toList() ??
-          [],
+      weeks: List.unmodifiable(weeks),
     );
   }
 }

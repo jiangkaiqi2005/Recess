@@ -61,6 +61,9 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(webviewImportProvider);
+    final semester = ref.watch(activeSemesterProvider).valueOrNull;
+    final previewReady = state.preview != null && state.preview!.canSubmit &&
+        state.preview!.context.matches(semester);
     return Scaffold(
       appBar: AppBar(
         title: Text(state.phase == WebviewPhase.select
@@ -91,7 +94,7 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
             ),
           if (state.phase == WebviewPhase.preview)
             TextButton(
-              onPressed: state.selectedCount == 0
+              onPressed: state.selectedCount == 0 || !previewReady
                   ? null
                   : () => _confirmAndImport(state),
               child: Text('导入 (${state.selectedCount})'),
@@ -279,7 +282,7 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
 
   // ── 预览列表 ──
   Widget _buildPreview(WebviewImportState state) {
-    if (state.courses.isEmpty) {
+    if (state.courses.isEmpty && state.skippedCount == 0) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -390,7 +393,8 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '有 ${state.skippedCount} 门课程无法识别星期，已跳过',
+                    '已跳过 ${state.skippedCount} 条课程记录：\n'
+                    '${state.preview?.skippedReasons.entries.map((e) => "${e.key}：${e.value}条").join("；") ?? "课程记录无效"}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.error,
                     ),
@@ -399,6 +403,23 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
               ],
             ),
           ),
+        if (state.preview != null && (!state.preview!.canSubmit ||
+            !state.preview!.context.matches(ref.watch(activeSemesterProvider).valueOrNull)))
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              state.preview!.canSubmit
+                  ? '学期设置已改变，请重新抓取并预览'
+                  : '${state.preview!.weekConflicts.join('；')}。请先核对调整学期并重新预览。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+        TextButton(
+          onPressed: notifier.backToLogin,
+          child: const Text('返回重新抓取'),
+        ),
         if (conflictedNames.isNotEmpty)
           ImportConflictBanner(
             names: conflictedNames,
@@ -579,9 +600,13 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
       // 等待 SPA 动态渲染完成
       await Future.delayed(const Duration(seconds: 2));
 
+      final semester = await ref.read(activeSemesterProvider.future);
+      if (semester == null) throw StateError('请先创建学期');
+      final previewContext = WebviewPreviewContext.fromSemester(semester);
+
       // 注入 JS 提取课程
       final result =
-          await _controller!.runJavaScriptReturningResult(_adapter!.extractJs);
+          await _controller!.runJavaScriptReturningResult(_adapter!.extractForSemester(previewContext.totalWeeks));
       final decoded = decodeWebviewExtractResult(result);
 
       // 适配器导航/等待信号：已跳转课表页或课表仍在加载，延迟后自动重试
@@ -613,9 +638,10 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
         throw Exception('课表数据格式异常，请确认已进入课表页面后重试');
       }
 
-      final (courses, skippedCount) = importCoursesFromDecoded(decoded);
+      final preview = previewWebviewCourses(decoded, previewContext);
+      final courses = preview.courses;
 
-      if (courses.isEmpty) {
+      if (courses.isEmpty && preview.skippedCount == 0) {
         // 抓取为空，捕获调试信息
         final debugInfo = await _controller!.runJavaScriptReturningResult(r'''
           (function() {
@@ -687,7 +713,7 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
 
       await _orientationController.leaveCaptureMode();
       if (!mounted) return;
-      notifier.showPreview(courses, skippedCount);
+      notifier.showValidatedPreview(preview);
     } catch (e) {
       if (mounted) notifier.setExtracting(false);
       await _orientationController.leaveCaptureMode();
@@ -754,7 +780,15 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
       );
       return;
     }
+    final preview = state.preview;
+    if (preview == null || !preview.canSubmit || !preview.context.matches(semester)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请核对学期设置并重新抓取预览')),
+      );
+      return;
+    }
     final submission = ImportSubmission.webview(
+      previewContext: preview.context,
       semesterId: semester.id,
       mode: state.mode,
       courses: state.courses,

@@ -34,6 +34,24 @@ void main() {
   });
 
   group('CquAdapter extractJs', () {
+    test('明确周次范围内筛选单双而不补到20周', () async {
+      final courses = await _runExtractor(r'''
+        const card = new FakeElement(
+          '本科 - 课程甲[992499-001]\n[1-8周，单周] [1-2节] D1210',
+          42, 101, {'data-day': '1'});
+        installDocument([card]);
+      ''');
+      expect(courses.single['weeks'], [1, 3, 5, 7]);
+    });
+    test('周次括号后的单双条件仍限制于该明确范围', () async {
+      final courses = await _runExtractor(r'''
+        const card = new FakeElement(
+          '本科 - 课程甲[992499-001]\n[1-8周]（单周） [1-2节] D1210',
+          42, 101, {'data-day': '1'});
+        installDocument([card]);
+      ''');
+      expect(courses.single['weeks'], [1, 3, 5, 7]);
+    });
     test('普通课旁的屏外教师详情不生成课程或计入无法识别星期', () async {
       final courses = await _runExtractor(r'''
         const headers = makeHeaders([

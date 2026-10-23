@@ -1,3 +1,4 @@
+import 'school_week_parser.dart';
 import 'generic_adapter.dart';
 import 'school_adapter.dart';
 
@@ -72,40 +73,21 @@ class ConfiguredSchoolAdapter extends SchoolAdapter {
   String get _zhengfangExtractor =>
       r'''
 (function() {
+''' + schoolWeekParserJs + r'''
   var results = [];
   var seen = {};
 
   function range(text) {
-    var values = [];
-    var raw = String(text || '');
-    var odd = /单|奇/.test(raw);
-    var even = /双|偶/.test(raw);
-    raw.replace(/第|周|节/g, '').split(/[,，、\s]+/)
-      .forEach(function(part) {
-        var match = part.match(/(\d+)\s*[-–~]\s*(\d+)/);
-        if (match) {
-          for (var n = parseInt(match[1]); n <= parseInt(match[2]); n++) {
-            values.push(n);
-          }
-        } else {
-          var value = parseInt(part);
-          if (!isNaN(value)) values.push(value);
-        }
-      });
-    return values.filter(function(value, index, all) {
-      if (all.indexOf(value) !== index) return false;
-      if (odd) return value % 2 === 1;
-      if (even) return value % 2 === 0;
-      return true;
-    }).sort(function(a, b) { return a - b; });
+    return schoolWeekNumbers(text, true);
   }
 
   function add(item) {
+    if (!item || typeof item !== 'object') { results.push(null); return; }
     var name = String(item.kcmc || item.courseName || '').trim();
-    var day = parseInt(item.xqj || item.dayOfWeek || item.weekDay);
+    var day = schoolInteger(item.xqj || item.dayOfWeek || item.weekDay);
     var sections = range(item.jcs || item.jc || item.sections || '');
-    var weeks = range(item.zcd || item.weeks || item.weekDescription || '');
-    if (!name || day < 1 || day > 7 || sections.length === 0) return;
+    var weeks = schoolWeekNumbers(item.zcd || item.weeks || item.weekDescription || '');
+
     var key = name + '|' + day + '|' + sections.join(',') + '|' + weeks.join(',');
     if (seen[key]) return;
     seen[key] = true;

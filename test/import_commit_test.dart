@@ -72,6 +72,292 @@ void main() {
     await semesters.setActive('s1');
   });
 
+  testWidgets('教务预览显示跳过原因和周次冲突并阻止提交', (tester) async {
+    await tester.runAsync(() async {
+      final semester = (await container.read(activeSemesterProvider.future))!;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: WebviewImportScreen(
+              orientationController: CourseCaptureOrientationController(
+                setPreferredOrientations: (_) async {},
+              ),
+            ),
+          ),
+        ),
+      );
+      final preview = previewWebviewCourses([
+        {
+          'name': '高数',
+          'dayOfWeek': 1,
+          'startSection': 1,
+          'endSection': 2,
+          'weeks': [19],
+        },
+        {
+          'name': '超限',
+          'dayOfWeek': 1,
+          'startSection': 1,
+          'endSection': 17,
+          'weeks': [1],
+        },
+        {
+          'name': '  ',
+          'dayOfWeek': 1,
+          'startSection': 1,
+          'endSection': 2,
+          'weeks': [1],
+        },
+      ], WebviewPreviewContext.fromSemester(semester));
+      container
+          .read(webviewImportProvider.notifier)
+          .showValidatedPreview(preview);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('节次超出第1–16节'), findsOneWidget);
+      expect(find.textContaining('课程名为空或无效'), findsOneWidget);
+      expect(find.textContaining('明确包含第19周'), findsOneWidget);
+      expect(find.textContaining('核对调整学期并重新预览'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(find.widgetWithText(TextButton, '导入 (1)'))
+            .onPressed,
+        isNull,
+      );
+      expect(
+        (await container
+            .read(courseRepositoryProvider)
+            .getCourses('s1')).single.id,
+        'old-s1',
+      );
+    });
+  });
+
+  for (final change in ['总周数', '目标学期', '开学日期']) {
+    testWidgets('教务确认期间更改$change拒绝旧预览且保留原课表', (tester) async {
+      await tester.runAsync(() async {
+        final semester = (await container.read(activeSemesterProvider.future))!;
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: WebviewImportScreen(
+                orientationController: CourseCaptureOrientationController(
+                  setPreferredOrientations: (_) async {},
+                ),
+              ),
+            ),
+          ),
+        );
+        final preview = previewWebviewCourses([
+          {
+            'name': '新课',
+            'dayOfWeek': 1,
+            'startSection': 1,
+            'endSection': 2,
+            'weeks': [1],
+          },
+        ], WebviewPreviewContext.fromSemester(semester));
+        container
+            .read(webviewImportProvider.notifier)
+            .showValidatedPreview(preview);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('导入 (1)'));
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        await tester.pumpAndSettle();
+        if (change == '目标学期') {
+          await container.read(semesterRepositoryProvider).setActive('s2');
+        } else {
+          await container
+              .read(semesterRepositoryProvider)
+              .upsert(
+                change == '总周数'
+                    ? semester.copyWith(totalWeeks: 20)
+                    : semester.copyWith(startDate: DateTime(2026, 9, 14)),
+              );
+        }
+        await tester.tap(find.widgetWithText(FilledButton, '替换'));
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('学期设置已改变'), findsOneWidget);
+        expect(
+          (await container
+              .read(courseRepositoryProvider)
+              .getCourses('s1')).single.id,
+          'old-s1',
+        );
+        expect(
+          (await container
+              .read(courseRepositoryProvider)
+              .getCourses('s2')).single.id,
+          'old-s2',
+        );
+        expect(
+          container.read(webviewImportProvider).phase,
+          WebviewPhase.preview,
+        );
+        expect(find.textContaining('已用 1 门课程'), findsNothing);
+      });
+    });
+  }
+
+  testWidgets('教务预览生成后更改学期设置需重新抓取', (tester) async {
+    await tester.runAsync(() async {
+      final semester = (await container.read(activeSemesterProvider.future))!;
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: WebviewImportScreen(
+              orientationController: CourseCaptureOrientationController(
+                setPreferredOrientations: (_) async {},
+              ),
+            ),
+          ),
+        ),
+      );
+      final preview = previewWebviewCourses([
+        {
+          'name': '新课',
+          'dayOfWeek': 1,
+          'startSection': 1,
+          'endSection': 2,
+          'weeks': [1],
+        },
+      ], WebviewPreviewContext.fromSemester(semester));
+      container
+          .read(webviewImportProvider.notifier)
+          .showValidatedPreview(preview);
+      await container
+          .read(semesterRepositoryProvider)
+          .upsert(semester.copyWith(totalWeeks: 8));
+      container.invalidate(activeSemesterProvider);
+      await container.read(activeSemesterProvider.future);
+      await tester.pumpAndSettle();
+      expect(find.text('学期设置已改变，请重新抓取并预览'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(find.widgetWithText(TextButton, '导入 (1)'))
+            .onPressed,
+        isNull,
+      );
+      expect(
+        (await container
+            .read(courseRepositoryProvider)
+            .getCourses('s1')).single.id,
+        'old-s1',
+      );
+    });
+  });
+
+  test('混批预览数量与实际提交数量一致且保留规范化周次', () async {
+    final semester =
+        (await container.read(semesterRepositoryProvider).getActiveSemester())!;
+    Map<String, dynamic> course(String name, List<int> weeks) => {
+      'name': name,
+      'dayOfWeek': 1,
+      'startSection': 1,
+      'endSection': 2,
+      'weeks': weeks,
+    };
+    final preview = previewWebviewCourses([
+      course('  高数  ', [3, 1, 3]),
+      course('物理', [2]),
+      course('', [1]),
+      {
+        ...course('超限', [1]),
+        'endSection': 17,
+      },
+      course('空周次', []),
+    ], WebviewPreviewContext.fromSemester(semester));
+    final notifier = WebviewImportNotifier();
+    addTearDown(notifier.dispose);
+    notifier.showValidatedPreview(preview);
+    expect(notifier.state.selectedCount, 2);
+    expect(notifier.state.skippedCount, 3);
+    final submission = ImportSubmission.webview(
+      semesterId: semester.id,
+      mode: ImportMode.replace,
+      courses: notifier.state.courses,
+      sectionTimes: const {},
+      previewContext: preview.context,
+    );
+    expect(submission.courses.length, notifier.state.selectedCount);
+    expect(await container.read(importCommitProvider).commit(submission), 2);
+    final imported = await container
+        .read(courseRepositoryProvider)
+        .getCourses(semester.id);
+    expect(imported.map((c) => c.name), ['高数', '物理']);
+    expect(imported.first.weeks, [1, 3]);
+    expect(
+      (await container.read(semesterRepositoryProvider).getActiveSemester())!
+          .totalWeeks,
+      18,
+    );
+  });
+
+  test('明确第19周不能写入18周学期，修正后必须重新预览', () async {
+    final semester =
+        (await container.read(semesterRepositoryProvider).getActiveSemester())!;
+    final data = [
+      {
+        'name': '第19周课程',
+        'dayOfWeek': 1,
+        'startSection': 1,
+        'endSection': 2,
+        'weeks': [19],
+      },
+    ];
+    final preview = previewWebviewCourses(
+      data,
+      WebviewPreviewContext.fromSemester(semester),
+    );
+    final submission = ImportSubmission.webview(
+      semesterId: semester.id,
+      mode: ImportMode.replace,
+      courses: preview.courses,
+      sectionTimes: const {},
+      previewContext: preview.context,
+    );
+    await expectLater(
+      container.read(importCommitProvider).commit(submission),
+      throwsStateError,
+    );
+    // 使用公开预览的完整诊断决定可提交性。
+    expect(preview.canSubmit, isFalse);
+    await container
+        .read(semesterRepositoryProvider)
+        .upsert(semester.copyWith(totalWeeks: 20));
+    await expectLater(
+      container.read(importCommitProvider).commit(submission),
+      throwsStateError,
+    );
+    expect(
+      (await container
+          .read(courseRepositoryProvider)
+          .getCourses('s1')).single.id,
+      'old-s1',
+    );
+    final corrected = previewWebviewCourses(
+      data,
+      WebviewPreviewContext.fromSemester(semester.copyWith(totalWeeks: 20)),
+    );
+    final fresh = ImportSubmission.webview(
+      semesterId: semester.id,
+      mode: ImportMode.replace,
+      courses: corrected.courses,
+      sectionTimes: const {},
+      previewContext: corrected.context,
+    );
+    expect(await container.read(importCommitProvider).commit(fresh), 1);
+    expect(
+      (await container
+          .read(courseRepositoryProvider)
+          .getCourses('s1')).single.weeks,
+      [19],
+    );
+  });
+
   testWidgets('教务提交失败保留预览并提示，重试保留勾选并使用节次时间与自动配色', (tester) async {
     await tester.runAsync(() async {
       await container.read(activeSemesterProvider.future);
@@ -125,7 +411,16 @@ void main() {
           'weeks': [1],
         },
       ]);
-      notifier.showPreview(parsed, 0);
+      notifier.showValidatedPreview(
+        WebviewCoursePreview(
+          parsed,
+          {},
+          [],
+          WebviewPreviewContext.fromSemester(
+            container.read(activeSemesterProvider).requireValue!,
+          ),
+        ),
+      );
       notifier.toggle(2);
       await tester.pumpAndSettle();
       await tester.tap(find.text('导入 (2)'));
@@ -162,9 +457,6 @@ void main() {
       await tester.tap(find.text('导入 (2)'));
       await Future<void>.delayed(const Duration(milliseconds: 30));
       await tester.pumpAndSettle();
-      await container.read(semesterRepositoryProvider).setActive('s2');
-      container.invalidate(activeSemesterProvider);
-      await container.read(activeSemesterProvider.future);
       notifier.toggle(1);
       notifier.setMode(ImportMode.merge);
       await tester.tap(find.widgetWithText(FilledButton, '替换'));
@@ -439,41 +731,44 @@ END:VCALENDAR''';
     );
   });
 
-  test('教务没有有效选择时共同提交不清空课表', () async {
+  test('教务坏记录在预览前跳过，全不选时共同提交不清空课表', () async {
     final before =
         jsonDecode(
           await container.read(backupRepositoryProvider).exportJson(),
         )['semesters'];
+    final semester =
+        (await container.read(semesterRepositoryProvider).getActiveSemester())!;
+    final preview = previewWebviewCourses([
+      {
+        'name': '',
+        'dayOfWeek': 1,
+        'startSection': 1,
+        'endSection': 2,
+        'weeks': [1],
+      },
+      {
+        'name': '未排周次',
+        'dayOfWeek': 1,
+        'startSection': 1,
+        'endSection': 2,
+        'weeks': [],
+      },
+      {
+        'name': '不选',
+        'dayOfWeek': 1,
+        'startSection': 1,
+        'endSection': 2,
+        'weeks': [1],
+      },
+    ], WebviewPreviewContext.fromSemester(semester));
+    expect(preview.skippedCount, 2);
+    preview.courses.single.selected = false;
     final submission = ImportSubmission.webview(
       semesterId: 's1',
       mode: ImportMode.replace,
-      courses: [
-        ImportCourse(
-          name: '',
-          dayOfWeek: 1,
-          startSection: 1,
-          endSection: 2,
-          weeks: [1],
-          source: 'webview',
-        ),
-        ImportCourse(
-          name: '未排周次',
-          dayOfWeek: 1,
-          startSection: 1,
-          endSection: 2,
-          source: 'webview',
-        ),
-        ImportCourse(
-          name: '不选',
-          dayOfWeek: 1,
-          startSection: 1,
-          endSection: 2,
-          weeks: [1],
-          source: 'webview',
-          selected: false,
-        ),
-      ],
+      courses: preview.courses,
       sectionTimes: const {},
+      previewContext: preview.context,
     );
     expect(await container.read(importCommitProvider).commit(submission), 0);
     expect(

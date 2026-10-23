@@ -1,3 +1,4 @@
+import 'school_week_parser.dart';
 import 'generic_adapter.dart';
 import 'school_adapter.dart';
 
@@ -34,85 +35,27 @@ class NcuAdapter extends SchoolAdapter {
   String get extractJs =>
       r'''
 (function() {
+''' + schoolWeekParserJs + r'''
   var results = [];
   var seen = {};
   var dayMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':7,'天':7};
 
   // ═══ 节次解析："1-2" / "1,2" / "3" ═══
   function parseSections(str) {
-    var out = [];
-    if (!str) return out;
-    var parts = String(str).replace(/第|节/g, '').split(/[,，、]+/);
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      var rm = p.match(/^(\d+)\s*[-–~]\s*(\d+)$/);
-      if (rm) {
-        for (var s = parseInt(rm[1]); s <= parseInt(rm[2]); s++) out.push(s);
-      } else {
-        var n = parseInt(p);
-        if (!isNaN(n)) out.push(n);
-      }
-    }
-    out = out.filter(function(value, index, all) {
-      return value >= 1 && value <= 20 && all.indexOf(value) === index;
-    });
-    out.sort(function(a, b) { return a - b; });
-    return out;
+    return schoolWeekNumbers(str, true);
   }
 
   // ═══ 周次解析："1-16周" / "1-16" / "1-8,11-16" / "1-15(单)" / "2-16(双)" ═══
   function parseWeeksText(t) {
-    var weeks = [];
-    if (!t) return weeks;
-    var odd = t.indexOf('单') >= 0 && t.indexOf('双') < 0;
-    var even = t.indexOf('双') >= 0 && t.indexOf('单') < 0;
-    var cleaned = t.replace(/第|周|单|双|\||[\(\)（）]/g, '');
-    var parts = cleaned.split(/[,，、\s]+/);
-    var ranges = [];
-    var minW = 99, maxW = 0;
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      if (!p) continue;
-      var rm = p.match(/^(\d+)\s*[-–~]\s*(\d+)$/);
-      if (rm) {
-        var a = parseInt(rm[1]), b = parseInt(rm[2]);
-        ranges.push([a, b]);
-        if (a < minW) minW = a;
-        if (b > maxW) maxW = b;
-      } else {
-        var n = parseInt(p);
-        if (!isNaN(n)) {
-          ranges.push([n, n]);
-          if (n < minW) minW = n;
-          if (n > maxW) maxW = n;
-        }
-      }
-    }
-    if (odd || even) {
-      for (var w = minW; w <= maxW; w++) {
-        if (odd && w % 2 === 1) weeks.push(w);
-        if (even && w % 2 === 0) weeks.push(w);
-      }
-    } else {
-      for (var j = 0; j < ranges.length; j++) {
-        for (var w2 = ranges[j][0]; w2 <= ranges[j][1]; w2++) weeks.push(w2);
-      }
-    }
-    var unique = [];
-    var seenW = {};
-    for (var i = 0; i < weeks.length; i++) {
-      if (!seenW[weeks[i]]) { seenW[weeks[i]] = true; unique.push(weeks[i]); }
-    }
-    unique.sort(function(a, b) { return a - b; });
-    return unique;
+    return schoolWeekNumbers(t);
   }
 
   function addResult(name, teacher, location, day, secs, weeks) {
-    if (!name) return;
+
     name = name.replace(/\(\d{4}[^)]*\)\s*$/, '').trim();
-    if (name.length < 2 || name.length > 60) return;
-    if (!secs || secs.length === 0) return;
-    if (day < 1 || day > 7) return;
+
+
+
     var key = name + '|' + day + '|' + secs[0] + '|' +
         secs[secs.length - 1] + '|' + weeks.join(',');
     if (seen[key]) return;
@@ -172,7 +115,8 @@ class NcuAdapter extends SchoolAdapter {
           if (!list || list.length === 0) continue;
           for (var i = 0; i < list.length; i++) {
             var it = list[i];
-            var day = parseInt(it.xqj || it.dayOfWeek || it.weekDay);
+            if (!it || typeof it !== 'object') { results.push(null); continue; }
+            var day = schoolInteger(it.xqj || it.dayOfWeek || it.weekDay);
             if (isNaN(day) && (it.xqjmc || it.weekDayName)) {
               var dm = String(it.xqjmc || it.weekDayName)
                   .match(/周([一二三四五六日天])|星期([一二三四五六日天])/);

@@ -10,6 +10,7 @@ import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/application/import_commit.dart';
 import 'package:recess/features/import/domain/import_course.dart';
+import 'package:recess/features/import/domain/webview_preview_context.dart';
 import 'package:recess/features/notification/application/reminder_scheduler.dart';
 import 'package:recess/features/schedule/domain/schedule_helpers.dart';
 import 'package:recess/features/schedule/presentation/course_detail_sheet.dart';
@@ -119,6 +120,14 @@ void main() {
   for (final change in ['顺延', '模板', '重置']) {
     testWidgets('$change后详情、今日和提醒跟随节次，已存教务快照保持原值', (tester) async {
       final submission = ImportSubmission.webview(
+        previewContext: WebviewPreviewContext.fromSemester(
+          Semester(
+            id: 's',
+            name: '测试学期',
+            startDate: DateTime(2026, 9, 7),
+            totalWeeks: 18,
+          ),
+        ),
         semesterId: 's',
         mode: ImportMode.replace,
         courses: [

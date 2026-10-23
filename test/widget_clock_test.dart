@@ -12,6 +12,7 @@ import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/application/import_commit.dart';
 import 'package:recess/features/import/domain/import_course.dart';
+import 'package:recess/features/import/domain/webview_preview_context.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
 import 'package:recess/features/widget/application/widget_service.dart';
 
@@ -129,6 +130,14 @@ void main() {
     test('小组件在$change后使用新节次，WebView已存显式快照保持原值', () async {
       final submission = ImportSubmission.webview(
         semesterId: 's',
+        previewContext: WebviewPreviewContext.fromSemester(
+          Semester(
+            id: 's',
+            name: '测试学期',
+            startDate: DateTime(2026, 9, 7),
+            totalWeeks: 18,
+          ),
+        ),
         mode: ImportMode.merge,
         courses: [
           ImportCourse(

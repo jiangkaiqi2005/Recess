@@ -1,3 +1,4 @@
+import 'school_week_parser.dart';
 import 'school_adapter.dart';
 
 /// 沈阳化工大学（正方教务管理系统 ZFSoft）适配器。
@@ -32,72 +33,17 @@ class SyuctAdapter extends SchoolAdapter {
   @override
   String get extractJs => r'''
 (function() {
+''' + schoolWeekParserJs + r'''
   var dayMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':7,'天':7};
 
   // ═══ 解析周次文本（如 "第1-16周"、"第1-8周|单周"、"第2-16周|双周"、"第1-2周,第5-16周"）═══
   function parseWeeks(t) {
-    var weeks = [];
-    if (!t) return weeks;
-    var odd = t.indexOf('单周') >= 0;
-    var even = t.indexOf('双周') >= 0;
-    var cleaned = t.replace(/第|周|单|双|\|/g, '');
-    var parts = cleaned.split(/[,，、\s]+/);
-    var ranges = [];
-    var minW = 99, maxW = 0;
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      if (!p) continue;
-      var rm = p.match(/^(\d+)\s*[-–~]\s*(\d+)$/);
-      if (rm) {
-        var a = parseInt(rm[1]), b = parseInt(rm[2]);
-        ranges.push([a, b]);
-        if (a < minW) minW = a;
-        if (b > maxW) maxW = b;
-      } else {
-        var n = parseInt(p);
-        if (!isNaN(n)) {
-          ranges.push([n, n]);
-          if (n < minW) minW = n;
-          if (n > maxW) maxW = n;
-        }
-      }
-    }
-    if (odd || even) {
-      for (var w = minW; w <= maxW; w++) {
-        if (odd && w % 2 === 1) weeks.push(w);
-        if (even && w % 2 === 0) weeks.push(w);
-      }
-    } else {
-      for (var j = 0; j < ranges.length; j++) {
-        for (var w2 = ranges[j][0]; w2 <= ranges[j][1]; w2++) weeks.push(w2);
-      }
-    }
-    // 去重排序
-    var unique = [];
-    var seenW = {};
-    for (var i = 0; i < weeks.length; i++) {
-      if (!seenW[weeks[i]]) { seenW[weeks[i]] = true; unique.push(weeks[i]); }
-    }
-    unique.sort(function(a, b) { return a - b; });
-    return unique;
+    return schoolWeekNumbers(t);
   }
 
   // ═══ 解析节次文本（如 "1,2"、"3"、"1-2"）═══
   function parseSections(str) {
-    var out = [];
-    if (!str) return out;
-    var parts = str.split(/[,，、]+/);
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      var rm = p.match(/^(\d+)\s*[-–~]\s*(\d+)$/);
-      if (rm) {
-        for (var s = parseInt(rm[1]); s <= parseInt(rm[2]); s++) out.push(s);
-      } else {
-        var n = parseInt(p);
-        if (!isNaN(n)) out.push(n);
-      }
-    }
-    return out;
+    return schoolWeekNumbers(str, true);
   }
 
   // ═══ 解析单个文档中的课表 ═══
@@ -113,10 +59,10 @@ class SyuctAdapter extends SchoolAdapter {
           .replace(/\u00a0/g, ' ').trim();
       if (!text) continue;
       // 以「周X第…节{第…}」模式把同一单元格内并排的多门课切分为独立块
-      var blocks = text.split(/(?=周[一二三四五六日天]\s*第\s*\d)/);
+      var blocks = text.split(/(?=周[一二三四五六日天]\s*第)/);
       for (var b = 0; b < blocks.length; b++) {
         var block = blocks[b];
-        var m = block.match(/周([一二三四五六日天])\s*第\s*([\d,，、\s\-–~]+?)\s*节\s*\{第\s*([^}]+)\}/);
+        var m = block.match(/周([一二三四五六日天])\s*第\s*([^\n{}]*?)\s*节\s*\{第\s*([^}]+)\}/);
         if (!m) continue;
         var day = dayMap[m[1]];
         if (!day) continue;
@@ -127,7 +73,7 @@ class SyuctAdapter extends SchoolAdapter {
         // 模式行在块内的索引
         var modeIdx = -1;
         for (var k = 0; k < lines.length; k++) {
-          if (/周[一二三四五六日天]\s*第\s*\d.*节.*\{第/.test(lines[k])) { modeIdx = k; break; }
+          if (/周[一二三四五六日天]\s*第.*节.*\{第/.test(lines[k])) { modeIdx = k; break; }
         }
         if (modeIdx < 0) continue;
         // 名称：模式行之前的第一行；若模式行在第一行则取其后的第一行

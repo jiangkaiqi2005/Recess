@@ -1,3 +1,4 @@
+import 'school_week_parser.dart';
 import 'school_adapter.dart';
 
 /// 通用教务系统适配器。
@@ -39,8 +40,9 @@ class GenericAdapter extends SchoolAdapter {
   String get extractJs => commonExtractJs;
 
   /// 可供按学校配置的适配器复用的通用 DOM 抽取脚本。
-  static const String commonExtractJs = r'''
+  static final String commonExtractJs = r'''
 (function() {
+''' + schoolWeekParserJs + r'''
   var results = [];
   var dayMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':7,'天':7};
   var seen = {};
@@ -95,15 +97,15 @@ class GenericAdapter extends SchoolAdapter {
                      row.getAttribute('data-day') ||
                      row.getAttribute('data-weekday') || '';
         var day = parseDay(rawDay);
-        if (day < 1 || day > 7) return;
-        var beginUnit = parseInt(cell.getAttribute('data-begin-unit') ||
+
+        var beginUnit = schoolInteger(cell.getAttribute('data-begin-unit') ||
                                  cell.getAttribute('data-start-section') ||
                                  row.getAttribute('data-begin-unit') || '0');
-        var endUnit = parseInt(cell.getAttribute('data-end-unit') ||
+        var endUnit = schoolInteger(cell.getAttribute('data-end-unit') ||
                                cell.getAttribute('data-end-section') ||
                                row.getAttribute('data-end-unit') || '0');
-        if (beginUnit < 1) return;
-        if (endUnit < beginUnit) endUnit = beginUnit;
+
+
 
         // 用 cell.innerText 获取完整文本，再按行拆分解析
         var cellText = (cell.innerText || cell.textContent || '').trim();
@@ -210,17 +212,17 @@ class GenericAdapter extends SchoolAdapter {
       // 检测星期标记
       var dm = line.match(/^周([一二三四五六日天])$/) || line.match(/^星期([一二三四五六日天])$/);
       if (dm && dayMap[dm[1]]) { currentDay = dayMap[dm[1]]; continue; }
-      if (currentDay === 0) currentDay = 1;
+
 
       // 尝试从行中提取课程名+周次+节次
       // 常见格式：课程名 1-16周 1-2节 教室
-      var courseMatch = line.match(/^(.{2,20}?)\s+([\d,\-–~、单双]+)\s*周\s*([\d,\-–~、]+)\s*节/);
+      var courseMatch = line.match(/^(.{2,20}?)\s+(.+?周(?:\s*[（(][单双奇偶]周?[)）])?)\s+([^周\n]*?)\s*节/);
       if (courseMatch) {
         var cname = courseMatch[1].trim();
-        var wks = parseWeeks(courseMatch[2] + '周');
+        var wks = parseWeeks(courseMatch[2]);
         var secs = parseRange(courseMatch[3]);
-        var startSec = secs.length > 0 ? secs[0] : 1;
-        var endSec = secs.length > 0 ? secs[secs.length - 1] : 1;
+        var startSec = secs[0];
+        var endSec = secs[secs.length - 1];
 
         // 教室：节次后面的文本
         var locMatch = line.match(/节\s*(.+)$/);
@@ -252,7 +254,7 @@ class GenericAdapter extends SchoolAdapter {
     var text = String(value || '').trim();
     var match = text.match(/(?:周|星期)?([一二三四五六日天])/);
     if (match && dayMap[match[1]]) return dayMap[match[1]];
-    var number = parseInt(text);
+    var number = schoolInteger(text);
     if (number >= 1 && number <= 7) return number;
     // 明确写出 0 时才按 0-indexed 处理，避免空字符串被误判为周一。
     if (text !== '' && number >= 0 && number <= 6) return number + 1;
@@ -332,17 +334,19 @@ class GenericAdapter extends SchoolAdapter {
       }
     } else {
       // 单行：尝试用分隔符拆分
-      var parts = text.split(/[,，;；\s]+/).filter(Boolean);
+      var parts = text.split(/[;；\s]+/).filter(Boolean);
+      var weekParts = [];
       name = parts[0] || '';
       for (var pi = 1; pi < parts.length; pi++) {
         if (/\d+.*周/.test(parts[pi]) || /单周/.test(parts[pi]) || /双周/.test(parts[pi])) {
-          weeksText = parts[pi];
-          weeks = parseWeeks(weeksText);
+          weekParts.push(parts[pi]);
         } else if (!location && parts[pi].length >= 2) {
           location = parts[pi];
         }
       }
     }
+
+    if (lines.length === 1) weeks = parseWeeks(weekParts.join(' '));
 
     // 清理课程名中的括号备注
     if (name) name = name.replace(/\([^)]*\)$/g, '').replace(/（[^）]*）$/g, '').trim();
@@ -351,59 +355,11 @@ class GenericAdapter extends SchoolAdapter {
   }
 
   function parseWeeks(text) {
-    if (!text) return [];
-    var weeks = [];
-    if (/单周/.test(text)) {
-      for (var i = 1; i <= 20; i += 2) weeks.push(i);
-      return weeks;
-    }
-    if (/双周/.test(text)) {
-      for (var i = 2; i <= 20; i += 2) weeks.push(i);
-      return weeks;
-    }
-    var cleaned = text.replace(/第|周|节/g, '');
-    var parts = cleaned.split(/[,，、\s]+/);
-    parts.forEach(function(part) {
-      part = part.trim();
-      if (!part) return;
-      var rangeMatch = part.match(/(\d+)\s*[-–~]\s*(\d+)/);
-      if (rangeMatch) {
-        var start = parseInt(rangeMatch[1]);
-        var end = parseInt(rangeMatch[2]);
-        for (var i = start; i <= end; i++) weeks.push(i);
-      } else {
-        var num = parseInt(part);
-        if (!isNaN(num)) weeks.push(num);
-      }
-    });
-    weeks = weeks.filter(function(v, i, a) { return a.indexOf(v) === i; });
-    weeks.sort(function(a, b) { return a - b; });
-    return weeks;
+    return schoolWeekNumbers(text);
   }
 
   function parseRange(text) {
-    if (!text) return [];
-    var nums = [];
-    var parts = text.split(/[,，、\s]+/);
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      if (!p) continue;
-      var m = p.match(/(\d+)\s*[-–~]\s*(\d+)/);
-      if (m) {
-        var a = parseInt(m[1]), b = parseInt(m[2]);
-        for (var j = a; j <= b; j++) nums.push(j);
-      } else {
-        var n = parseInt(p);
-        if (!isNaN(n)) nums.push(n);
-      }
-    }
-    var unique = [];
-    var seenN = {};
-    for (var i = 0; i < nums.length; i++) {
-      if (!seenN[nums[i]]) { seenN[nums[i]] = true; unique.push(nums[i]); }
-    }
-    unique.sort(function(a, b) { return a - b; });
-    return unique;
+    return schoolWeekNumbers(text, true);
   }
 })();
 ''';
