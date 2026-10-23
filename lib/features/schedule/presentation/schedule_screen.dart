@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/core/utils/week_calculator.dart';
-import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/features/semester/application/semester_mutations.dart';
 import 'package:recess/features/schedule/domain/schedule_helpers.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
 import '../application/schedule_providers.dart';
@@ -279,10 +279,18 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   Future<void> _setCurrentWeek(int week) async {
     final semester = ref.read(activeSemesterProvider).valueOrNull;
     if (semester == null) return;
-    await ref
-        .read(semesterRepositoryProvider)
-        .upsert(semester.copyWith(currentWeekOverride: week));
-    ref.invalidate(activeSemesterProvider);
+    try {
+      await ref
+          .read(semesterMutationsProvider)
+          .save(semester.copyWith(currentWeekOverride: week));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败：$e')),
+        );
+      }
+      return;
+    }
     if (!mounted) return;
     _animateToWeek(week, semester.totalWeeks);
     ScaffoldMessenger.of(context)

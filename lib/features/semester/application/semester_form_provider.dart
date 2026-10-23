@@ -2,26 +2,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:recess/core/models/semester.dart';
-import 'package:recess/data/providers/database_providers.dart';
-import 'package:recess/data/repositories/course_platform_repository.dart';
-import 'package:recess/data/repositories/course_repository.dart';
-import 'package:recess/data/repositories/semester_repository.dart';
+import 'package:recess/features/semester/application/semester_mutations.dart';
 
 /// 学期编辑表单状态机。新增时 id 为空，保存时生成。
 final semesterFormProvider =
     StateNotifierProvider.autoDispose<SemesterFormNotifier, Semester>(
-  (ref) => SemesterFormNotifier(
-    ref.watch(semesterRepositoryProvider),
-    ref.watch(courseRepositoryProvider),
-    ref.watch(coursePlatformRepositoryProvider),
-  ),
+  (ref) => SemesterFormNotifier(ref.watch(semesterMutationsProvider)),
 );
 
 class SemesterFormNotifier extends StateNotifier<Semester> {
-  final SemesterRepository _repo;
-  final CourseRepository _courseRepo;
-  final CoursePlatformRepository _platformRepo;
-  SemesterFormNotifier(this._repo, this._courseRepo, this._platformRepo)
+  final SemesterMutations _mutations;
+  SemesterFormNotifier(this._mutations)
       : super(Semester(
           id: '',
           name: '',
@@ -51,17 +42,13 @@ class SemesterFormNotifier extends StateNotifier<Semester> {
   Future<String> save({bool activate = false}) async {
     var s = state;
     if (s.id.isEmpty) s = s.copyWith(id: const Uuid().v4());
+    await _mutations.save(s, activate: activate);
     state = s;
-    await _repo.upsert(s);
-    if (activate) await _repo.setActive(s.id);
     return s.id;
   }
 
   Future<void> delete() async {
     if (state.id.isEmpty) return;
-    // 先清理关联课程与课程平台，避免孤儿数据
-    await _courseRepo.deleteBySemester(state.id);
-    await _platformRepo.deleteBySemester(state.id);
-    await _repo.delete(state.id);
+    await _mutations.delete(state.id);
   }
 }

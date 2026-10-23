@@ -7,7 +7,6 @@ import 'package:recess/core/models/semester.dart';
 import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/features/semester/application/semester_form_provider.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
-import 'package:recess/data/providers/database_providers.dart';
 
 class SemesterScreen extends ConsumerWidget {
   const SemesterScreen({super.key});
@@ -68,9 +67,6 @@ class SemesterScreen extends ConsumerWidget {
       builder: (_) => SemesterEditSheet(initial: initial),
     ).then((changed) {
       if (changed == true) {
-        // 列表与首页（激活学期/当前周）同步刷新。
-        ref.invalidate(semestersProvider);
-        ref.invalidate(activeSemesterProvider);
         ref.invalidate(semesterFormProvider);
       }
     });
@@ -320,10 +316,18 @@ class _SemesterEditSheetState extends ConsumerState<SemesterEditSheet> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () async {
-                  await ref.read(semesterFormProvider.notifier).save(
-                        activate: _activate,
+                  try {
+                    await ref.read(semesterFormProvider.notifier).save(
+                          activate: _activate,
+                        );
+                    if (context.mounted) Navigator.of(context).pop(true);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('保存失败：$e')),
                       );
-                  if (context.mounted) Navigator.of(context).pop(true);
+                    }
+                  }
                 },
                 child: Text(isEdit ? '保存' : '创建'),
               ),
@@ -363,13 +367,16 @@ class _SemesterEditSheetState extends ConsumerState<SemesterEditSheet> {
       ),
     );
     if (confirmed == true) {
-      await ref.read(semesterFormProvider.notifier).delete();
-      // 同时清掉该学期课程。
-      final id = widget.initial?.id;
-      if (id != null && id.isNotEmpty) {
-        await ref.read(courseRepositoryProvider).deleteBySemester(id);
+      try {
+        await ref.read(semesterFormProvider.notifier).delete();
+        if (context.mounted) Navigator.of(context).pop(true);
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除失败：$e')),
+          );
+        }
       }
-      if (context.mounted) Navigator.of(context).pop(true);
     }
   }
 }
