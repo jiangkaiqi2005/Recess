@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  小组件深色配色，取自 AppColors 的深色主题（lib/core/theme/app_theme.dart）。
+  复制到 android/app/src/main/res/values-night/colors.xml
+-->
+<resources>
+    <color name="widget_surface">#FF141B27</color>
+    <color name="widget_text">#FFEDF2FC</color>
+    <color name="widget_text_muted">#FFA8B4C7</color>
+</resources>

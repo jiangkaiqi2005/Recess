@@ -1,28 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 小组件布局。复制到 android/app/src/main/res/layout/course_widget.xml -->
+<!--
+  小组件布局：标题栏 + 可滚动课次列表。
+  列表由 CourseWidgetService 提供，条目布局见 course_widget_item.xml。
+  复制到 android/app/src/main/res/layout/course_widget.xml
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@drawable/course_widget_background"
     android:orientation="vertical"
-    android:padding="12dp"
-    android:background="@android:color/white">
+    android:padding="12dp">
 
     <TextView
         android:id="@+id/widget_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="今天"
-        android:textStyle="bold"
-        android:textSize="14sp"
-        android:textColor="#222222" />
-
-    <TextView
-        android:id="@+id/widget_courses"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textSize="13sp"
-        android:textColor="#444444"
-        android:text="今天没有课 🎉" />
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="第 8 周 · 周四"
+        android:textColor="@color/widget_text_muted"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <ListView
+        android:id="@+id/widget_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_weight="1"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="8dp"
+        android:overScrollMode="never"
+        android:scrollbars="none" />
+
+    <!-- 临时空文案：下一节课兜底与两种空状态由后续票实现。 -->
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="今天没有课"
+        android:textColor="@color/widget_text_muted"
+        android:textSize="12sp"
+        android:visibility="gone" />
 </LinearLayout>

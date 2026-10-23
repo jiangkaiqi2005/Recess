@@ -23,10 +23,16 @@ flutter pub get
 | `native_templates/android/app/src/main/AndroidManifest.xml` | `android/app/src/main/AndroidManifest.xml` |
 | `native_templates/android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt` | `android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt` |
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt` |
+| `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetService.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetService.kt` |
+| `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetData.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetData.kt` |
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetSelector.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetSelector.kt` |
 | `native_templates/android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt` | `android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt` |
 | `native_templates/android/app/src/main/res/xml/course_widget_info.xml` | `android/app/src/main/res/xml/course_widget_info.xml` |
 | `native_templates/android/app/src/main/res/layout/course_widget.xml` | `android/app/src/main/res/layout/course_widget.xml` |
+| `native_templates/android/app/src/main/res/layout/course_widget_item.xml` | `android/app/src/main/res/layout/course_widget_item.xml` |
+| `native_templates/android/app/src/main/res/drawable/course_widget_background.xml` | `android/app/src/main/res/drawable/course_widget_background.xml` |
+| `native_templates/android/app/src/main/res/values/colors.xml` | `android/app/src/main/res/values/colors.xml` |
+| `native_templates/android/app/src/main/res/values-night/colors.xml` | `android/app/src/main/res/values-night/colors.xml` |
 | `native_templates/android/app/src/main/res/xml/filepaths.xml` | `android/app/src/main/res/xml/filepaths.xml` |
 
 模板中的 Kotlin 包名与真实包名 `io.github.jiangkaiqi2005.recess` 一致，复制后无需修改。
@@ -43,14 +49,17 @@ Gradle 模板包含 API 24 最低版本、通知等依赖所需的 desugaring �
 若旧的本地工程仍有 `android/app/build.gradle`，请先备份并合并其中的自定义配置，
 最终只保留一种 app 模块构建脚本，避免 Groovy 文件优先于 Kotlin 模板。
 
-完整的 `AndroidManifest.xml` 已注册桌面小组件 Receiver 与应用内更新所需的
+完整的 `AndroidManifest.xml` 已注册桌面小组件 Receiver、供列表使用的
+RemoteViewsService（`BIND_REMOTEVIEWS` 权限，`exported="false"`）与应用内更新所需的
 FileProvider/安装权限；`AndroidManifest.receiver.xml` 仅作为 Receiver 片段参考。
 
 Android 上 `home_widget` 将数据写入 `HomeWidgetSharedPreferences`；
-`CourseWidgetProvider` 读取其中的 `occurrences`（从今天到学期结束的课次列表）、
-`semester_days`（逐日教学周映射）与 `widget_loaded`（是否曾写入过数据）。
+`CourseWidgetProvider` 与 `CourseWidgetService` 通过 `WidgetData` 读取其中的
+`occurrences`（从今天到学期结束的课次列表）、`semester_days`（逐日教学周映射）。
 周次、钟点都由 Dart 侧算好，原生端的 `WidgetSelector` 只按当前本地时间
-挑选今天还没结束的课次并生成标题栏。
+挑选今天还没结束的课次并生成标题栏；`CourseWidgetService` 把挑选结果填充到
+小组件里的 `ListView`，条目颜色取自 Dart 写入的 `color` / `color_dark`，
+表面色与文字色见 `values/colors.xml` 与 `values-night/colors.xml`。
 
 ## 3. 验证
 
@@ -80,8 +89,9 @@ Windows 下如 `gradlew` 不可执行，可用 `cmd //c gradlew.bat :app:testDeb
   上下课时刻自行安排刷新（后续票处理）。
 - 尚未接入 Android 后台定时任务（如需整点自定义，可加 `WorkManager` 或
   `home_widget` 的 background callback）。
-- 小组件当前仍是纯文本布局，最多展示原生模板允许的前若干门课程；2×2
-  可滚动列表与下一节课兜底尚未实现。
+- 小组件为 2×2 的可滚动课次列表（`CourseWidgetService` 提供条目），可以拉伸、
+  不能缩到 2×2 以下；下一节课兜底与两种空状态尚未实现（后续票处理），
+  今天没有剩余课次时只显示一条临时文案。
 - `native_templates/android/app/src/test/` 下的 Kotlin 单测只在本地复制模板后
   用 Gradle 运行，CI 不执行。
 - ICS 时间按学校本地时间处理，忽略 `TZID`/UTC 偏移。

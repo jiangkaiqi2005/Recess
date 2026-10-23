@@ -46,6 +46,12 @@
                 android:resource="@xml/course_widget_info" />
         </receiver>
 
+        <!-- 小组件列表数据源，仅由系统（持有 BIND_REMOTEVIEWS）绑定。 -->
+        <service
+            android:name=".CourseWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
         <!-- 仅将校验后的私有缓存安装包通过 content URI 交给系统安装器。 -->
         <provider
             android:name=".UpdateFileProvider"
