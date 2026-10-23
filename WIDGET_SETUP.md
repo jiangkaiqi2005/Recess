@@ -128,8 +128,9 @@ Windows 下如 `gradlew` 不可执行，可用 `cmd //c gradlew.bat :app:testDeb
 - 不注册开机广播（`BOOT_COMPLETED`）。手机重启后，系统发出的
   `APPWIDGET_UPDATE` 会让 `CourseWidgetProvider.onUpdate` 重新挂上闹钟，
   不需要打开 App。
-- 小组件为 2×2 的可滚动课次列表（`CourseWidgetService` 提供条目），可以拉伸、
-  不能缩到 2×2 以下；今天没有剩余课次时改为一条不可滚动的下一节课，上方用
+- 小组件为固定 2×2 的可滚动课次列表（`CourseWidgetService` 提供条目），不能
+  拉伸；卡片由透明的正方形垫片撑成正方形，在格子里居中。今天没有剩余课次时
+  改为一条不可滚动的下一节课，上方用
   主题色胶囊标注日期；从未加载时显示「打开 Recess 加载课表」，本学期剩余
   时间没有课次时显示「本学期课程已结束」。
 - `native_templates/android/app/src/test/` 下的 Kotlin 单测只在本地复制模板后

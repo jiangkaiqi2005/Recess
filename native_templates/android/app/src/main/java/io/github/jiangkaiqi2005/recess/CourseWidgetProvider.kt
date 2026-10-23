@@ -77,7 +77,7 @@ class CourseWidgetProvider : AppWidgetProvider() {
         views.setPendingIntentTemplate(R.id.widget_list, launchAppIntent(context))
         // 根布局、兜底条目与空状态点击都拉起 App 的课表页。
         val launchIntent = launchAppIntent(context)
-        views.setOnClickPendingIntent(R.id.widget_root, launchIntent)
+        views.setOnClickPendingIntent(android.R.id.background, launchIntent)
         views.setOnClickPendingIntent(R.id.widget_item_root, launchIntent)
         views.setOnClickPendingIntent(R.id.widget_empty, launchIntent)
 

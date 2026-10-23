@@ -1,17 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  小组件元数据：默认 2×2（Android 12+ 用 targetCell，旧系统用最小宽高），
-  允许横向和纵向拉伸，但不能缩到 2×2 以下。30 分钟周期更新作为兜底。
+  小组件元数据：固定 2×2（Android 12+ 用 targetCell，旧系统用最小宽高），
+  不允许拉伸；卡片在布局里保持正方形。30 分钟周期更新作为兜底。
   复制到 android/app/src/main/res/xml/course_widget_info.xml
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="110dp"
     android:minHeight="110dp"
-    android:minResizeWidth="110dp"
-    android:minResizeHeight="110dp"
     android:targetCellWidth="2"
     android:targetCellHeight="2"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/course_widget"
-    android:resizeMode="horizontal|vertical"
+    android:resizeMode="none"
     android:widgetCategory="home_screen" />
