@@ -2,26 +2,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:recess/core/models/semester.dart';
-import 'package:recess/data/providers/database_providers.dart';
-import 'package:recess/data/repositories/course_platform_repository.dart';
-import 'package:recess/data/repositories/course_repository.dart';
-import 'package:recess/data/repositories/semester_repository.dart';
+import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/features/semester/application/semester_mutations.dart';
 
 /// 学期编辑表单状态机。新增时 id 为空，保存时生成。
 final semesterFormProvider =
     StateNotifierProvider.autoDispose<SemesterFormNotifier, Semester>(
-  (ref) => SemesterFormNotifier(
-    ref.watch(semesterRepositoryProvider),
-    ref.watch(courseRepositoryProvider),
-    ref.watch(coursePlatformRepositoryProvider),
-  ),
+  (ref) => SemesterFormNotifier(ref.watch(semesterMutationsProvider)),
 );
 
 class SemesterFormNotifier extends StateNotifier<Semester> {
-  final SemesterRepository _repo;
-  final CourseRepository _courseRepo;
-  final CoursePlatformRepository _platformRepo;
-  SemesterFormNotifier(this._repo, this._courseRepo, this._platformRepo)
+  final SemesterMutations _mutations;
+  SemesterFormNotifier(this._mutations)
       : super(Semester(
           id: '',
           name: '',
@@ -34,7 +26,7 @@ class SemesterFormNotifier extends StateNotifier<Semester> {
   void init(Semester initial) {
     if (_initialized) return;
     _initialized = true;
-    state = initial;
+    state = normalizeSemesterWeeks(initial);
   }
 
   void setName(String v) => state = state.copyWith(name: v);
@@ -42,26 +34,22 @@ class SemesterFormNotifier extends StateNotifier<Semester> {
   void setStartDate(DateTime d) => state = state.copyWith(startDate: d);
 
   void setTotalWeeks(int w) =>
-      state = state.copyWith(totalWeeks: w.clamp(1, 30));
+      state = normalizeSemesterWeeks(state.copyWith(totalWeeks: w));
 
   void setCurrentWeekOverride(int? w) =>
-      state = state.copyWith(currentWeekOverride: w);
+      state = normalizeSemesterWeeks(state.copyWith(currentWeekOverride: w));
 
   /// 返回保存后的 id。新增时生成 id；[activate] 为 true 则设为唯一激活学期。
   Future<String> save({bool activate = false}) async {
-    var s = state;
+    var s = normalizeSemesterWeeks(state);
     if (s.id.isEmpty) s = s.copyWith(id: const Uuid().v4());
+    await _mutations.save(s, activate: activate);
     state = s;
-    await _repo.upsert(s);
-    if (activate) await _repo.setActive(s.id);
     return s.id;
   }
 
   Future<void> delete() async {
     if (state.id.isEmpty) return;
-    // 先清理关联课程与课程平台，避免孤儿数据
-    await _courseRepo.deleteBySemester(state.id);
-    await _platformRepo.deleteBySemester(state.id);
-    await _repo.delete(state.id);
+    await _mutations.delete(state.id);
   }
 }

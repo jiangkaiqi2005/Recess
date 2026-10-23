@@ -5,6 +5,15 @@ library;
 
 import 'package:recess/core/models/semester.dart';
 
+/// 沿用学期编辑范围，保留手动模式并将覆盖值调整到最近合法周。
+Semester normalizeSemesterWeeks(Semester semester) {
+  final totalWeeks = semester.totalWeeks.clamp(1, 30);
+  return semester.copyWith(
+    totalWeeks: totalWeeks,
+    currentWeekOverride: semester.currentWeekOverride?.clamp(1, totalWeeks),
+  );
+}
+
 /// 根据开学日期与今天推算当前周（1-based）。早于开学返回 0。
 int computeCurrentWeek(DateTime startDate, DateTime today) {
   final start = DateTime(startDate.year, startDate.month, startDate.day);
@@ -16,11 +25,17 @@ int computeCurrentWeek(DateTime startDate, DateTime today) {
   return (days ~/ 7) + 1;
 }
 
-/// 学期的当前周：手动修改过（调课/假期）就用修改值，否则由开学日期推算。
+/// 学期的当前周：手动覆盖调整到合法周，否则保留日期推算的原始周数。
 /// 主页标题、今天高亮、初始查看周与「今日课程」都以它为准。
 int currentWeekOf(Semester semester, DateTime today) =>
-    semester.currentWeekOverride ??
+    normalizeSemesterWeeks(semester).currentWeekOverride ??
     computeCurrentWeek(semester.startDate, today);
+
+/// 有效教学当前周；自动推算在学期外时没有当前教学周。
+int? teachingWeekOf(Semester semester, DateTime today) {
+  final week = currentWeekOf(semester, today);
+  return week >= 1 && week <= semester.totalWeeks ? week : null;
+}
 
 /// 返回某学期第 [week] 周、星期 [weekday] 的日期。
 DateTime dateForWeekday(DateTime semesterStart, int week, int weekday) {

@@ -8,6 +8,7 @@ import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
 import 'package:recess/features/course/application/course_platforms_provider.dart';
+import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/course/presentation/course_platform_display.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
 
@@ -78,7 +79,7 @@ void showCourseDetailSheet(
               label: '时间',
               value: '周${_dayLabels[course.dayOfWeek - 1]} '
                   '第${course.startSection}-${course.endSection}节'
-                  '${_formatSectionTime(course.startSection, course.endSection, sectionTimes)}',
+                  '${_formatCourseTime(course, sectionTimes)}',
             ),
             _DetailRow(
               icon: Icons.date_range_outlined,
@@ -185,10 +186,10 @@ String _formatWeeks(List<int> weeks) {
   return ranges.join(', ');
 }
 
-String _formatSectionTime(
-    int startSection, int endSection, Map<int, SectionTime> sectionTimes) {
-  final start = sectionTimes[startSection]?.startTime ?? '';
-  final end = sectionTimes[endSection]?.endTime ?? '';
+String _formatCourseTime(Course course, Map<int, SectionTime> sectionTimes) {
+  final clock = CourseClock(course, sectionTimes);
+  final start = clock.startTime ?? '';
+  final end = clock.endTime ?? '';
   if (start.isEmpty || end.isEmpty) return '';
   return ' ($start-$end)';
 }

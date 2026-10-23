@@ -7,6 +7,7 @@ import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
 import 'package:recess/features/course/application/course_platforms_provider.dart';
 import 'package:recess/features/schedule/presentation/course_detail_sheet.dart';
+import 'package:recess/features/settings/domain/section_time.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +33,8 @@ void main() {
     weeks: [1],
   );
 
-  Future<void> openSheet(WidgetTester tester, Course course) async {
+  Future<void> openSheet(WidgetTester tester, Course course,
+      {Map<int, SectionTime> sectionTimes = const {}}) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -59,7 +61,7 @@ void main() {
           home: Scaffold(
             body: Builder(
               builder: (context) => TextButton(
-                onPressed: () => showCourseDetailSheet(context, course, {}),
+                onPressed: () => showCourseDetailSheet(context, course, sectionTimes),
                 child: const Text('打开'),
               ),
             ),
@@ -70,6 +72,36 @@ void main() {
     await tester.tap(find.text('打开'));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('详情优先显示课程显式钟点，而不是冲突的全局节次钟点', (tester) async {
+    await openSheet(tester,
+      withoutPlatforms.copyWith(startTime: '08:30', endTime: '09:00'),
+      sectionTimes: const {1: SectionTime('08:00', 45), 2: SectionTime('08:55', 45)},
+    );
+    expect(find.text('周二 第1-2节 (08:30-09:00)'), findsOneWidget);
+  });
+
+  for (final sample in [
+    (start: '08:30', end: null, text: ' (08:30-09:40)'),
+    (start: null, end: '09:00', text: ' (08:00-09:00)'),
+    (start: null, end: null, text: ' (08:00-09:40)'),
+    (start: '', end: null, text: ''),
+    (start: null, end: '', text: ''),
+    (start: '不是钟点', end: '09:00', text: ' (不是钟点-09:00)'),
+  ]) {
+    testWidgets('详情逐端来源及原有文字降级：${sample.start}/${sample.end}', (tester) async {
+      await openSheet(tester,
+        withoutPlatforms.copyWith(startTime: sample.start, endTime: sample.end),
+        sectionTimes: const {1: SectionTime('08:00', 45), 2: SectionTime('08:55', 45)},
+      );
+      expect(find.text('周二 第1-2节${sample.text}'), findsOneWidget);
+    });
+  }
+
+  testWidgets('详情无钟点时继续显示星期与节次', (tester) async {
+    await openSheet(tester, withoutPlatforms);
+    expect(find.text('周二 第1-2节'), findsOneWidget);
+  });
 
   testWidgets('详情面板在周次和备注之间显示课程平台', (tester) async {
     await openSheet(tester, withPlatforms);

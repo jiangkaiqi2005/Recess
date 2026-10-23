@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,32 @@ void main() {
 
   tearDown(() async {
     await database.close();
+  });
+
+  test('首次空库导出的实际字节文件包含默认激活学期并能恢复', () async {
+    final directory = await Directory.systemTemp.createTemp('recess_first_backup_');
+    try {
+      final file = File('${directory.path}/backup.json');
+      await file.writeAsBytes(await backup.exportBytes());
+      final parsed = BackupFile.parseBytes(await file.readAsBytes());
+      final source = await semesters.getSemesters();
+      expect(source, hasLength(1));
+      expect(parsed.semesters.single.id, source.single.id);
+      expect(parsed.activeSemesterId, source.single.id);
+      expect(parsed.semesters.single.totalWeeks, 18);
+      expect(parsed.semesters.single.startDate.weekday, DateTime.monday);
+
+      final restored = await backup.restoreBackup(parsed);
+      expect(restored.semesterCount, 1);
+      expect(restored.courseCount, 0);
+      final active = await semesters.getActiveSemester();
+      expect(active?.id, source.single.id);
+      expect(active?.name, source.single.name);
+      expect(active?.startDate, source.single.startDate);
+      expect(active?.totalWeeks, 18);
+    } finally {
+      await directory.delete(recursive: true);
+    }
   });
 
   test('新旧色板与自定义 ARGB 在备份导出恢复后保持原始值', () async {
@@ -99,6 +126,66 @@ void main() {
     };
     return const JsonEncoder().convert(data);
   }
+
+  test('最终激活失败时旧学期课程平台和激活状态整体保留', () async {
+    await semesters.upsert(Semester(
+      id: 'old-s', name: '旧学期', startDate: DateTime(2020), totalWeeks: 10,
+    ));
+    await semesters.setActive('old-s');
+    await courses.upsert(const Course(
+      id: 'old-c', semesterId: 'old-s', name: '旧课程', dayOfWeek: 1,
+      startSection: 1, endSection: 2, weeks: [1, 2], notes: '旧备注 📚',
+    ));
+    await CoursePlatformRepository(database).replacePlatforms(
+      'old-s', '旧课程', const [
+        CoursePlatform(purpose: CoursePlatformPurpose.lab, name: '旧平台'),
+      ],
+    );
+    final before = jsonDecode(await backup.exportJson()) as Map;
+    before.remove('exportedAt');
+    await database.customStatement('''
+      CREATE TRIGGER fail_restore_activation BEFORE UPDATE OF is_active ON semesters
+      BEGIN SELECT RAISE(ABORT, 'forced activation failure'); END;
+    ''');
+
+    await expectLater(backup.restore(exportFixture()), throwsA(anything));
+    expect((await semesters.getSemesters()).map((s) => s.id), ['old-s']);
+    await database.customStatement('DROP TRIGGER fail_restore_activation');
+
+    final after = jsonDecode(await backup.exportJson()) as Map;
+    after.remove('exportedAt');
+    expect(after, before);
+    expect((await semesters.getActiveSemester())?.id, 'old-s');
+  });
+
+  test('课程插入失败时全部替换回滚', () async {
+    await backup.restore(exportFixture());
+    final before = jsonDecode(await backup.exportJson()) as Map;
+    before.remove('exportedAt');
+    await database.customStatement('''
+      CREATE TRIGGER fail_course_insert BEFORE INSERT ON courses
+      WHEN NEW.id = 'c2'
+      BEGIN SELECT RAISE(ABORT, 'forced course insert failure'); END;
+    ''');
+
+    await expectLater(backup.restore(exportFixture()), throwsA(anything));
+
+    final after = jsonDecode(await backup.exportJson()) as Map;
+    after.remove('exportedAt');
+    expect(after, before);
+  });
+
+  test('旧备份没有激活标记时选定文件中的第一个学期', () async {
+    final data = jsonDecode(exportFixture()) as Map<String, dynamic>;
+    for (final semester in data['semesters'] as List) {
+      (semester as Map).remove('isActive');
+    }
+
+    await backup.restore(jsonEncode(data));
+
+    expect((await semesters.getActiveSemester())?.id, 's1');
+    expect(await courses.getCourses('s2'), hasLength(1));
+  });
 
   test('恢复备份后数据与备份一致，激活学期与周次覆盖被保留', () async {
     // 先写入一些旧数据，确保被覆盖。

@@ -3,12 +3,12 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import 'package:recess/core/models/course_platform.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/domain/import_course.dart';
+import 'package:recess/features/import/application/import_commit.dart';
 import 'package:recess/features/import/data/ics_parser.dart';
 import 'package:recess/features/import/data/json_importer.dart';
 
@@ -156,43 +156,40 @@ class ImportNotifier extends StateNotifier<ImportState> {
   /// 用勾选的课程替换当前学期课表（每条生成新 id）。
   void setMode(ImportMode mode) => state = state.copyWith(mode: mode);
 
-  Future<void> confirmImport() async {
-    final toImport = state.courses.where((c) => c.selected).toList();
-    if (toImport.isEmpty) return;
-
+  Future<ImportSubmission?> prepareImport() async {
+    final snapshot = state;
+    if (snapshot.selectedCount == 0 ||
+        snapshot.status == ImportStatus.importing) {
+      return null;
+    }
     final semester = await _activeSemester();
-    if (semester == null) return;
-    final repo = _ref.read(courseRepositoryProvider);
-
-    state = state.copyWith(status: ImportStatus.importing);
-    final uuid = const Uuid();
-    final replacements = toImport
-        .map((course) => course.toCourse(semester.id).copyWith(id: uuid.v4()))
-        .toList(growable: false);
-
-    // 合并：保留现有课程；替换：整体覆盖，都不影响其他学期课程。
-    if (state.mode == ImportMode.merge) {
-      await repo.addCourses(semester.id, replacements);
-    } else {
-      await repo.replaceForSemester(semester.id, replacements);
-    }
-    // 平台按课程名归属，替换课程不会删除已有平台；文件里给出的平台按课程名
-    // 整体覆盖到目标学期，但只写实际导入的课程。
-    final platformRepo = _ref.read(coursePlatformRepositoryProvider);
-    final platforms = platformsForImportedCourses(state.platforms, toImport);
-    for (final entry in platforms.entries) {
-      await platformRepo.replacePlatforms(semester.id, entry.key, entry.value);
-    }
-    final count = replacements.length;
-
-    // 课程流由 drift watch 自动发射新数据，无需手动 invalidate；
-    // 桌面小组件刷新由根部的 _AppEffects 集中监听，这里不再单独触发。
-
-    state = state.copyWith(
-      status: ImportStatus.done,
-      importedCount: count,
-      courses: const [],
+    if (semester == null) return null;
+    return ImportSubmission.file(
+      semesterId: semester.id,
+      mode: snapshot.mode,
+      courses: snapshot.courses,
+      platforms: snapshot.platforms,
     );
+  }
+
+  Future<void> confirmImport([ImportSubmission? submission]) async {
+    if (state.status == ImportStatus.importing) return;
+    submission ??= await prepareImport();
+    if (submission == null || submission.courses.isEmpty) return;
+    state = state.copyWith(status: ImportStatus.importing);
+    try {
+      final count = await _ref.read(importCommitProvider).commit(submission);
+      state = state.copyWith(
+        status: ImportStatus.done,
+        importedCount: count,
+        courses: const [],
+      );
+    } catch (e) {
+      state = state.copyWith(
+        status: ImportStatus.preview,
+        errorMessage: '导入失败：$e',
+      );
+    }
   }
 
   void reset() => state = const ImportState();

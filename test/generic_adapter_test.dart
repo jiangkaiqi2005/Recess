@@ -3,8 +3,46 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recess/features/import/data/generic_adapter.dart';
+import 'package:recess/features/import/data/configured_school_adapter.dart';
+import 'package:recess/features/import/data/ncu_adapter.dart';
+import 'package:recess/features/import/data/school_adapter.dart';
+import 'package:recess/features/import/application/webview_import_provider.dart';
 
 void main() {
+  for (final adapter in <SchoolAdapter>[
+    GenericAdapter(url: 'https://example.edu'),
+    const ConfiguredSchoolAdapter(
+      schoolName: '正方', loginUrl: 'https://example.edu',
+      system: AcademicSystemType.zhengfang,
+    ),
+    NcuAdapter(),
+  ]) {
+    test('${adapter.schoolName} 单行逗号字段与周次列表均完整保留', () async {
+      for (final separator in [',', '，']) {
+        for (final entry in {
+          '1-8周': [1, 2, 3, 4, 5, 6, 7, 8],
+          '1-4,9-12周(单)': [1, 3, 9, 11],
+          '1-4，9-12周，单周': [1, 3, 9, 11],
+          '1,3,5周': [1, 3, 5],
+          '1-4, 9-12周，单周': [1, 3, 9, 11],
+        }.entries) {
+          final records = await _runSingleLine(
+            adapter, ['课程甲', '教师甲', '教室甲', entry.key].join(separator),
+          );
+          final (courses, skipped) = importCoursesFromDecoded(records);
+          expect(skipped, 0, reason: '$separator ${entry.key}');
+          expect(courses.single.name, '课程甲');
+          expect(courses.single.weeks, entry.value);
+        }
+      }
+      final (invalid, skipped) = importCoursesFromDecoded(
+        await _runSingleLine(adapter, '课程甲,教师甲,教室甲,1-4,未知周,单周'),
+      );
+      expect(invalid, isEmpty);
+      expect(skipped, 1);
+    });
+  }
+
   test('传统表格按逻辑网格处理 rowspan 并保持星期列对齐', () async {
     final script = '''
       class Cell {
@@ -89,4 +127,64 @@ void main() {
       if (await file.exists()) await file.delete();
     }
   });
+}
+
+Future<List<dynamic>> _runSingleLine(SchoolAdapter adapter, String text) async {
+  final script = '''
+    class Cell {
+      constructor(text, attrs = {}) {
+        this.innerText = this.textContent = text; this.attrs = attrs;
+      }
+      getAttribute(name) { return this.attrs[name] || null; }
+      querySelectorAll() { return []; }
+    }
+    const cells = [new Cell(${jsonEncode(text)}, {
+      'data-day':'1', 'data-begin-unit':'1', 'data-end-unit':'2'
+    })];
+    const row = {
+      getAttribute() { return null; },
+      querySelector(selector) { return cells.find(c => selector.split(',').some(
+        s => /^\\[([^\\]]+)\\]\$/.test(s.trim()) && c.getAttribute(s.trim().slice(1,-1))
+      )) || null; },
+      querySelectorAll(selector) {
+        return selector.split(',').some(s => s.trim() === 'td') ? cells : [];
+      }
+    };
+    const table = {
+      querySelectorAll(selector) {
+        return selector.split(',').some(s => /(^| )tr\$/.test(s.trim())) ? [row]
+          : selector === 'td' ? cells : [];
+      }
+    };
+    global.document = {
+      querySelector(selector) {
+        return selector.split(',').some(s => s.trim() === '#kbTable') ? table : null;
+      },
+      querySelectorAll(selector) {
+        const selectors = selector.split(',').map(s => s.trim());
+        if (selectors.includes('table')) return [table];
+        if (selectors.includes('td')) return cells;
+        return [];
+      },
+      body: {innerText:''}
+    };
+    global.window = {location:{hostname:'example.edu',pathname:'/jwglxt/'}};
+    global.XMLHttpRequest = function() {
+      this.open = function() {}; this.setRequestHeader = function() {};
+      this.send = function() { this.status = 200; this.responseText = '{"kbList":[]}'; };
+    };
+    const result = ${adapter.extractForSemester(18)};
+    process.stdout.write(result);
+  ''';
+  final directory = await Directory.systemTemp.createTemp('recess_single_line_');
+  try {
+    final file = File('${directory.path}/fixture.js');
+    await file.writeAsString(script);
+    final result = await Process.run('node', [file.path],
+        stdoutEncoding: utf8, stderrEncoding: utf8);
+    expect(result.exitCode, 0, reason: result.stderr.toString());
+    return jsonDecode(result.stdout as String) as List<dynamic>;
+  } finally {
+    await directory.delete(recursive: true);
+  }
 }

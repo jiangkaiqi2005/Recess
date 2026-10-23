@@ -8,6 +8,8 @@ import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/features/course/domain/course_clock.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
 
 /// Android 桌面小组件的 Dart 桥接层。
 ///
@@ -66,26 +68,28 @@ class WidgetService {
       final all = await courseRepo.getCourses(semester.id);
 
       final now = DateTime.now();
-      final currentWeek = semester.currentWeekOverride ??
-          computeCurrentWeek(semester.startDate, now);
+      final currentWeek = teachingWeekOf(semester, now);
       final todayWeekday = now.weekday;
 
       final todayCourses = all
           .where((c) =>
-              c.dayOfWeek == todayWeekday && c.weeks.contains(currentWeek))
+              currentWeek != null &&
+              c.dayOfWeek == todayWeekday &&
+              c.weeks.contains(currentWeek))
           .toList()
         ..sort((a, b) => a.startSection.compareTo(b.startSection));
 
+      final sectionTimes = _ref.read(sectionTimesProvider);
       final items = todayCourses
           .map((c) => {
                 'name': c.name,
-                'time': _timeRange(c),
+                'time': _timeRange(c, sectionTimes),
                 'location': c.location ?? '',
                 'color': AppConstants.courseDisplayColor(c.colorValue),
               })
           .toList();
 
-      final title = currentWeek >= 1 ? '今天 · 第$currentWeek周' : '今天';
+      final title = currentWeek != null ? '今天 · 第$currentWeek周' : '今天';
 
       await HomeWidget.saveWidgetData(_keyTitle, title);
       await HomeWidget.saveWidgetData(_keyCourses, jsonEncode(items));
@@ -102,9 +106,10 @@ class WidgetService {
     // 通过 HomeWidget.updateWidget 回传 URI 后在此处理。
   }
 
-  String _timeRange(Course c) {
-    if (c.startTime != null && c.endTime != null) {
-      return '${c.startTime}-${c.endTime}';
+  String _timeRange(Course c, Map<int, SectionTime> sectionTimes) {
+    final clock = CourseClock(c, sectionTimes);
+    if (clock.startTime != null && clock.endTime != null) {
+      return '${clock.startTime}-${clock.endTime}';
     }
     return '第${c.startSection}-${c.endSection}节';
   }

@@ -33,23 +33,9 @@ class AppDatabase extends _$AppDatabase {
         },
       );
 
-  /// 序列化并发播种，避免首启瞬间多次调用导致写入多个学期。
-  Future<void>? _seedFuture;
-
   /// 若不存在任何学期，写入一个默认激活学期（开学日取最近周一，18 周）。
-  /// 设计为幂等：多次调用安全。
+  /// 每次检查；数据库事务串行执行，避免并发读取重复播种。
   Future<void> seedDefaultSemester() async {
-    if (_seedFuture != null) return _seedFuture!;
-    _seedFuture = _doSeed();
-    try {
-      await _seedFuture;
-    } catch (_) {
-      _seedFuture = null;
-      rethrow;
-    }
-  }
-
-  Future<void> _doSeed() async {
     await transaction(() async {
       final count = await (select(semesters)
             ..where((s) => s.isActive.equals(true)))

@@ -1,3 +1,4 @@
+import 'school_week_parser.dart';
 import 'package:recess/features/import/data/school_adapter.dart';
 
 /// 井冈山大学（金智智慧校园 wisedu）适配器。
@@ -47,6 +48,7 @@ class JgsuAdapter extends SchoolAdapter {
   @override
   String get extractJs => r'''
 (function() {
+''' + schoolWeekParserJs + r'''
   var results = [];
   var seen = {};
   var dayMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':7,'天':7};
@@ -55,56 +57,16 @@ class JgsuAdapter extends SchoolAdapter {
   // 必须排序：乱序输入（"5,1-2"）若不排序会导致 startSection > endSection，
   // release 构建下（assert 关闭）带着负高度进课表布局直接崩溃。
   function parseSections(str) {
-    var out = [];
-    if (!str) return out;
-    var parts = String(str).split(/[,，、]+/);
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      var rm = p.match(/(\d+)\s*[-–~]\s*(\d+)/);
-      if (rm) {
-        for (var s = parseInt(rm[1]); s <= parseInt(rm[2]); s++) out.push(s);
-      } else {
-        var n = parseInt(p);
-        if (!isNaN(n)) out.push(n);
-      }
-    }
-    out = out.filter(function(v, i, a) { return a.indexOf(v) === i; });
-    out.sort(function(a, b) { return a - b; });
-    return out;
+    return schoolWeekNumbers(str, true);
   }
 
   // 周次文本："1-16周" / "1-8,11-16" / "1-15(单)" / "2-16(双)"
   function parseWeeksText(t) {
-    var weeks = [];
-    if (!t) return weeks;
-    t = String(t);
-    var odd = t.indexOf('单') >= 0 && t.indexOf('双') < 0;
-    var even = t.indexOf('双') >= 0 && t.indexOf('单') < 0;
-    var cleaned = t.replace(/第|周|单|双|\||[\(\)（）]/g, '');
-    var parts = cleaned.split(/[,，、\s]+/);
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      if (!p) continue;
-      var rm = p.match(/(\d+)\s*[-–~]\s*(\d+)/);
-      if (rm) {
-        for (var w = parseInt(rm[1]); w <= parseInt(rm[2]); w++) weeks.push(w);
-      } else {
-        var n = parseInt(p);
-        if (!isNaN(n)) weeks.push(n);
-      }
-    }
-    weeks = weeks.filter(function(v, i, a) {
-      if (a.indexOf(v) !== i) return false;
-      if (odd) return v % 2 === 1;
-      if (even) return v % 2 === 0;
-      return true;
-    });
-    weeks.sort(function(a, b) { return a - b; });
-    return weeks;
+    return schoolWeekNumbers(t);
   }
 
   function addResult(name, teacher, location, day, secs, weeks) {
-    if (!name || !day || day < 1 || day > 7 || !secs || secs.length === 0) return;
+
     var key = name + '|' + day + '|' + secs.join(',') + '|' +
               (location || '') + '|' + weeks.join(',');
     if (seen[key]) return;
@@ -159,7 +121,8 @@ class JgsuAdapter extends SchoolAdapter {
           if (!list || list.length === 0) continue;
           for (var i = 0; i < list.length; i++) {
             var it = list[i];
-            var day = parseInt(it.xqj);
+            if (!it || typeof it !== 'object') { results.push(null); continue; }
+            var day = schoolInteger(it.xqj);
             if (isNaN(day) && it.xqjmc) {
               var dm = String(it.xqjmc).match(/周([一二三四五六日天])|星期([一二三四五六日天])/);
               if (dm) day = dayMap[dm[1] || dm[2]];
@@ -245,16 +208,16 @@ class JgsuAdapter extends SchoolAdapter {
           var dm = String(rawDay).match(/(?:周|星期)?([一二三四五六日天])/);
           if (dm && dayMap[dm[1]]) day = dayMap[dm[1]];
           if (!day) {
-            var num = parseInt(rawDay);
+            var num = schoolInteger(rawDay);
             if (num >= 1 && num <= 7) day = num;
             else if (rawDay !== '' && num >= 0 && num <= 6) day = num + 1;
           }
-          var begin = parseInt(cell.getAttribute('data-begin-unit') ||
+          var begin = schoolInteger(cell.getAttribute('data-begin-unit') ||
                                cell.getAttribute('data-start-section') || '0');
-          var end = parseInt(cell.getAttribute('data-end-unit') ||
+          var end = schoolInteger(cell.getAttribute('data-end-unit') ||
                              cell.getAttribute('data-end-section') || '0');
-          if (begin < 1) continue;
-          if (end < begin) end = begin;
+
+
           var text = (cell.innerText || cell.textContent || '').trim();
           if (!text || text.length < 2) continue;
           // 单元格文本首行=课程名，其余行找 周次/教师/教室
@@ -276,8 +239,7 @@ class JgsuAdapter extends SchoolAdapter {
               location = ln;
             }
           }
-          var secs = [begin];
-          for (var s = begin + 1; s <= end; s++) secs.push(s);
+          var secs = [begin, end];
           addResult(name, teacher, location, day || 0, secs, weeks);
         }
       }

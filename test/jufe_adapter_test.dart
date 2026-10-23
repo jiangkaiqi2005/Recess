@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recess/features/import/data/jufe_adapter.dart';
 import 'package:recess/features/import/data/school_adapter.dart';
+import 'package:recess/features/import/application/webview_import_provider.dart';
 
 void main() {
   final adapter = JufeAdapter();
@@ -79,11 +80,11 @@ void main() {
           }
         };
       }
-      const header = {querySelectorAll: function() {
+      const header = {getAttribute: function() { return null; }, querySelectorAll: function() {
         return [cell('节次', null), cell('星期一', null), cell('星期二', null)];
       }};
-      const courseRow = {querySelectorAll: function(selector) {
-        if (selector === 'td') {
+      const courseRow = {getAttribute: function() { return null; }, querySelectorAll: function(selector) {
+        if (selector.indexOf('td') >= 0) {
           return [cell('5', null), cell('', null),
             cell('财政学\n1-16周\n王老师\n麦庐园教二203', '2')];
         }
@@ -91,7 +92,7 @@ void main() {
       }};
       const table = {querySelectorAll: function(selector) {
         if (selector === 'tr') return [header, courseRow];
-        if (selector.indexOf('tbody tr') >= 0) return [courseRow];
+        if (selector.indexOf('tbody tr') >= 0) return [header, courseRow];
         return [];
       }};
       global.document = {
@@ -131,7 +132,56 @@ void main() {
     expect(result, isA<Map<String, dynamic>>());
     expect(result['__nav'], isTrue);
   });
+
+  for (final section in ['第1.5-6节', '第1-6.5节', '第-1-6节', '第1e1-12节']) {
+    test('文本节次 $section 不从非法数字尾部猜测整数', () async {
+      for (final dataSection in [false, true]) {
+        final records = await _runExtractor(
+          _textSectionTable(section, dataSection: dataSection),
+        );
+        final (courses, skipped) = importCoursesFromDecoded(records);
+        expect(courses, isEmpty, reason: section);
+        expect(skipped, 1, reason: section);
+      }
+    });
+  }
+
+  test('缺少节次 data 属性时仍可读取合法文本范围', () async {
+    final records = await _runExtractor(_textSectionTable('第5-6节'));
+    final (courses, skipped) = importCoursesFromDecoded(records);
+    expect(skipped, 0);
+    expect(courses.single.startSection, 5);
+    expect(courses.single.endSection, 6);
+  });
+
+  test('现代结构的空 data 值仍作为坏记录诊断', () async {
+    final records = await _runExtractor(_textSectionTable('第5-6节', day: ''));
+    final (courses, skipped) = importCoursesFromDecoded(records);
+    expect(courses, isEmpty);
+    expect(skipped, 1);
+  });
 }
+
+String _textSectionTable(String sections, {String day = '1', bool dataSection = false}) => '''
+  const text = ${jsonEncode('课程甲\n1-8周\n${dataSection ? '' : sections}\n教师甲')};
+  const cell = {
+    innerText: text, textContent: text,
+    getAttribute: function(name) {
+      if (name === 'data-day') return ${jsonEncode(day)};
+      if (name === 'data-section') return ${dataSection ? jsonEncode(sections) : 'null'};
+      return null;
+    }
+  };
+  const row = {
+    getAttribute: function() { return null; },
+    querySelectorAll: function() { return [cell]; }
+  };
+  const table = {querySelectorAll: function() { return [row]; }};
+  global.document = {
+    querySelector: function() { return table; },
+    querySelectorAll: function() { return []; }
+  };
+''';
 
 Future<List<Map<String, dynamic>>> _runExtractor(String setup) async {
   final result = await _runExtractorRaw(setup);

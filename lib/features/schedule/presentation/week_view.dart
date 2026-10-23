@@ -56,9 +56,9 @@ class WeekView extends ConsumerWidget {
     final semester = ref.watch(activeSemesterProvider).valueOrNull;
     final semesterStart = semester?.startDate;
     // 仅当查看的是当前周时，才在表头标示"今天"（避免查看历史/未来周时
-    // 误标某一天的日期）。currentWeek>0 防御开学前误判。
-    final currentWeek = semester != null ? currentWeekOf(semester, now) : 0;
-    final isCurrentWeek = currentWeek > 0 && currentWeek == selectedWeek;
+    // 误标某一天的日期）。学期外没有可高亮的当前教学周。
+    final currentWeek = semester != null ? teachingWeekOf(semester, now) : null;
+    final isCurrentWeek = currentWeek != null && currentWeek == selectedWeek;
 
     return Column(
       children: [
