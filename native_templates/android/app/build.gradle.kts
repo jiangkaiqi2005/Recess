@@ -103,4 +103,6 @@ flutter {
 dependencies {
     // 为通知等依赖提供 Java API 反糖。
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // 桌面小组件纯 Kotlin 挑选类的 JVM 单测（CI 不运行）。
+    testImplementation("junit:junit:4.13.2")
 }

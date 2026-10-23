@@ -36,7 +36,8 @@
 
         <receiver
             android:name=".CourseWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="今日课程">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

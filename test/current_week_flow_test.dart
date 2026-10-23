@@ -127,6 +127,34 @@ void main() {
   Finder todayText(String text) =>
       find.descendant(of: find.byType(BottomSheet), matching: find.text(text));
 
+  String dateKey(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  List<Map<String, dynamic>> widgetOccurrences() =>
+      (jsonDecode(widgetData['occurrences'] as String) as List)
+          .cast<Map<String, dynamic>>();
+
+  List<Map<String, dynamic>> widgetDays() =>
+      (jsonDecode(widgetData['semester_days'] as String) as List)
+          .cast<Map<String, dynamic>>();
+
+  int? widgetWeekOn(DateTime date) {
+    final key = dateKey(date);
+    for (final day in widgetDays()) {
+      if (day['date'] == key) return day['week'] as int;
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? widgetOccurrenceOn(DateTime date) {
+    final key = dateKey(date);
+    final items =
+        widgetOccurrences().where((item) => item['date'] == key).toList();
+    return items.isEmpty ? null : items.first;
+  }
+
   Future<void> openEdit(WidgetTester tester, String name) async {
     router.push('/semester');
     await tester.pumpAndSettle();
@@ -203,11 +231,11 @@ void main() {
     await tester.runAsync(
       () => container.read(widgetServiceProvider).updateTodayWidget(),
     );
-    expect(widgetData['widget_title'], '今天 · 第8周');
-    expect(
-      (jsonDecode(widgetData['courses'] as String) as List).single['name'],
-      '第8周课程',
-    );
+    expect(widgetData.containsKey('widget_title'), isFalse);
+    expect(widgetData.containsKey('courses'), isFalse);
+    expect(widgetData['widget_loaded'], isTrue);
+    expect(widgetWeekOn(now), 8);
+    expect(widgetOccurrenceOn(now)!['name'], '第8周课程');
     expect(tester.takeException(), isNull);
   });
 
@@ -242,11 +270,8 @@ void main() {
     await tester.runAsync(
       () => container.read(widgetServiceProvider).updateTodayWidget(),
     );
-    expect(widgetData['widget_title'], '今天 · 第12周');
-    expect(
-      (jsonDecode(widgetData['courses'] as String) as List).single['name'],
-      '第12周课程',
-    );
+    expect(widgetWeekOn(now), 12);
+    expect(widgetOccurrenceOn(now)!['name'], '第12周课程');
     expect(tester.takeException(), isNull);
   });
 
@@ -278,11 +303,8 @@ void main() {
     await tester.runAsync(
       () => container.read(widgetServiceProvider).updateTodayWidget(),
     );
-    expect(widgetData['widget_title'], '今天 · 第12周');
-    expect(
-      (jsonDecode(widgetData['courses'] as String) as List).single['name'],
-      '第12周课程',
-    );
+    expect(widgetWeekOn(now), 12);
+    expect(widgetOccurrenceOn(now)!['name'], '第12周课程');
     expect(tester.takeException(), isNull);
   });
 
@@ -323,11 +345,8 @@ void main() {
     await tester.runAsync(
       () => container.read(widgetServiceProvider).updateTodayWidget(),
     );
-    expect(widgetData['widget_title'], '今天 · 第12周');
-    expect(
-      (jsonDecode(widgetData['courses'] as String) as List).single['name'],
-      '第12周课程',
-    );
+    expect(widgetWeekOn(now), 12);
+    expect(widgetOccurrenceOn(now)!['name'], '第12周课程');
     expect(tester.takeException(), isNull);
   });
 
@@ -359,11 +378,8 @@ void main() {
       await tester.runAsync(
         () => container.read(widgetServiceProvider).updateTodayWidget(),
       );
-      expect(widgetData['widget_title'], '今天 · 第${sample.valid}周');
-      expect(
-        (jsonDecode(widgetData['courses'] as String) as List).single['name'],
-        '第${sample.valid}周课程',
-      );
+      expect(widgetWeekOn(now), sample.valid);
+      expect(widgetOccurrenceOn(now)!['name'], '第${sample.valid}周课程');
       final persisted = await tester.runAsync(
         () => container.read(semesterRepositoryProvider).getActiveSemester(),
       );
@@ -397,8 +413,16 @@ void main() {
     await tester.runAsync(
       () => container.read(widgetServiceProvider).updateTodayWidget(),
     );
-    expect(widgetData['widget_title'], '今天');
-    expect(jsonDecode(widgetData['courses'] as String), isEmpty);
+    expect(widgetWeekOn(now), 0);
+    expect(widgetOccurrenceOn(now), isNull);
+    final futureOccurrences = widgetOccurrences();
+    expect(futureOccurrences, isNotEmpty);
+    expect(
+      futureOccurrences.every(
+        (item) => (item['date'] as String).compareTo(dateKey(now)) > 0,
+      ),
+      isTrue,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -422,11 +446,8 @@ void main() {
     await tester.runAsync(
       () => container.read(widgetServiceProvider).updateTodayWidget(),
     );
-    expect(widgetData['widget_title'], '今天 · 第1周');
-    expect(
-      (jsonDecode(widgetData['courses'] as String) as List).single['name'],
-      '第1周课程',
-    );
+    expect(widgetWeekOn(now), 1);
+    expect(widgetOccurrenceOn(now)!['name'], '第1周课程');
     expect(tester.takeException(), isNull);
   });
 
@@ -457,8 +478,9 @@ void main() {
     await tester.runAsync(
       () => container.read(widgetServiceProvider).updateTodayWidget(),
     );
-    expect(widgetData['widget_title'], '今天');
-    expect(jsonDecode(widgetData['courses'] as String), isEmpty);
+    expect(widgetData['widget_loaded'], isTrue);
+    expect(widgetDays(), isEmpty);
+    expect(widgetOccurrences(), isEmpty);
     expect(tester.takeException(), isNull);
   });
 }

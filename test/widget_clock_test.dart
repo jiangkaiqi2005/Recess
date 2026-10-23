@@ -6,13 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/providers/database_providers.dart';
-import 'package:recess/features/import/application/import_commit.dart';
-import 'package:recess/features/import/domain/import_course.dart';
-import 'package:recess/features/import/domain/webview_preview_context.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
 import 'package:recess/features/widget/application/widget_service.dart';
 
@@ -22,13 +20,23 @@ void main() {
   late ProviderContainer container;
   late Map<String, Object?> saved;
   String? widgetName;
+  late DateTime now;
   const channel = MethodChannel('home_widget');
   const updates = MethodChannel('home_widget/updates');
+
+  final semester = Semester(
+    id: 's',
+    name: '测试学期',
+    startDate: DateTime(2026, 9, 7),
+    totalWeeks: 3,
+  );
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     saved = {};
     widgetName = null;
+    // 2026-09-17 是第 2 周周四。学期只跨 9 月，避免测试依赖运行机器的夏令时。
+    now = DateTime(2026, 9, 17, 10, 0);
     binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
       call,
     ) async {
@@ -47,20 +55,16 @@ void main() {
     );
     database = db.AppDatabase(NativeDatabase.memory());
     container = ProviderContainer(
-      overrides: [appDatabaseProvider.overrideWithValue(database)],
+      overrides: [
+        appDatabaseProvider.overrideWithValue(database),
+        widgetServiceProvider.overrideWith(
+          (ref) => WidgetService(ref, now: () => now),
+        ),
+      ],
     );
     await container
         .read(semesterRepositoryProvider)
-        .upsert(
-          Semester(
-            id: 's',
-            name: '测试学期',
-            startDate: DateTime(2026, 9, 7),
-            totalWeeks: 18,
-            currentWeekOverride: 1,
-          ),
-          activate: true,
-        );
+        .upsert(semester, activate: true);
     await container.read(sectionTimesProvider.notifier).setAllTimes(const {
       1: SectionTime('08:00', 45),
       2: SectionTime('08:55', 45),
@@ -74,126 +78,226 @@ void main() {
     binding.defaultBinaryMessenger.setMockMethodCallHandler(updates, null);
   });
 
-  Course course(String name, {String? startTime, String? endTime}) => Course(
+  Course course(
+    String name, {
+    int dayOfWeek = 4,
+    List<int> weeks = const [2],
+    int startSection = 1,
+    int endSection = 2,
+    String? startTime,
+    String? endTime,
+    String? location,
+    String? teacher,
+    String? notes,
+    int colorValue = AppConstants.defaultCourseColor,
+  }) => Course(
     id: name,
     semesterId: 's',
     name: name,
-    dayOfWeek: DateTime.now().weekday,
-    startSection: 1,
-    endSection: 2,
-    weeks: const [1],
+    teacher: teacher,
+    location: location,
+    dayOfWeek: dayOfWeek,
+    startSection: startSection,
+    endSection: endSection,
     startTime: startTime,
     endTime: endTime,
+    weeks: weeks,
+    colorValue: colorValue,
+    notes: notes,
   );
 
-  test('自动学期结束后小组件不标成教学周，也不显示越界周课程', () async {
-    final now = DateTime.now();
-    final monday = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday - 1));
-    await container.read(semesterRepositoryProvider).upsert(Semester(
-      id: 's', name: '结束学期',
-      startDate: monday.subtract(const Duration(days: 56)), totalWeeks: 8,
-    ));
-    await container.read(courseRepositoryProvider).upsert(
-      course('越界周课程').copyWith(weeks: const [9]),
-    );
-    await container.read(widgetServiceProvider).updateTodayWidget();
-    expect(saved['widget_title'], '今天');
-    expect(jsonDecode(saved['courses'] as String), isEmpty);
-    expect(widgetName, 'CourseWidgetProvider');
-  });
-
-  test('小组件实际payload逐端使用当前节次回退并保留显式钟点', () async {
-    for (final c in [
-      course('无显式'),
-      course('显式', startTime: '08:30', endTime: '09:00'),
-      course('只开始', startTime: '08:30'),
-      course('只结束', endTime: '09:00'),
-    ]) {
-      await container.read(courseRepositoryProvider).upsert(c);
+  Future<void> upsertAndUpdate(List<Course> courses) async {
+    for (final item in courses) {
+      await container.read(courseRepositoryProvider).upsert(item);
     }
     await container.read(widgetServiceProvider).updateTodayWidget();
-    final items = jsonDecode(saved['courses'] as String) as List;
-    expect(
-      {for (final item in items) item['name']: item['time']},
-      {
-        '无显式': '08:00-09:40',
-        '显式': '08:30-09:00',
-        '只开始': '08:30-09:40',
-        '只结束': '08:00-09:00',
-      },
-    );
-    expect(saved['widget_title'], '今天 · 第1周');
+  }
+
+  List<Map<String, dynamic>> occurrences() =>
+      (jsonDecode(saved['occurrences'] as String) as List)
+          .cast<Map<String, dynamic>>();
+
+  List<Map<String, dynamic>> semesterDays() =>
+      (jsonDecode(saved['semester_days'] as String) as List)
+          .cast<Map<String, dynamic>>();
+
+  Map<String, Map<String, dynamic>> occurrencesByName() => {
+    for (final item in occurrences()) item['name'] as String: item,
+  };
+
+  test('写入从今天到学期结束的全部课次，不再写旧键', () async {
+    await upsertAndUpdate([
+      course('过去', weeks: const [1]),
+      course('今天', location: '教1-101', teacher: '张老师', notes: '备注'),
+      course('最后一周', weeks: const [3]),
+      course('越界周', weeks: const [4]),
+    ]);
+
+    expect(saved.keys.toSet(), {
+      'occurrences',
+      'semester_days',
+      'widget_loaded',
+    });
+    expect(saved['widget_loaded'], true);
     expect(widgetName, 'CourseWidgetProvider');
+
+    final items = occurrences();
+    expect(items.map((item) => item['name']), ['今天', '最后一周']);
+    expect(items.map((item) => item['date']), ['2026-09-17', '2026-09-24']);
+
+    final today = items.first;
+    expect(today['start'], '2026-09-17T08:00');
+    expect(today['end'], '2026-09-17T09:40');
+    expect(today['start_section'], 1);
+    expect(today['end_section'], 2);
+    expect(today['location'], '教1-101');
+    expect(
+      today['color'],
+      AppConstants.courseDisplayColor(AppConstants.defaultCourseColor),
+    );
+    expect(
+      today['color_dark'],
+      AppConstants.courseDisplayColor(
+        AppConstants.defaultCourseColor,
+        dark: true,
+      ),
+    );
+    expect(today.keys, isNot(contains('teacher')));
+    expect(today.keys, isNot(contains('notes')));
+    expect(today.keys, isNot(contains('platforms')));
+
+    final days = semesterDays();
+    expect(days.first, {'date': '2026-09-17', 'week': 2});
+    expect(days.last, {'date': '2026-09-27', 'week': 3});
+    expect(
+      days,
+      hasLength(
+        DateTime(2026, 9, 27).difference(DateTime(2026, 9, 17)).inDays + 1,
+      ),
+    );
+    for (var i = 1; i < days.length; i++) {
+      expect(
+        DateTime.parse(
+          days[i]['date'] as String,
+        ).difference(DateTime.parse(days[i - 1]['date'] as String)).inDays,
+        1,
+      );
+    }
   });
 
-  test('小组件保留空串和无效显式文本，缺少端点才显示节次', () async {
-    for (final c in [
+  test('课程自带钟点优先，缺失的一端回退到节次时间', () async {
+    await upsertAndUpdate([
+      course('显式', startTime: '08:30', endTime: '09:15'),
+      course('无显式'),
+      course('只开始', startTime: '08:30'),
+      course('只结束', endTime: '09:15'),
+    ]);
+
+    final items = occurrencesByName();
+    expect(items['显式']!['start'], '2026-09-17T08:30');
+    expect(items['显式']!['end'], '2026-09-17T09:15');
+    expect(items['无显式']!['start'], '2026-09-17T08:00');
+    expect(items['无显式']!['end'], '2026-09-17T09:40');
+    expect(items['只开始']!['start'], '2026-09-17T08:30');
+    expect(items['只开始']!['end'], '2026-09-17T09:40');
+    expect(items['只结束']!['start'], '2026-09-17T08:00');
+    expect(items['只结束']!['end'], '2026-09-17T09:15');
+  });
+
+  test('两端都拿不到钟点时写入空字符串，无效显式值不回退', () async {
+    await upsertAndUpdate([
+      course('缺节次', startSection: 15, endSection: 16),
       course('空开始', startTime: ''),
       course('坏结束', endTime: '不是钟点'),
-      course('缺节次').copyWith(startSection: 15, endSection: 16),
-    ]) {
-      await container.read(courseRepositoryProvider).upsert(c);
-    }
-    await container.read(widgetServiceProvider).updateTodayWidget();
-    final items = jsonDecode(saved['courses'] as String) as List;
-    expect(
-      {for (final item in items) item['name']: item['time']},
-      {'空开始': '-09:40', '坏结束': '08:00-不是钟点', '缺节次': '第15-16节'},
-    );
+    ]);
+
+    final items = occurrencesByName();
+    expect(items['缺节次']!['start'], '');
+    expect(items['缺节次']!['end'], '');
+    expect(items['空开始']!['start'], '');
+    expect(items['空开始']!['end'], '2026-09-17T09:40');
+    expect(items['坏结束']!['start'], '2026-09-17T08:00');
+    expect(items['坏结束']!['end'], '');
   });
 
-  for (final change in ['顺延', '模板', '重置']) {
-    test('小组件在$change后使用新节次，WebView已存显式快照保持原值', () async {
-      final submission = ImportSubmission.webview(
-        semesterId: 's',
-        previewContext: WebviewPreviewContext.fromSemester(
-          Semester(
-            id: 's',
-            name: '测试学期',
-            startDate: DateTime(2026, 9, 7),
-            totalWeeks: 18,
-          ),
-        ),
-        mode: ImportMode.merge,
-        courses: [
-          ImportCourse(
-            name: '教务快照',
-            dayOfWeek: DateTime.now().weekday,
-            startSection: 1,
-            endSection: 2,
-            weeks: [1],
-            source: 'webview',
-          ),
-        ],
-        sectionTimes: container.read(sectionTimesProvider),
-      );
-      await container.read(importCommitProvider).commit(submission);
-      await container.read(courseRepositoryProvider).upsert(course('节次课程'));
-      final notifier = container.read(sectionTimesProvider.notifier);
-      late String expectedRange;
-      if (change == '顺延') {
-        await notifier.shiftFromFirstStart('08:30');
-        expectedRange = '08:30-10:10';
-      } else if (change == '模板') {
-        await notifier.applyTemplate(sectionTimeTemplates[1]);
-        expectedRange = '08:00-11:15';
-      } else {
-        await notifier.shiftFromFirstStart('09:00');
-        await notifier.resetToDefault();
-        expectedRange = '08:00-09:40';
-      }
-      await container.read(widgetServiceProvider).updateTodayWidget();
-      final items = jsonDecode(saved['courses'] as String) as List;
-      expect(
-        {for (final item in items) item['name']: item['time']},
-        {'教务快照': '08:00-09:40', '节次课程': expectedRange},
-      );
-      final stored = await container
-          .read(courseRepositoryProvider)
-          .getCourse(submission.courses.single.id);
-      expect(stored!.startTime, '08:00');
-      expect(stored.endTime, '09:40');
-    });
-  }
+  test('节次时间变更后回退钟点跟随更新，显式快照保持原值', () async {
+    await container
+        .read(courseRepositoryProvider)
+        .upsert(course('显式快照', startTime: '08:00', endTime: '09:40'));
+    await container.read(courseRepositoryProvider).upsert(course('节次回退'));
+    await container
+        .read(sectionTimesProvider.notifier)
+        .applyTemplate(sectionTimeTemplates[1]);
+
+    await container.read(widgetServiceProvider).updateTodayWidget();
+
+    final items = occurrencesByName();
+    expect(items['显式快照']!['start'], '2026-09-17T08:00');
+    expect(items['显式快照']!['end'], '2026-09-17T09:40');
+    expect(items['节次回退']!['start'], '2026-09-17T08:00');
+    expect(items['节次回退']!['end'], '2026-09-17T11:15');
+  });
+
+  test('手动当前周让未来日期都使用同一周，并按日期写入课次', () async {
+    await container
+        .read(semesterRepositoryProvider)
+        .upsert(semester.copyWith(currentWeekOverride: 3), activate: true);
+    await upsertAndUpdate([
+      course('重复课', weeks: const [3]),
+    ]);
+
+    final days = semesterDays();
+    expect(days, isNotEmpty);
+    expect(days.map((day) => day['week']).toSet(), {3});
+    expect(occurrences().map((item) => item['date']), [
+      '2026-09-17',
+      '2026-09-24',
+    ]);
+    expect(occurrences().map((item) => item['name']), ['重复课', '重复课']);
+  });
+
+  test('开学前写入今天到学期结束的逐日映射与开课后课次', () async {
+    now = DateTime(2026, 8, 1, 9, 0);
+    await upsertAndUpdate([
+      course('第一节课', dayOfWeek: 1, weeks: const [1]),
+    ]);
+
+    final days = semesterDays();
+    expect(days.first, {'date': '2026-08-01', 'week': 0});
+    expect(days.last, {'date': '2026-09-27', 'week': 3});
+    expect(days.firstWhere((day) => day['date'] == '2026-09-07')['week'], 1);
+    expect(occurrencesByName()['第一节课']!['date'], '2026-09-07');
+  });
+
+  test('学期结束后不写课次，但仍标记已加载', () async {
+    now = DateTime(2026, 10, 1, 9, 0);
+    await upsertAndUpdate([course('已结束')]);
+
+    expect(jsonDecode(saved['occurrences'] as String), isEmpty);
+    expect(jsonDecode(saved['semester_days'] as String), isEmpty);
+    expect(saved['widget_loaded'], true);
+    expect(widgetName, 'CourseWidgetProvider');
+  });
+
+  test('时间冲突的课次全部保留，按开始时刻、节次与名称稳定排序', () async {
+    await upsertAndUpdate([
+      course('晚间', startTime: '10:00', startSection: 3, endSection: 4),
+      course('早五', startTime: '08:00', startSection: 5, endSection: 6),
+      course('早一', startTime: '08:00', startSection: 1, endSection: 2),
+      course('冲突B', startTime: '09:00'),
+      course('冲突A', startTime: '09:00'),
+      course('无钟点后', startSection: 11, endSection: 12),
+      course('无钟点前', startSection: 9, endSection: 10),
+    ]);
+
+    expect(occurrences().map((item) => item['name']), [
+      '早一',
+      '早五',
+      '冲突A',
+      '冲突B',
+      '晚间',
+      '无钟点前',
+      '无钟点后',
+    ]);
+  });
 }
