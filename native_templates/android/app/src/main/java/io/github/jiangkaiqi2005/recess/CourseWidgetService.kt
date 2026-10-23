@@ -63,11 +63,9 @@ private class CourseWidgetFactory(private val context: Context) :
             "setBackgroundColor",
             widgetBarColor(context, occurrence)
         )
-        // 条目只提供 fill-in Intent，真正的启动动作来自 Provider 设置的点击模板。
-        views.setOnClickFillInIntent(
-            R.id.widget_item_root,
-            Intent().putExtra(EXTRA_POSITION, position)
-        )
+        // ListView 条目必须设置 fill-in Intent 才会响应 Provider 的点击模板；
+        // 模板直接拉起 App、不读取条目位置，因此这里放空 Intent，不携带死数据。
+        views.setOnClickFillInIntent(R.id.widget_item_root, Intent())
         return views
     }
 
@@ -75,6 +73,8 @@ private class CourseWidgetFactory(private val context: Context) :
 
     override fun getViewTypeCount(): Int = 1
 
+    // 列表会随下课与刷新重排，position 并不稳定；返回它只为满足接口，
+    // 配合 hasStableIds=false 让系统在数据变化时整表重建。
     override fun getItemId(position: Int): Long = position.toLong()
 
     override fun hasStableIds(): Boolean = false
@@ -93,9 +93,5 @@ private class CourseWidgetFactory(private val context: Context) :
         } else {
             emptyList()
         }
-    }
-
-    private companion object {
-        const val EXTRA_POSITION = "widget_item_position"
     }
 }

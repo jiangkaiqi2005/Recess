@@ -91,7 +91,7 @@ class _AppEffectsState extends ConsumerState<_AppEffects>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // 回到前台：可能跨越了午夜，立即补刷一次今日课程。
     if (state == AppLifecycleState.resumed) {
-      _service?.updateTodayWidget();
+      _service?.updateWidget();
       _scheduleReminderRefresh();
     }
   }
@@ -132,7 +132,7 @@ class _AppEffectsState extends ConsumerState<_AppEffects>
     _midnightTimer = Timer(
       nextMidnight.difference(now) + const Duration(seconds: 1),
       () {
-        _service?.updateTodayWidget();
+        _service?.updateWidget();
         _scheduleReminderRefresh();
         _scheduleMidnightRefresh();
       },

@@ -2,8 +2,9 @@ package io.github.jiangkaiqi2005.recess
 
 // 上下课与零点自动刷新：每次渲染小组件后，用不精确闹钟安排下一次刷新。
 //
-// - 只使用 AlarmManager.setAndAllowWhileIdle + AlarmManager.RTC，这是非精确
-//   闹钟，不申请 SCHEDULE_EXACT_ALARM，Doze 下允许系统延后触发；
+// - 只使用 AlarmManager.setAndAllowWhileIdle + AlarmManager.RTC_WAKEUP，这是
+//   非精确闹钟，不申请 SCHEDULE_EXACT_ALARM；RTC_WAKEUP 能在熄屏休眠时唤醒
+//   设备触发刷新，Doze 下仍允许系统延后触发；
 // - 始终使用同一个显式广播 PendingIntent 身份，安排前先 cancel，避免闹钟
 //   越积越多；
 // - 闹钟触发后回到 CourseWidgetProvider 重新渲染，渲染完成后再算一次
@@ -50,7 +51,7 @@ internal object WidgetRefreshScheduler {
         val safeTriggerAtMillis =
             if (triggerAtMillis > now) triggerAtMillis else now + MIN_DELAY_MILLIS
         alarmManager.setAndAllowWhileIdle(
-            AlarmManager.RTC,
+            AlarmManager.RTC_WAKEUP,
             safeTriggerAtMillis,
             pendingIntent
         )

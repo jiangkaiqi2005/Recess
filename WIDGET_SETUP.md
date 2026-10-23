@@ -19,6 +19,9 @@ flutter pub get
 
 | 模板文件 | 目标位置 |
 |---|---|
+| `native_templates/android/build.gradle` | `android/build.gradle`（把 `__NDK_VERSION__` 替换为本机 NDK 版本；CI 自动替换） |
+| `native_templates/android/settings.gradle` | `android/settings.gradle` |
+| `native_templates/android/gradle/wrapper/gradle-wrapper.properties` | `android/gradle/wrapper/gradle-wrapper.properties` |
 | `native_templates/android/app/build.gradle.kts` | `android/app/build.gradle.kts` |
 | `native_templates/android/app/src/main/AndroidManifest.xml` | `android/app/src/main/AndroidManifest.xml` |
 | `native_templates/android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt` | `android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt` |
@@ -31,6 +34,7 @@ flutter pub get
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetRender.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/WidgetRender.kt` |
 | `native_templates/android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt` | `android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetSelectorTest.kt` |
 | `native_templates/android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetTextTest.kt` | `android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetTextTest.kt` |
+| `native_templates/android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetDataTest.kt` | `android/app/src/test/java/io/github/jiangkaiqi2005/recess/WidgetDataTest.kt` |
 | `native_templates/android/app/src/main/res/xml/course_widget_info.xml` | `android/app/src/main/res/xml/course_widget_info.xml` |
 | `native_templates/android/app/src/main/res/layout/course_widget.xml` | `android/app/src/main/res/layout/course_widget.xml` |
 | `native_templates/android/app/src/main/res/layout/course_widget_item.xml` | `android/app/src/main/res/layout/course_widget_item.xml` |
@@ -45,10 +49,15 @@ flutter pub get
 也可以在 PowerShell 中一次性覆盖复制整个原生模板：
 
 ```powershell
+Copy-Item native_templates/android/settings.gradle android/settings.gradle -Force
+Copy-Item native_templates/android/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties -Force
 Copy-Item native_templates/android/app/build.gradle.kts android/app/build.gradle.kts -Force
 Copy-Item native_templates/android/app/src/main/* android/app/src/main/ -Recurse -Force
 Copy-Item native_templates/android/app/src/test android/app/src/ -Recurse -Force
 ```
+
+根目录 `build.gradle` 含 `__NDK_VERSION__` 占位符，不能直接复制；用
+`sed "s/__NDK_VERSION__/$(ls $ANDROID_HOME/ndk | sort -V | tail -1)/g"` 或手工替换。
 
 Gradle 模板包含 API 24 最低版本、通知等依赖所需的 desugaring 版本、架构过滤和固定签名配置。
 若旧的本地工程仍有 `android/app/build.gradle`，请先备份并合并其中的自定义配置，
@@ -58,7 +67,8 @@ Gradle 模板包含 API 24 最低版本、通知等依赖所需的 desugaring �
 RemoteViewsService（`BIND_REMOTEVIEWS` 权限，`exported="false"`）与应用内更新所需的
 FileProvider/安装权限；`AndroidManifest.receiver.xml` 仅作为 Receiver 片段参考。
 
-Android 上 `home_widget` 将数据写入 `HomeWidgetSharedPreferences`；
+Android 上 `home_widget` 将数据写入 `HomeWidgetPreferences`（`home_widget 0.6.0`
+的 `HomeWidgetPlugin.PREFERENCES`；升级插件时需核对）；
 `CourseWidgetProvider` 与 `CourseWidgetService` 通过 `WidgetData` 读取其中的
 `occurrences`（从今天到学期结束的课次列表）、`semester_days`（逐日教学周映射）
 与 `widget_loaded`（是否成功写入过数据）。周次、钟点都由 Dart 侧算好，原生端的
@@ -104,8 +114,8 @@ Windows 下如 `gradlew` 不可执行，可用 `cmd //c gradlew.bat :app:testDeb
   `WidgetRefreshScheduler`，每次安排前先取消旧闹钟；到点后重新渲染并重新
   安排，形成自维持链。App 仍在课表、节次、学期变化或回到前台时主动写入并刷新。
 - 不申请 `SCHEDULE_EXACT_ALARM`，也不使用 `setExact*`。闹钟使用
-  `AlarmManager.setAndAllowWhileIdle(AlarmManager.RTC, ...)`，系统在 Doze
-  或省电策略下可能延迟几分钟才更新。
+  `AlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, ...)`，能在熄屏
+  休眠时唤醒设备触发刷新；Doze 或省电策略下仍可能延迟几分钟才更新。
 - 保留 `course_widget_info.xml` 的 `updatePeriodMillis="1800000"`（30 分钟）
   系统周期更新作为兜底；若系统限制后台广播，最坏情况下要等下一次 30 分钟更新。
 - 不注册开机广播（`BOOT_COMPLETED`）。手机重启后，系统发出的

@@ -229,7 +229,7 @@ void main() {
     expect(todayText('第12周课程'), findsNothing);
     expect(find.textContaining('第 8 周 · 周'), findsOneWidget);
     await tester.runAsync(
-      () => container.read(widgetServiceProvider).updateTodayWidget(),
+      () => container.read(widgetServiceProvider).updateWidget(),
     );
     expect(widgetData.containsKey('widget_title'), isFalse);
     expect(widgetData.containsKey('courses'), isFalse);
@@ -268,7 +268,7 @@ void main() {
     await openToday(tester);
     expect(todayText('第12周课程'), findsOneWidget);
     await tester.runAsync(
-      () => container.read(widgetServiceProvider).updateTodayWidget(),
+      () => container.read(widgetServiceProvider).updateWidget(),
     );
     expect(widgetWeekOn(now), 12);
     expect(widgetOccurrenceOn(now)!['name'], '第12周课程');
@@ -301,7 +301,7 @@ void main() {
     );
     expect(semesters.singleWhere((s) => s.id == 's').currentWeekOverride, 12);
     await tester.runAsync(
-      () => container.read(widgetServiceProvider).updateTodayWidget(),
+      () => container.read(widgetServiceProvider).updateWidget(),
     );
     expect(widgetWeekOn(now), 12);
     expect(widgetOccurrenceOn(now)!['name'], '第12周课程');
@@ -343,7 +343,7 @@ void main() {
     expect(container.read(selectedWeekProvider), 16);
     expect(find.text('第 16 周   当前为第 12 周'), findsOneWidget);
     await tester.runAsync(
-      () => container.read(widgetServiceProvider).updateTodayWidget(),
+      () => container.read(widgetServiceProvider).updateWidget(),
     );
     expect(widgetWeekOn(now), 12);
     expect(widgetOccurrenceOn(now)!['name'], '第12周课程');
@@ -376,7 +376,7 @@ void main() {
       expect(todayText('第${sample.valid}周课程'), findsOneWidget);
       expect(find.textContaining('第 ${sample.valid} 周 · 周'), findsOneWidget);
       await tester.runAsync(
-        () => container.read(widgetServiceProvider).updateTodayWidget(),
+        () => container.read(widgetServiceProvider).updateWidget(),
       );
       expect(widgetWeekOn(now), sample.valid);
       expect(widgetOccurrenceOn(now)!['name'], '第${sample.valid}周课程');
@@ -411,7 +411,7 @@ void main() {
     expect(todayText('尚未开学'), findsOneWidget);
     expect(todayText('第1周课程'), findsNothing);
     await tester.runAsync(
-      () => container.read(widgetServiceProvider).updateTodayWidget(),
+      () => container.read(widgetServiceProvider).updateWidget(),
     );
     expect(widgetWeekOn(now), 0);
     expect(widgetOccurrenceOn(now), isNull);
@@ -444,7 +444,7 @@ void main() {
     expect(todayText('第1周课程'), findsOneWidget);
     expect(find.textContaining('第 1 周 · 周'), findsOneWidget);
     await tester.runAsync(
-      () => container.read(widgetServiceProvider).updateTodayWidget(),
+      () => container.read(widgetServiceProvider).updateWidget(),
     );
     expect(widgetWeekOn(now), 1);
     expect(widgetOccurrenceOn(now)!['name'], '第1周课程');
@@ -476,7 +476,7 @@ void main() {
     expect(todayText('第9周课程'), findsNothing);
     expect(todayText('第8周课程'), findsNothing);
     await tester.runAsync(
-      () => container.read(widgetServiceProvider).updateTodayWidget(),
+      () => container.read(widgetServiceProvider).updateWidget(),
     );
     expect(widgetData['widget_loaded'], isTrue);
     expect(widgetDays(), isEmpty);

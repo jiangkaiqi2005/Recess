@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
 import 'package:recess/core/constants/app_constants.dart';
-import 'package:recess/core/models/semester.dart';
 import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/course/domain/course_clock.dart';
@@ -60,18 +59,18 @@ class WidgetService {
   ///
   /// 用短防抖合并一条打印链路上连续发射的多次流事件（切换学期、批量导入、
   /// 恢复备份都会同时波及多个 provider），避免对原生小组件反复写数据。
-  /// 实际写数据时仍通过 [_now] 取时间，与直接调用 [updateTodayWidget] 一致。
+  /// 实际写数据时仍通过 [_now] 取时间，与直接调用 [updateWidget] 一致。
   void scheduleUpdate() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      updateTodayWidget();
+      updateWidget();
     });
   }
 
   /// 计算并写入从今天到学期结束的课次与逐日教学周，然后刷新 UI。
   ///
   /// 失败时不抛出（小组件是加分项，不应影响主流程）。
-  Future<void> updateTodayWidget() async {
+  Future<void> updateWidget() async {
     await _ensureInit();
     try {
       final semesterRepo = _ref.read(semesterRepositoryProvider);
@@ -84,7 +83,7 @@ class WidgetService {
       final now = _now();
       final today = DateTime(now.year, now.month, now.day);
       final normalized = normalizeSemesterWeeks(semester);
-      final semesterEnd = _lastSemesterDay(normalized);
+      final semesterEnd = lastSemesterDay(normalized);
       final courseClocks = {
         for (final course in all) course.id: CourseClock(course, sectionTimes),
       };
@@ -203,26 +202,6 @@ class _Occurrence {
     'color': color,
     'color_dark': colorDark,
   };
-}
-
-/// 学期最后一个教学周的周日。按日历日向前推算，避免夏令时下 24 小时
-/// 时长把日期挪到前一天。
-DateTime _lastSemesterDay(Semester semester) {
-  final start = DateTime(
-    semester.startDate.year,
-    semester.startDate.month,
-    semester.startDate.day,
-  );
-  final firstMonday = DateTime(
-    start.year,
-    start.month,
-    start.day - (start.weekday - 1),
-  );
-  return DateTime(
-    firstMonday.year,
-    firstMonday.month,
-    firstMonday.day + semester.totalWeeks * 7 - 1,
-  );
 }
 
 /// 先按日期，再按开始时刻（缺失的开始时刻排在同一天最后），

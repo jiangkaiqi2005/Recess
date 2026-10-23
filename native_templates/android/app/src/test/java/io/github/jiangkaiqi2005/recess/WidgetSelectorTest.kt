@@ -327,7 +327,7 @@ class WidgetSelectorTest {
     }
 
     @Test
-    fun `下一节课缺少开始时刻时按当天节次取第一个`() {
+    fun `下一节课当天全部缺少开始时刻时按节次取第一个`() {
         val saturday = LocalDate.of(2026, 10, 24)
         val selection = WidgetSelector.select(
             now = LocalDateTime.of(2026, 10, 22, 21, 0),
@@ -356,6 +356,56 @@ class WidgetSelectorTest {
         assertEquals(WidgetDisplayMode.NEXT, selection.mode)
         assertEquals("周六", selection.capsule)
         assertEquals(listOf("缺钟点前"), selection.occurrences.map { it.name })
+    }
+
+    @Test
+    fun `下一节课先按开始时刻取最早，缺开始时刻的课次排在有钟点者之后`() {
+        val friday = thursday.plusDays(1)
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 21, 0),
+            occurrences = listOf(
+                occurrence(
+                    "第1-2节无钟点",
+                    null,
+                    null,
+                    startSection = 1,
+                    endSection = 2,
+                    date = friday
+                ),
+                occurrence(
+                    "第5-6节有钟点",
+                    "14:00",
+                    "15:40",
+                    startSection = 5,
+                    endSection = 6,
+                    date = friday
+                )
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        // 规格：下一节课是「今天之后最早的那个课次」，按数据契约先比开始时刻；
+        // 只有当天全部课次都缺少开始时刻时，才退回按节次取第一节。
+        assertEquals(WidgetDisplayMode.NEXT, selection.mode)
+        assertEquals("明天 · 周五", selection.capsule)
+        assertEquals(listOf("第5-6节有钟点"), selection.occurrences.map { it.name })
+    }
+
+    @Test
+    fun `开始时刻缺失且结束时刻已过时当天仍然保留`() {
+        val selection = WidgetSelector.select(
+            now = LocalDateTime.of(2026, 10, 22, 21, 0),
+            occurrences = listOf(
+                occurrence("只缺开始", null, "10:00", startSection = 3, endSection = 4)
+            ),
+            days = teachingDays(),
+            loaded = true
+        )
+
+        assertEquals(WidgetDisplayMode.TODAY, selection.mode)
+        assertEquals(listOf("只缺开始"), selection.occurrences.map { it.name })
+        assertEquals(midnightAfter(), selection.nextRefresh)
     }
 
     @Test

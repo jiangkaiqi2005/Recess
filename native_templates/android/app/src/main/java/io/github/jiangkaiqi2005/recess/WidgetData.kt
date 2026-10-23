@@ -26,8 +26,11 @@ internal data class WidgetData(
     val loaded: Boolean
 ) {
     companion object {
-        // home_widget 在 Android 上将数据写入名为 HomeWidgetSharedPreferences 的偏好表。
-        private const val PREFS_NAME = "HomeWidgetSharedPreferences"
+        // 名称必须与 home_widget 0.6.0 的 HomeWidgetPlugin.PREFERENCES 一致
+        // （android/src/main/kotlin/es/antonborri/home_widget/HomeWidgetPlugin.kt），
+        // 否则读不到 Dart 写入的数据，小组件会一直显示「打开 Recess 加载课表」。
+        // 升级 home_widget 时先核对插件的这个常量；WidgetDataTest 会盯住该值。
+        internal const val PREFS_NAME = "HomeWidgetPreferences"
         private const val KEY_OCCURRENCES = "occurrences"
         private const val KEY_SEMESTER_DAYS = "semester_days"
         private const val KEY_LOADED = "widget_loaded"

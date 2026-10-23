@@ -110,7 +110,7 @@ void main() {
     for (final item in courses) {
       await container.read(courseRepositoryProvider).upsert(item);
     }
-    await container.read(widgetServiceProvider).updateTodayWidget();
+    await container.read(widgetServiceProvider).updateWidget();
   }
 
   List<Map<String, dynamic>> occurrences() =>
@@ -229,7 +229,7 @@ void main() {
         .read(sectionTimesProvider.notifier)
         .applyTemplate(sectionTimeTemplates[1]);
 
-    await container.read(widgetServiceProvider).updateTodayWidget();
+    await container.read(widgetServiceProvider).updateWidget();
 
     final items = occurrencesByName();
     expect(items['显式快照']!['start'], '2026-09-17T08:00');
