@@ -377,7 +377,7 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
             return InkWell(
               onTap: () {
                 ref.read(courseFormProvider.notifier).setColor(c);
-                        },
+              },
               child: Container(
                 width: 32,
                 height: 32,
@@ -531,7 +531,7 @@ class _PlatformSection extends ConsumerWidget {
                 tooltip: '删除平台',
                 onPressed: () {
                   notifier.removeAt(i);
-                            },
+                },
               ),
               onTap: () => edit(i),
             ),
