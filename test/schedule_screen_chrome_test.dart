@@ -12,6 +12,7 @@ import 'package:recess/data/repositories/semester_repository.dart';
 import 'package:recess/features/schedule/application/schedule_providers.dart';
 import 'package:recess/features/schedule/presentation/schedule_screen.dart';
 import 'package:recess/features/schedule/presentation/week_view.dart';
+import 'package:recess/features/semester/application/semester_mutations.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
 
 void main() {
@@ -252,22 +253,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('切换激活学期更新总周数并定位到新学期当前周', (tester) async {
+  testWidgets('切换当前学期更新总周数并定位到新学期当前周', (tester) async {
     await pumpSchedule(tester);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(ScheduleScreen)),
     );
-    final repo = SemesterRepository(database);
     await tester.runAsync(() async {
-      await repo.upsert(Semester(
+      await container.read(semesterMutationsProvider).save(Semester(
         id: 'new-semester',
         name: '新学期',
         startDate: semesterStart.subtract(const Duration(days: 14)),
         totalWeeks: 8,
-      ));
-      await repo.setActive('new-semester');
+      ), activate: true);
+      await container.read(activeSemesterProvider.future);
     });
-    container.invalidate(activeSemesterProvider);
     await tester.pumpAndSettle();
 
     final pageView = tester.widget<PageView>(find.byType(PageView));

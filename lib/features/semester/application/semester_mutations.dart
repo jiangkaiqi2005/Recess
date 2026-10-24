@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/features/schedule/application/schedule_providers.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
 
 final semesterMutationsProvider = Provider<SemesterMutations>((ref) {
@@ -15,18 +16,21 @@ class SemesterMutations {
   SemesterMutations(this._ref);
 
   Future<void> save(Semester semester, {bool activate = false}) async {
-    await _ref
-        .read(semesterRepositoryProvider)
-        .upsert(semester, activate: activate);
-    _refresh();
+    final repo = _ref.read(semesterRepositoryProvider);
+    final previous = activate ? await repo.getActiveSemester() : null;
+    await repo.upsert(semester, activate: activate);
+    _refresh(resetViewedWeek: activate && previous?.id != semester.id);
   }
 
   Future<void> delete(String id) async {
-    await _ref.read(semesterRepositoryProvider).delete(id);
-    _refresh();
+    final repo = _ref.read(semesterRepositoryProvider);
+    final previous = await repo.getActiveSemester();
+    await repo.delete(id);
+    _refresh(resetViewedWeek: previous?.id == id);
   }
 
-  void _refresh() {
+  void _refresh({bool resetViewedWeek = false}) {
+    if (resetViewedWeek) _ref.invalidate(selectedWeekProvider);
     _ref.invalidate(activeSemesterProvider);
     _ref.invalidate(scheduleCoursesProvider);
     _ref.invalidate(semestersProvider);

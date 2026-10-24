@@ -7,6 +7,7 @@ import 'package:recess/features/import/domain/import_course.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
 import 'import_confirm_dialog.dart';
 import 'import_preview_list.dart';
+import 'import_target_semester.dart';
 
 /// 课程导入页（Phase 5）。
 /// 流程：选择文件 → 解析 → 预览勾选 → 确认导入。
@@ -49,9 +50,20 @@ class ImportScreen extends ConsumerWidget {
     switch (state.status) {
       case ImportStatus.idle:
       case ImportStatus.picking:
-        return _IdleView(
-          busy: state.status == ImportStatus.picking,
-          onPick: () => ref.read(importProvider.notifier).pickAndParse(),
+        return Column(
+          children: [
+            if (state.status == ImportStatus.idle)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: ImportTargetSemester(),
+              ),
+            Expanded(
+              child: _IdleView(
+                busy: state.status == ImportStatus.picking,
+                onPick: () => ref.read(importProvider.notifier).pickAndParse(),
+              ),
+            ),
+          ],
         );
       case ImportStatus.parsing:
       case ImportStatus.importing:

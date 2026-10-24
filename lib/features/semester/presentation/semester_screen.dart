@@ -6,10 +6,12 @@ import 'package:intl/intl.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/features/semester/application/semester_form_provider.dart';
+import 'package:recess/features/semester/application/semester_mutations.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
 
 class SemesterScreen extends ConsumerWidget {
-  const SemesterScreen({super.key});
+  final DateTime Function()? now;
+  const SemesterScreen({super.key, this.now});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -64,7 +66,7 @@ class SemesterScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => SemesterEditSheet(initial: initial),
+      builder: (_) => SemesterEditSheet(initial: initial, now: now),
     ).then((changed) {
       if (changed == true) {
         ref.invalidate(semesterFormProvider);
@@ -159,7 +161,14 @@ class _SemesterCard extends StatelessWidget {
 /// 学期新增/编辑底部弹层。
 class SemesterEditSheet extends ConsumerStatefulWidget {
   final Semester? initial;
-  const SemesterEditSheet({super.key, this.initial});
+  final DateTime Function()? now;
+  final bool fromImport;
+  const SemesterEditSheet({
+    super.key,
+    this.initial,
+    this.now,
+    this.fromImport = false,
+  });
 
   @override
   ConsumerState<SemesterEditSheet> createState() => _SemesterEditSheetState();
@@ -167,14 +176,21 @@ class SemesterEditSheet extends ConsumerStatefulWidget {
 
 class _SemesterEditSheetState extends ConsumerState<SemesterEditSheet> {
   late final TextEditingController _nameCtrl;
-  bool _activate = false;
+  late bool _activate;
   bool _overrideOn = false;
 
   @override
   void initState() {
     super.initState();
+    _activate = widget.initial == null;
+    final today = (widget.now ?? DateTime.now)();
+    final nextMonday = DateTime(
+      today.year,
+      today.month,
+      today.day + (DateTime.monday - today.weekday + 7) % 7,
+    );
     final s = widget.initial ??
-        Semester(id: '', name: '', startDate: DateTime.now(), totalWeeks: 18);
+        Semester(id: '', name: '', startDate: nextMonday, totalWeeks: 18);
     _nameCtrl = TextEditingController(text: s.name);
     _overrideOn = s.currentWeekOverride != null;
     // initState 中不可修改 Provider 状态（riverpod 禁止在 Widget 生命周期内修改），
@@ -194,6 +210,7 @@ class _SemesterEditSheetState extends ConsumerState<SemesterEditSheet> {
   Widget build(BuildContext context) {
     final semester = ref.watch(semesterFormProvider);
     final isEdit = widget.initial != null;
+    final activeId = ref.watch(activeSemesterProvider).valueOrNull?.id;
     final theme = Theme.of(context);
 
     return Padding(
@@ -305,8 +322,8 @@ class _SemesterEditSheetState extends ConsumerState<SemesterEditSheet> {
                 ],
               ),
             ),
-            // 新建学期时显示"保存后设为当前学期"开关
-            if (!isEdit)
+            // 学期管理页新建时可选择是否设为当前学期。
+            if (!isEdit && !widget.fromImport)
               SwitchListTile(
                 title: const Text('保存后设为当前学期'),
                 value: _activate,
@@ -316,10 +333,10 @@ class _SemesterEditSheetState extends ConsumerState<SemesterEditSheet> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () async {
+                onPressed: semester.name.trim().isEmpty ? null : () async {
                   try {
                     await ref.read(semesterFormProvider.notifier).save(
-                          activate: _activate,
+                          activate: widget.fromImport || _activate,
                         );
                     if (context.mounted) Navigator.of(context).pop(true);
                   } catch (e) {
@@ -333,6 +350,28 @@ class _SemesterEditSheetState extends ConsumerState<SemesterEditSheet> {
                 child: Text(isEdit ? '保存' : '创建'),
               ),
             ),
+            if (isEdit && activeId != null && widget.initial!.id != activeId)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () async {
+                    try {
+                      await ref.read(semesterMutationsProvider).save(
+                            widget.initial!,
+                            activate: true,
+                          );
+                      if (context.mounted) Navigator.of(context).pop(true);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('保存失败：$e')),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('设为当前学期'),
+                ),
+              ),
             if (isEdit)
               SizedBox(
                 width: double.infinity,

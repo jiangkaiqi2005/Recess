@@ -40,13 +40,16 @@ void main() {
     await database.close();
   });
 
-  Future<void> openSemesters(WidgetTester tester) async {
+  Future<void> openSemesters(
+    WidgetTester tester, {
+    DateTime Function()? now,
+  }) async {
     await tester.binding.setSurfaceSize(const Size(480, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const MaterialApp(home: SemesterScreen()),
+        child: MaterialApp(home: SemesterScreen(now: now)),
       ),
     );
     await tester.pumpAndSettle();
@@ -69,6 +72,186 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> waitForFailure(WidgetTester tester, String message) async {
+    for (var i = 0;
+        i < 100 && find.textContaining(message).evaluate().isEmpty;
+        i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('新建学期默认设为当前学期且总周数为18', (tester) async {
+    await tester.runAsync(() async {
+      await openSemesters(tester);
+      await tester.tap(find.byTooltip('添加学期'));
+      await tester.pumpAndSettle();
+      final activate = find.widgetWithText(SwitchListTile, '保存后设为当前学期');
+      expect(tester.widget<SwitchListTile>(activate).value, isTrue);
+      await tester.enterText(find.byType(TextField), '新学期');
+      await tester.pump();
+      await tester.tap(find.text('创建'));
+      await waitForSheetClosed(tester);
+      expect(find.byType(SemesterEditSheet), findsNothing);
+      final current =
+          await container.read(semesterRepositoryProvider).getActiveSemester();
+      expect(current!.name, '新学期');
+      expect(current.totalWeeks, 18);
+      expect(find.text('当前'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  for (final today in [DateTime(2026, 10, 22), DateTime(2026, 10, 26)]) {
+    testWidgets('今天为${today.day}日时新建日期默认为10月26日周一', (tester) async {
+      await tester.runAsync(() async {
+        await openSemesters(tester, now: () => today);
+        await tester.tap(find.byTooltip('添加学期'));
+        await tester.pumpAndSettle();
+        expect(find.text('2026-10-26'), findsOneWidget);
+        await tester.enterText(find.byType(TextField), '新学期');
+        await tester.pump();
+        await tester.tap(find.text('创建'));
+        await waitForSheetClosed(tester);
+        final current =
+            await container
+                .read(semesterRepositoryProvider)
+                .getActiveSemester();
+        expect(current!.startDate, DateTime(2026, 10, 26));
+        expect(current.totalWeeks, 18);
+        expect(tester.takeException(), isNull);
+      });
+    });
+  }
+
+  testWidgets('关闭设为当前开关后创建保留原当前学期', (tester) async {
+    await tester.runAsync(() async {
+      await openSemesters(tester);
+      await tester.tap(find.byTooltip('添加学期'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '提前建好的下学期');
+      await tester.tap(find.text('保存后设为当前学期'));
+      await tester.pump();
+      await tester.tap(find.text('创建'));
+      await waitForSheetClosed(tester);
+      expect(find.byType(SemesterEditSheet), findsNothing);
+      expect(find.text('提前建好的下学期'), findsOneWidget);
+      final current =
+          await container.read(semesterRepositoryProvider).getActiveSemester();
+      expect(current!.id, 'old');
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  testWidgets('新建名称为空或空白不能创建有效名称去除首尾空白后保存', (tester) async {
+    await tester.runAsync(() async {
+      await openSemesters(tester);
+      await tester.tap(find.byTooltip('添加学期'));
+      await tester.pumpAndSettle();
+      final create = find.widgetWithText(FilledButton, '创建');
+      expect(tester.widget<FilledButton>(create).onPressed, isNull);
+      await tester.enterText(find.byType(TextField), '   ');
+      await tester.pump();
+      expect(tester.widget<FilledButton>(create).onPressed, isNull);
+      expect(
+        (await container.read(semesterRepositoryProvider).getSemesters())
+            .length,
+        1,
+      );
+      await tester.enterText(find.byType(TextField), '  新学期  ');
+      await tester.pump();
+      expect(tester.widget<FilledButton>(create).onPressed, isNotNull);
+      await tester.tap(create);
+      await waitForSheetClosed(tester);
+      expect(find.byType(SemesterEditSheet), findsNothing);
+      final current =
+          await container.read(semesterRepositoryProvider).getActiveSemester();
+      expect(current!.name, '新学期');
+      expect(find.text('新学期'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  for (final initialName in ['旧学期', '']) {
+    testWidgets('编辑${initialName.isEmpty ? '旧空名称' : '已有'}学期保留日期且名称必填', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        if (initialName.isEmpty) {
+          await database.customStatement(
+            'UPDATE semesters SET name = ? WHERE id = ?',
+            ['', 'old'],
+          );
+        }
+        await openSemesters(tester, now: () => DateTime(2026, 10, 22));
+        await tester.tap(
+          find.text(initialName.isEmpty ? '未命名学期' : initialName),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('2026-09-07'), findsOneWidget);
+        expect(find.text('保存后设为当前学期'), findsNothing);
+        final save = find.widgetWithText(FilledButton, '保存');
+        if (initialName.isEmpty) {
+          expect(tester.widget<FilledButton>(save).onPressed, isNull);
+        }
+        await tester.enterText(find.byType(TextField), '');
+        await tester.pump();
+        expect(tester.widget<FilledButton>(save).onPressed, isNull);
+        await tester.enterText(find.byType(TextField), '   ');
+        await tester.pump();
+        expect(tester.widget<FilledButton>(save).onPressed, isNull);
+        final unchanged =
+            await container
+                .read(semesterRepositoryProvider)
+                .getActiveSemester();
+        expect(unchanged!.name, initialName);
+        await tester.enterText(find.byType(TextField), '  补全名称  ');
+        await tester.pump();
+        expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+        await tester.tap(save);
+        await waitForSheetClosed(tester);
+        expect(find.byType(SemesterEditSheet), findsNothing);
+        expect(find.text('补全名称'), findsOneWidget);
+        final saved =
+            await container
+                .read(semesterRepositoryProvider)
+                .getActiveSemester();
+        expect(saved!.name, '补全名称');
+        expect(saved.startDate, DateTime(2026, 9, 7));
+        expect(tester.takeException(), isNull);
+      });
+    });
+  }
+
+  testWidgets('编辑非当前学期保存后仍保留原当前学期', (tester) async {
+    await tester.runAsync(() async {
+      await container.read(semesterRepositoryProvider).upsert(
+            Semester(
+              id: 'next',
+              name: '下学期',
+              startDate: DateTime(2027, 2, 22),
+              totalWeeks: 18,
+            ),
+          );
+      await openSemesters(tester);
+      await tester.tap(find.text('下学期'));
+      await tester.pumpAndSettle();
+      expect(find.text('保存后设为当前学期'), findsNothing);
+      await tester.enterText(find.byType(TextField), '修改后的下学期');
+      await tester.pump();
+      await tester.tap(find.text('保存'));
+      await waitForSheetClosed(tester);
+      expect(find.byType(SemesterEditSheet), findsNothing);
+      expect(find.text('修改后的下学期'), findsOneWidget);
+      final current = await container
+          .read(semesterRepositoryProvider)
+          .getActiveSemester();
+      expect(current!.id, 'old');
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   testWidgets('创建并激活失败保留编辑页和旧学期并显示失败', (tester) async {
     await tester.runAsync(() async {
       await openSemesters(tester);
@@ -81,9 +264,9 @@ void main() {
       await tester.tap(find.byTooltip('添加学期'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), '新学期');
-      await tester.tap(find.text('保存后设为当前学期'));
+      await tester.pump();
       await tester.tap(find.text('创建'));
-      await tester.pumpAndSettle();
+      await waitForFailure(tester, '保存失败');
       expect(tester.takeException(), isNull);
       expect(find.byType(SemesterEditSheet), findsOneWidget);
       expect(find.textContaining('保存失败'), findsOneWidget);
@@ -105,7 +288,7 @@ void main() {
       await tester.tap(find.text('删除学期'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('删除'));
-      await tester.pumpAndSettle();
+      await waitForFailure(tester, '删除失败');
       expect(tester.takeException(), isNull);
       expect(find.byType(SemesterEditSheet), findsOneWidget);
       expect(find.textContaining('删除失败'), findsOneWidget);

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:recess/core/models/course.dart';
-import 'package:recess/core/models/semester.dart';
 import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/semester/application/semester_mutations.dart';
@@ -58,17 +57,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       _schedulePageSync(next);
     });
     _schedulePageSync(ref.read(selectedWeekProvider));
-
-    // 在设置里切换了激活学期：查看周重置到新学期的当前周。
-    ref.listen<AsyncValue<Semester?>>(activeSemesterProvider, (prev, next) {
-      final before = prev?.valueOrNull;
-      final after = next.valueOrNull;
-      if (before == null || after == null || before.id == after.id) return;
-      ref.read(selectedWeekProvider.notifier).goTo(
-            currentWeekOf(after, DateTime.now()),
-            totalWeeks: after.totalWeeks,
-          );
-    });
 
     return Scaffold(
       appBar: AppBar(

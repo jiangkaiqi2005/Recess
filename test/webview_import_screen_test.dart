@@ -1,14 +1,34 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:recess/core/theme/app_theme.dart';
+import 'package:recess/data/app_database.dart' as db;
+import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/application/course_capture_orientation.dart';
 import 'package:recess/features/import/data/school_adapter.dart';
 import 'package:recess/features/import/presentation/webview_import_screen.dart';
+import 'package:recess/features/semester/application/semester_providers.dart';
 
 void main() {
+  late db.AppDatabase database;
+  late ProviderContainer container;
+
+  setUp(() async {
+    database = db.AppDatabase(NativeDatabase.memory());
+    container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(database)],
+    );
+    await container.read(activeSemesterProvider.future);
+  });
+
+  tearDown(() async {
+    container.dispose();
+    await database.close();
+  });
+
   test('WebView 仅将 ERR_CACHE_MISS 识别为可恢复缓存错误', () {
     expect(isWebViewCacheMiss('net::ERR_CACHE_MISS'), isTrue);
     expect(isWebViewCacheMiss('Net::Err_Cache_Miss'), isTrue);
@@ -23,7 +43,8 @@ void main() {
       },
     );
     await tester.pumpWidget(
-      ProviderScope(
+      UncontrolledProviderScope(
+        container: container,
         child: MaterialApp(
           theme: AppTheme.light,
           home: WebviewImportScreen(
@@ -56,7 +77,8 @@ void main() {
 
   testWidgets('可按学校名称筛选高校目录', (tester) async {
     await tester.pumpWidget(
-      ProviderScope(
+      UncontrolledProviderScope(
+        container: container,
         child: MaterialApp(
           theme: AppTheme.light,
           home: const WebviewImportScreen(),

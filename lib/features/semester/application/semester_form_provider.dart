@@ -41,7 +41,7 @@ class SemesterFormNotifier extends StateNotifier<Semester> {
 
   /// 返回保存后的 id。新增时生成 id；[activate] 为 true 则设为唯一激活学期。
   Future<String> save({bool activate = false}) async {
-    var s = normalizeSemesterWeeks(state);
+    var s = normalizeSemesterWeeks(state.copyWith(name: state.name.trim()));
     if (s.id.isEmpty) s = s.copyWith(id: const Uuid().v4());
     await _mutations.save(s, activate: activate);
     state = s;

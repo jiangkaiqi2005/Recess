@@ -17,6 +17,7 @@ import 'package:recess/features/settings/application/section_times_provider.dart
 import '../data/school_adapter.dart';
 import 'import_confirm_dialog.dart';
 import 'import_preview_list.dart';
+import 'import_target_semester.dart';
 
 /// Android WebView 会把无法重放的无缓存请求报为 ERR_CACHE_MISS。
 bool isWebViewCacheMiss(String description) =>
@@ -126,6 +127,8 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const ImportTargetSemester(),
+        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
