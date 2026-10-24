@@ -54,6 +54,7 @@ try {
     Copy-Item -LiteralPath native_templates/android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt -Destination $mainActivityPath -Force
     Copy-Item -LiteralPath native_templates/android/app/src/main/AndroidManifest.xml -Destination android/app/src/main/AndroidManifest.xml -Force
     Copy-Item -LiteralPath native_templates/android/app/src/main/res/xml/filepaths.xml -Destination android/app/src/main/res/xml/filepaths.xml -Force
+    Copy-Item -LiteralPath native_templates/android/app/src/main/res/xml/network_security_config.xml -Destination android/app/src/main/res/xml/network_security_config.xml -Force
     $targets = [ordered]@{
         'android' = 'android-arm,android-arm64,android-x64'
         'arm64-v8a' = 'android-arm64'

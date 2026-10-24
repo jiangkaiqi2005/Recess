@@ -22,7 +22,6 @@ concurrency:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   build-android:
@@ -31,7 +30,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -150,7 +149,7 @@ jobs:
           python3 scripts/prepare_update_manifest.py --tag "$RELEASE_TAG"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: android-release-${{ env.RELEASE_TAG }}
           path: build/release/*
