@@ -114,3 +114,17 @@ GitHub branch protection makes a direct push impossible.
 3. Commit and push directly to `develop`.
 4. To release: prepare and verify the release, update `main` and `develop` directly, then tag `vX.Y.Z` and publish the GitHub Release.
 5. Hotfixes start from `main`, are verified locally, then are pushed directly to both `main` and `develop`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues on `jiangkaiqi2005/Recess`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical triage roles use the default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` at the repo root plus `docs/adr/`. See `docs/agents/domain.md`.
