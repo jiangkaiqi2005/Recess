@@ -8,6 +8,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'package:recess/features/import/application/import_commit.dart';
 import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/application/course_capture_orientation.dart';
 import 'package:recess/features/import/application/webview_import_provider.dart';
@@ -1008,9 +1009,8 @@ class _CustomUrlCardState extends State<_CustomUrlCard> {
                       keyboardType: TextInputType.url,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return '请输入 URL';
-                        final uri = Uri.tryParse(v.trim());
-                        if (uri == null || !uri.hasScheme) {
-                          return '请输入完整 URL（含 https://）';
+                        if (!isAllowedPlatformUrl(v)) {
+                          return '请输入 http(s):// 开头的完整 URL';
                         }
                         return null;
                       },

@@ -542,6 +542,7 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
   late final _nameCtrl = TextEditingController(text: widget.initial?.name);
   late final _urlCtrl = TextEditingController(text: widget.initial?.url);
   String? _nameError;
+  String? _urlError;
 
   @override
   void dispose() {
@@ -557,6 +558,10 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
       return;
     }
     final url = _urlCtrl.text.trim();
+    if (url.isNotEmpty && !isAllowedPlatformUrl(url)) {
+      setState(() => _urlError = '链接需为 http(s):// 开头的完整地址');
+      return;
+    }
     Navigator.of(context).pop(CoursePlatform(
       purpose: _purpose,
       name: name,
@@ -605,9 +610,10 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _urlCtrl,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: '链接（可选）',
                 hintText: 'https://',
+                errorText: _urlError,
               ),
               keyboardType: TextInputType.url,
               onSubmitted: (_) => _submit(),

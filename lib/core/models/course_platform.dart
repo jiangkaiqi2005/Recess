@@ -52,10 +52,20 @@ class CoursePlatform {
 /// 同一学期内按课程名分组的课程平台：课程名 → 该课的平台（组内有序）。
 typedef CoursePlatformGroups = Map<String, List<CoursePlatform>>;
 
+/// 课程平台链接仅允许 http/https，防止导入文件携带任意协议的 URI
+///（如 intent://、content://）被外部打开。
+bool isAllowedPlatformUrl(String url) {
+  final uri = Uri.tryParse(url.trim());
+  return uri != null &&
+      (uri.scheme == 'http' || uri.scheme == 'https') &&
+      uri.host.isNotEmpty;
+}
+
 /// 解析 JSON 中的 `platforms` 字段：`{"<课程名>": [{"purpose", "name", "url"}]}`。
 ///
 /// 备份恢复与 JSON 课表导入共用。用途键未知、平台名为空或条目不是对象时跳过
-/// 该条，并把原因追加到 [skipped]；字段整体不是对象时视为没有平台。
+/// 该条，并把原因追加到 [skipped]；链接协议非 http/https 时保留条目但忽略
+/// 链接，同样记入 [skipped]；字段整体不是对象时视为没有平台。
 CoursePlatformGroups parseCoursePlatformGroups(
   Object? raw, {
   List<String>? skipped,
@@ -83,7 +93,11 @@ CoursePlatformGroups parseCoursePlatformGroups(
         skipped?.add('课程平台「$courseName」第${i + 1}条：用途或平台名非法');
         continue;
       }
-      final url = item['url']?.toString().trim();
+      var url = item['url']?.toString().trim();
+      if (url != null && url.isNotEmpty && !isAllowedPlatformUrl(url)) {
+        url = null;
+        skipped?.add('课程平台「$courseName」第${i + 1}条：链接协议不允许，已忽略');
+      }
       result
           .putIfAbsent(courseName, () => [])
           .add(

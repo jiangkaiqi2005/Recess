@@ -266,6 +266,10 @@ class _PlatformSection extends ConsumerWidget {
 
   Future<void> _open(BuildContext context, String url) async {
     final messenger = ScaffoldMessenger.of(context);
+    if (!isAllowedPlatformUrl(url)) {
+      messenger.showSnackBar(const SnackBar(content: Text('链接协议不允许打开')));
+      return;
+    }
     final uri = Uri.tryParse(url);
     var opened = false;
     try {
