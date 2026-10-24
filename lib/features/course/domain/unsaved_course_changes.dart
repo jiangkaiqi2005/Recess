@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
 
@@ -26,8 +24,16 @@ bool hasUnsavedCourseChanges({
     return true;
   }
   if (!_sameWeeks(draft.weeks, initial.weeks)) return true;
-  return !listEquals(platforms, initialPlatforms);
+  return !_samePlatforms(platforms, initialPlatforms);
 }
 
 bool _sameWeeks(List<int> a, List<int> b) =>
     a.length == b.length && {...a}.containsAll(b);
+
+bool _samePlatforms(List<CoursePlatform> a, List<CoursePlatform> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}

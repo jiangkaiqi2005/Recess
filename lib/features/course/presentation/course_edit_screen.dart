@@ -13,7 +13,15 @@ import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
 
-const List<String> _weekdayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const List<String> _weekdayLabels = [
+  '周一',
+  '周二',
+  '周三',
+  '周四',
+  '周五',
+  '周六',
+  '周日'
+];
 
 class CourseEditScreen extends ConsumerStatefulWidget {
   final String? courseId;
@@ -32,8 +40,7 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
   Widget build(BuildContext context) {
     final initAsync = ref.watch(courseInitialProvider(widget.courseId));
     final isCopy = widget.courseId?.startsWith('copy:') ?? false;
-    final isEdit =
-        widget.courseId != null && widget.courseId!.isNotEmpty && !isCopy;
+    final isEdit = widget.courseId != null && widget.courseId!.isNotEmpty && !isCopy;
     final hasChanges = _hasUnsavedChanges();
 
     return PopScope<Object?>(
@@ -68,9 +75,7 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
                 _initialCourse = initial;
                 Future.microtask(() async {
                   ref.read(courseFormProvider.notifier).init(initial);
-                  await ref
-                      .read(coursePlatformsFormProvider.notifier)
-                      .init(
+                  await ref.read(coursePlatformsFormProvider.notifier).init(
                         semesterId: initial.semesterId,
                         courseName: initial.name,
                         originalName: initial.id.isEmpty ? null : initial.name,
@@ -114,21 +119,20 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
   Future<bool> _confirmDiscard() async {
     final discard = await showDialog<bool>(
       context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('放弃修改？'),
-            content: const Text('你有未保存的修改，确定要放弃吗？'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('继续编辑'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('放弃'),
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('放弃修改？'),
+        content: const Text('你有未保存的修改，确定要放弃吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('继续编辑'),
           ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('放弃'),
+          ),
+        ],
+      ),
     );
     return discard == true;
   }
@@ -136,39 +140,36 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
   Future<void> _save(BuildContext context) async {
     final course = ref.read(courseFormProvider);
     if (course.name.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请填写课程名称')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请填写课程名称')),
+      );
       return;
     }
     bool? ok;
     try {
-      ok = await ref
-          .read(courseFormProvider.notifier)
-          .save(
-            platforms:
-                ref
-                    .read(coursePlatformsFormProvider.notifier)
-                    .pendingForCurrentName,
+      ok = await ref.read(courseFormProvider.notifier).save(
+            platforms: ref
+                .read(coursePlatformsFormProvider.notifier)
+                .pendingForCurrentName,
           );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('保存失败：$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败：$e')),
+        );
       }
       return;
     }
     if (ok == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请至少选择一周，否则课程不会显示')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请至少选择一周，否则课程不会显示')),
+      );
       return;
     }
     if (!ok) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先在「学期管理」中创建学期')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先在「学期管理」中创建学期')),
+      );
       return;
     }
     if (context.mounted) context.pop();
@@ -278,9 +279,8 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
             return ChoiceChip(
               label: Text(_weekdayLabels[i]),
               selected: selected,
-              onSelected:
-                  (_) =>
-                      ref.read(courseFormProvider.notifier).setDayOfWeek(day),
+              onSelected: (_) =>
+                  ref.read(courseFormProvider.notifier).setDayOfWeek(day),
             );
           }),
         ),
@@ -293,10 +293,8 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
                 label: '起始',
                 value: course.startSection,
                 sectionTimes: ref.watch(sectionTimesProvider),
-                onChanged:
-                    (v) => ref
-                        .read(courseFormProvider.notifier)
-                        .setStartSection(v!),
+                onChanged: (v) =>
+                    ref.read(courseFormProvider.notifier).setStartSection(v!),
               ),
             ),
             const SizedBox(width: 12),
@@ -305,9 +303,8 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
                 label: '结束',
                 value: course.endSection,
                 sectionTimes: ref.watch(sectionTimesProvider),
-                onChanged:
-                    (v) =>
-                        ref.read(courseFormProvider.notifier).setEndSection(v!),
+                onChanged: (v) =>
+                    ref.read(courseFormProvider.notifier).setEndSection(v!),
               ),
             ),
           ],
@@ -319,36 +316,32 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
           runSpacing: 4,
           children: [
             TextButton(
-              onPressed:
-                  () => ref
-                      .read(courseFormProvider.notifier)
-                      .setAllWeeks(List.generate(totalWeeks, (i) => i + 1)),
+              onPressed: () => ref
+                  .read(courseFormProvider.notifier)
+                  .setAllWeeks(List.generate(totalWeeks, (i) => i + 1)),
               child: const Text('全选'),
             ),
             TextButton(
-              onPressed:
-                  () => ref.read(courseFormProvider.notifier).clearWeeks(),
+              onPressed: () =>
+                  ref.read(courseFormProvider.notifier).clearWeeks(),
               child: const Text('清空'),
             ),
             TextButton(
-              onPressed:
-                  () => ref
-                      .read(courseFormProvider.notifier)
-                      .setOddWeeks(totalWeeks),
+              onPressed: () => ref
+                  .read(courseFormProvider.notifier)
+                  .setOddWeeks(totalWeeks),
               child: const Text('单周'),
             ),
             TextButton(
-              onPressed:
-                  () => ref
-                      .read(courseFormProvider.notifier)
-                      .setEvenWeeks(totalWeeks),
+              onPressed: () => ref
+                  .read(courseFormProvider.notifier)
+                  .setEvenWeeks(totalWeeks),
               child: const Text('双周'),
             ),
             TextButton(
-              onPressed:
-                  () => ref
-                      .read(courseFormProvider.notifier)
-                      .invertWeeks(totalWeeks),
+              onPressed: () => ref
+                  .read(courseFormProvider.notifier)
+                  .invertWeeks(totalWeeks),
               child: const Text('反选'),
             ),
           ],
@@ -356,10 +349,8 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
         Row(
           children: [
             const Spacer(),
-            Text(
-              '已选 ${course.weeks.length} 周',
-              style: theme.textTheme.labelSmall,
-            ),
+            Text('已选 ${course.weeks.length} 周',
+                style: theme.textTheme.labelSmall),
           ],
         ),
         Wrap(
@@ -371,8 +362,8 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
             return FilterChip(
               label: Text('$w'),
               selected: selected,
-              onSelected:
-                  (_) => ref.read(courseFormProvider.notifier).toggleWeek(w),
+              onSelected: (_) =>
+                  ref.read(courseFormProvider.notifier).toggleWeek(w),
             );
           }),
         ),
@@ -380,44 +371,35 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
         const _FieldLabel('卡片颜色'),
         Wrap(
           spacing: 10,
-          children:
-              AppConstants.coursePalette.map((c) {
-                final selected =
-                    AppConstants.courseDisplayColor(course.colorValue) == c;
-                return InkWell(
-                  onTap: () {
-                    ref.read(courseFormProvider.notifier).setColor(c);
-                  },
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Color(
-                        AppConstants.courseDisplayColor(
-                          c,
-                          dark: theme.brightness == Brightness.dark,
-                        ),
-                      ),
-                      shape: BoxShape.circle,
-                      border:
-                          selected
-                              ? Border.all(
-                                color: theme.colorScheme.onSurface,
-                                width: 2,
-                              )
-                              : null,
-                    ),
-                    child:
-                        selected
-                            ? const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 18,
-                            )
-                            : null,
-                  ),
-                );
-              }).toList(),
+          children: AppConstants.coursePalette.map((c) {
+            final selected =
+                AppConstants.courseDisplayColor(course.colorValue) == c;
+            return InkWell(
+              onTap: () {
+                ref.read(courseFormProvider.notifier).setColor(c);
+                        },
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Color(AppConstants.courseDisplayColor(
+                    c,
+                    dark: theme.brightness == Brightness.dark,
+                  )),
+                  shape: BoxShape.circle,
+                  border: selected
+                      ? Border.all(
+                          color: theme.colorScheme.onSurface,
+                          width: 2,
+                        )
+                      : null,
+                ),
+                child: selected
+                    ? const Icon(Icons.check, color: Colors.white, size: 18)
+                    : null,
+              ),
+            );
+          }).toList(),
         ),
         const SizedBox(height: 20),
         _PlatformSection(courseName: course.name.trim()),
@@ -435,14 +417,10 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
           const SizedBox(height: 24),
           TextButton.icon(
             onPressed: () => _delete(context),
-            icon: Icon(
-              Icons.delete_outline,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            label: Text(
-              '删除课程',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
+            icon: Icon(Icons.delete_outline,
+                color: Theme.of(context).colorScheme.error),
+            label: Text('删除课程',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
         const SizedBox(height: 24),
@@ -455,30 +433,29 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
     if (id.isEmpty) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('删除课程'),
-            content: const Text('确定要删除这门课程吗？此操作不可撤销。'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('取消'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('删除'),
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除课程'),
+        content: const Text('确定要删除这门课程吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
           ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
     );
     if (confirmed == true) {
       try {
         await ref.read(courseRepositoryProvider).delete(id);
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('删除失败：$e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除失败：$e')),
+          );
         }
         return;
       }
@@ -502,10 +479,9 @@ class _PlatformSection extends ConsumerWidget {
     Future<void> edit(int? index) async {
       final result = await showDialog<CoursePlatform>(
         context: context,
-        builder:
-            (_) => _CoursePlatformDialog(
-              initial: index == null ? null : platforms[index],
-            ),
+        builder: (_) => _CoursePlatformDialog(
+          initial: index == null ? null : platforms[index],
+        ),
       );
       if (result == null) return;
       if (index == null) {
@@ -543,20 +519,19 @@ class _PlatformSection extends ConsumerWidget {
             child: ListTile(
               leading: Icon(coursePlatformIcon(platforms[i].purpose)),
               title: Text(coursePlatformTitle(platforms[i])),
-              subtitle:
-                  platforms[i].url == null
-                      ? null
-                      : Text(
-                        platforms[i].url!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+              subtitle: platforms[i].url == null
+                  ? null
+                  : Text(
+                      platforms[i].url!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
               trailing: IconButton(
                 icon: const Icon(Icons.delete_outline),
                 tooltip: '删除平台',
                 onPressed: () {
                   notifier.removeAt(i);
-                },
+                            },
               ),
               onTap: () => edit(i),
             ),
@@ -601,13 +576,11 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
       setState(() => _urlError = '链接需为 http(s):// 开头的完整地址');
       return;
     }
-    Navigator.of(context).pop(
-      CoursePlatform(
-        purpose: _purpose,
-        name: name,
-        url: url.isEmpty ? null : url,
-      ),
-    );
+    Navigator.of(context).pop(CoursePlatform(
+      purpose: _purpose,
+      name: name,
+      url: url.isEmpty ? null : url,
+    ));
   }
 
   @override
@@ -667,7 +640,10 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
-        FilledButton(onPressed: _submit, child: const Text('确定')),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('确定'),
+        ),
       ],
     );
   }
@@ -679,14 +655,14 @@ class _FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(
-      text,
-      style: Theme.of(
-        context,
-      ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+      );
 }
 
 class _SectionDropdown extends StatelessWidget {
@@ -709,7 +685,8 @@ class _SectionDropdown extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
@@ -718,11 +695,14 @@ class _SectionDropdown extends StatelessWidget {
           items: List.generate(maxSections, (i) {
             final s = i + 1;
             final sectionTime = sectionTimes[s];
-            final display =
-                sectionTime != null && sectionTime.startTime.isNotEmpty
-                    ? '第$s节 · ${sectionTime.timeRange}'
-                    : '第$s节';
-            return DropdownMenuItem(value: s, child: Text(display));
+            final display = sectionTime != null &&
+                    sectionTime.startTime.isNotEmpty
+                ? '第$s节 · ${sectionTime.timeRange}'
+                : '第$s节';
+            return DropdownMenuItem(
+              value: s,
+              child: Text(display),
+            );
           }),
           onChanged: onChanged,
         ),

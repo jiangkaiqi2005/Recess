@@ -1,6 +1,6 @@
 import 'package:recess/core/constants/app_constants.dart';
-import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/features/import/domain/import_course.dart';
 
 /// 自包含的 ICS（iCalendar）课程解析器。
@@ -37,16 +37,14 @@ class IcsCourseParser {
 
     void skip(int index, String summary, String reason) {
       final name = summary.trim();
-      diagnostics?.add(
-        ImportDiagnostic(
-          kind: ImportDiagnosticKind.skipped,
-          record:
-              name.isEmpty || name == '未命名课程'
-                  ? '第${index + 1}个事件'
-                  : '第${index + 1}个事件「$name」',
-          reason: reason,
-        ),
-      );
+      final record = name.isEmpty || name == '未命名课程'
+          ? '第${index + 1}个事件'
+          : '第${index + 1}个事件「$name」';
+      diagnostics?.add(ImportDiagnostic(
+        kind: ImportDiagnosticKind.skipped,
+        record: record,
+        reason: reason,
+      ));
     }
 
     for (var i = 0; i < blocks.length; i++) {
@@ -96,8 +94,9 @@ class IcsCourseParser {
       }
 
       final startSection = _sectionFromTime(_hhmm(start));
-      final endSection =
-          end != null ? _sectionFromTime(_hhmm(end)) : startSection;
+      final endSection = end != null
+          ? _sectionFromTime(_hhmm(end))
+          : startSection;
       if (endSection < startSection) {
         // 容错：结束节次低于开始节次时跳过该事件，避免污染其余解析。
         skip(i, summary, '结束时间早于开始时间');
@@ -107,22 +106,20 @@ class IcsCourseParser {
       // 默认按 DTSTART 的星期；若 RRULE 指定了 BYDAY 则按每个星期各生成一条。
       final days = byDays.isNotEmpty ? byDays : [start.weekday];
       for (final d in days) {
-        result.add(
-          ImportCourse(
-            name: summary,
-            teacher: _extractTeacher(description),
-            location: location,
-            dayOfWeek: d,
-            startSection: startSection,
-            endSection: endSection,
-            startTime: _hhmm(start),
-            endTime: end != null ? _hhmm(end) : null,
-            weeks: weeks,
-            colorValue: _pickColor(result.length),
-            notes: _stripTeacher(description),
-            source: 'ics',
-          ),
-        );
+        result.add(ImportCourse(
+          name: summary,
+          teacher: _extractTeacher(description),
+          location: location,
+          dayOfWeek: d,
+          startSection: startSection,
+          endSection: endSection,
+          startTime: _hhmm(start),
+          endTime: end != null ? _hhmm(end) : null,
+          weeks: weeks,
+          colorValue: _pickColor(result.length),
+          notes: _stripTeacher(description),
+          source: 'ics',
+        ));
       }
     }
     return result;
@@ -132,12 +129,10 @@ class IcsCourseParser {
   static int _sectionFromTime(String hhmm) {
     final parts = hhmm.split(':');
     if (parts.length != 2) return 1;
-    final mins =
-        (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
+    final mins = (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
     int best = 1;
-    final sorted =
-        AppConstants.sectionStartTimes.entries.toList()
-          ..sort((a, b) => a.key.compareTo(b.key));
+    final sorted = AppConstants.sectionStartTimes.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
     for (final e in sorted) {
       final sp = e.value.split(':');
       final sm = (int.tryParse(sp[0]) ?? 0) * 60 + (int.tryParse(sp[1]) ?? 0);
@@ -166,7 +161,8 @@ class IcsCourseParser {
       if (until != null) {
         // Compute the actual course date for the next occurrence,
         // using the first occurrence as base (not semesterStart).
-        final nextDate = firstOccurrence.add(Duration(days: k * interval * 7));
+        final nextDate =
+            firstOccurrence.add(Duration(days: k * interval * 7));
         if (nextDate.isAfter(until)) break;
       }
       w += interval;
@@ -261,13 +257,7 @@ class IcsCourseParser {
     return m
         .group(1)!
         .split(',')
-        .map(
-          (d) =>
-              _weekdayMap[d.trim().toUpperCase().replaceFirst(
-                RegExp(r'^[+-]?\d+'),
-                '',
-              )],
-        )
+        .map((d) => _weekdayMap[d.trim().toUpperCase().replaceFirst(RegExp(r'^[+-]?\d+'), '')])
         .where((d) => d != null)
         .cast<int>()
         .toList();
@@ -292,10 +282,9 @@ class IcsCourseParser {
   /// 从 DESCRIPTION 提取教师（形如 "教师: 张三" / "teacher:张三" / "张三"）。
   static String? _extractTeacher(String? description) {
     if (description == null || description.isEmpty) return null;
-    final m = RegExp(
-      r'(?:教师|teacher|授课教师)\s*[:：]\s*(.+)',
-      caseSensitive: false,
-    ).firstMatch(description);
+    final m = RegExp(r'(?:教师|teacher|授课教师)\s*[:：]\s*(.+)',
+            caseSensitive: false)
+        .firstMatch(description);
     if (m != null) return m.group(1)?.trim();
     // 退而求其次：取第一句非空文本作为教师。
     final first = description.split(RegExp(r'[\n;；]')).first.trim();
@@ -306,13 +295,12 @@ class IcsCourseParser {
     if (description == null) return null;
     // 去掉已单独提取的教师片段，保留其余备注。
     return description
-        .replaceAll(
-          RegExp(r'(?:教师|teacher|授课教师)\s*[:：]\s*\S+', caseSensitive: false),
-          '',
-        )
+        .replaceAll(RegExp(r'(?:教师|teacher|授课教师)\s*[:：]\s*\S+',
+            caseSensitive: false), '')
         .replaceAll(RegExp(r'[\n\s]+'), ' ')
         .trim();
   }
 
-  static int _pickColor(int index) => AppConstants.courseAutoColor(index);
+  static int _pickColor(int index) =>
+      AppConstants.courseAutoColor(index);
 }

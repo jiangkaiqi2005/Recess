@@ -60,23 +60,23 @@ class ImportState {
     int? totalWeeks,
     ImportMode? mode,
     CoursePlatformGroups? platforms,
-  }) => ImportState(
-    status: status ?? this.status,
-    courses: courses ?? this.courses,
-    errorMessage: errorMessage ?? this.errorMessage,
-    importedCount: importedCount ?? this.importedCount,
-    diagnostics: diagnostics ?? this.diagnostics,
-    totalWeeks: totalWeeks ?? this.totalWeeks,
-    mode: mode ?? this.mode,
-    platforms: platforms ?? this.platforms,
-  );
+  }) =>
+      ImportState(
+        status: status ?? this.status,
+        courses: courses ?? this.courses,
+        errorMessage: errorMessage ?? this.errorMessage,
+        importedCount: importedCount ?? this.importedCount,
+        diagnostics: diagnostics ?? this.diagnostics,
+        totalWeeks: totalWeeks ?? this.totalWeeks,
+        mode: mode ?? this.mode,
+        platforms: platforms ?? this.platforms,
+      );
 
   int get selectedCount => courses.where((c) => c.selected).length;
 }
 
-final importProvider = StateNotifierProvider<ImportNotifier, ImportState>((
-  ref,
-) {
+final importProvider =
+    StateNotifierProvider<ImportNotifier, ImportState>((ref) {
   return ImportNotifier(ref);
 });
 
@@ -126,11 +126,8 @@ class ImportNotifier extends StateNotifier<ImportState> {
         return;
       }
 
-      final (courses, platforms, diagnostics) = _parseByType(
-        ext,
-        content,
-        semester,
-      );
+      final (courses, platforms, diagnostics) =
+          _parseByType(ext, content, semester);
       if (courses.isEmpty) {
         state = state.copyWith(
           status: ImportStatus.error,
@@ -217,7 +214,11 @@ class ImportNotifier extends StateNotifier<ImportState> {
   }
 
   (List<ImportCourse>, CoursePlatformGroups, List<ImportDiagnostic>)
-  _parseByType(String ext, String content, Semester semester) {
+      _parseByType(
+    String ext,
+    String content,
+    Semester semester,
+  ) {
     switch (ext) {
       case 'json':
         final result = JsonCourseImporter.parse(
@@ -240,7 +241,11 @@ class ImportNotifier extends StateNotifier<ImportState> {
         );
       default:
         // 不支持的格式，返回空。
-        return (const <ImportCourse>[], const {}, const <ImportDiagnostic>[]);
+        return (
+          const <ImportCourse>[],
+          const {},
+          const <ImportDiagnostic>[],
+        );
     }
   }
 
@@ -256,18 +261,18 @@ class ImportNotifier extends StateNotifier<ImportState> {
 /// [ImportCourse] 的私有便捷复制（仅翻转 selected），避免对外暴露可变字段。
 extension _ImportCourseCopy on ImportCourse {
   ImportCourse _copyWithSelected(bool selected) => ImportCourse(
-    name: name,
-    teacher: teacher,
-    location: location,
-    dayOfWeek: dayOfWeek,
-    startSection: startSection,
-    endSection: endSection,
-    startTime: startTime,
-    endTime: endTime,
-    weeks: weeks,
-    colorValue: colorValue,
-    notes: notes,
-    source: source,
-    selected: selected,
-  );
+        name: name,
+        teacher: teacher,
+        location: location,
+        dayOfWeek: dayOfWeek,
+        startSection: startSection,
+        endSection: endSection,
+        startTime: startTime,
+        endTime: endTime,
+        weeks: weeks,
+        colorValue: colorValue,
+        notes: notes,
+        source: source,
+        selected: selected,
+      );
 }

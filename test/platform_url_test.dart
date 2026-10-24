@@ -33,9 +33,15 @@ void main() {
       expect(list, hasLength(1));
       expect(list.single.name, '学习通');
       expect(list.single.url, isNull);
-      expect(diagnostics.map((d) => (d.kind, d.message)), [
-        (ImportDiagnosticKind.partial, '课程平台「高数」第1条：链接协议不允许，已忽略'),
-      ]);
+      expect(
+        diagnostics.map((d) => (d.kind, d.message)),
+        [
+          (
+            ImportDiagnosticKind.partial,
+            '课程平台「高数」第1条：链接协议不允许，已忽略',
+          ),
+        ],
+      );
     });
 
     test('合法 https 与无 url 的记录不受影响', () {

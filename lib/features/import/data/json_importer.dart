@@ -43,8 +43,10 @@ class JsonCourseImporter {
     List<ImportCourse> courses,
     CoursePlatformGroups platforms,
     List<ImportDiagnostic> diagnostics,
-  })
-  parse(String jsonText, {int? totalWeeks}) {
+  }) parse(
+    String jsonText, {
+    int? totalWeeks,
+  }) {
     final diagnostics = <ImportDiagnostic>[];
     final List<dynamic> rawList;
     Object? rawPlatforms;
@@ -69,23 +71,19 @@ class JsonCourseImporter {
     for (var i = 0; i < rawList.length; i++) {
       final item = rawList[i];
       if (item is! Map) {
-        diagnostics.add(
-          ImportDiagnostic(
-            kind: ImportDiagnosticKind.skipped,
-            record: '第${i + 1}条',
-            reason: '非对象',
-          ),
-        );
+        diagnostics.add(ImportDiagnostic(
+          kind: ImportDiagnosticKind.skipped,
+          record: '第${i + 1}条',
+          reason: '非对象',
+        ));
         continue;
       }
       final map = Map<String, dynamic>.from(item);
       final course = _parseOne(map, i, totalWeeks, diagnostics);
       if (course != null) result.add(course);
     }
-    final platforms = parseCoursePlatformGroups(
-      rawPlatforms,
-      diagnostics: diagnostics,
-    );
+    final platforms =
+        parseCoursePlatformGroups(rawPlatforms, diagnostics: diagnostics);
     return (courses: result, platforms: platforms, diagnostics: diagnostics);
   }
 
@@ -96,27 +94,20 @@ class JsonCourseImporter {
     List<ImportDiagnostic> diagnostics,
   ) {
     final record = '第${index + 1}条';
-    final name = m['name']?.toString().trim();
-    if (name == null || name.isEmpty) {
-      diagnostics.add(
-        ImportDiagnostic(
+    void skip(String reason) => diagnostics.add(ImportDiagnostic(
           kind: ImportDiagnosticKind.skipped,
           record: record,
-          reason: '缺少 name',
-        ),
-      );
+          reason: reason,
+        ));
+    final name = m['name']?.toString().trim();
+    if (name == null || name.isEmpty) {
+      skip('缺少 name');
       return null;
     }
 
     final dayOfWeek = _toInt(m['dayOfWeek']);
     if (dayOfWeek == null || dayOfWeek < 1 || dayOfWeek > 7) {
-      diagnostics.add(
-        ImportDiagnostic(
-          kind: ImportDiagnosticKind.skipped,
-          record: record,
-          reason: 'dayOfWeek 非法',
-        ),
-      );
+      skip('dayOfWeek 非法');
       return null;
     }
     final startSection = _toInt(m['startSection']) ?? 1;
@@ -124,65 +115,36 @@ class JsonCourseImporter {
     if (startSection < 1 ||
         endSection > AppConstants.maxSections ||
         endSection < startSection) {
-      diagnostics.add(
-        ImportDiagnostic(
-          kind: ImportDiagnosticKind.skipped,
-          record: record,
-          reason: '节次非法',
-        ),
-      );
+      skip('节次非法');
       return null;
     }
 
     List<int> weeks;
     if (m['weeks'] is List) {
       final rawWeeks = (m['weeks'] as List).map(_toInt).toList();
-      final inRange =
-          rawWeeks
-              .where(
-                (w) =>
-                    w != null &&
-                    w >= 1 &&
-                    (totalWeeks == null || w <= totalWeeks),
-              )
-              .cast<int>()
-              .toList();
-      final outOfRange =
-          rawWeeks
-              .where(
-                (w) =>
-                    w != null &&
-                    (w < 1 || (totalWeeks != null && w > totalWeeks)),
-              )
-              .length;
+      final inRange = rawWeeks
+          .where((w) =>
+              w != null && w >= 1 && (totalWeeks == null || w <= totalWeeks))
+          .cast<int>()
+          .toList();
+      final outOfRange = rawWeeks
+          .where((w) =>
+              w != null && (w < 1 || (totalWeeks != null && w > totalWeeks)))
+          .length;
       if (inRange.isEmpty) {
-        diagnostics.add(
-          ImportDiagnostic(
-            kind: ImportDiagnosticKind.skipped,
-            record: record,
-            reason: '周次为空',
-          ),
-        );
+        skip('周次为空');
         return null;
       }
       if (outOfRange > 0) {
-        diagnostics.add(
-          ImportDiagnostic(
-            kind: ImportDiagnosticKind.partial,
-            record: record,
-            reason: '$outOfRange 个周次超出学期范围，已忽略',
-          ),
-        );
+        diagnostics.add(ImportDiagnostic(
+          kind: ImportDiagnosticKind.partial,
+          record: record,
+          reason: '$outOfRange 个周次超出学期范围，已忽略',
+        ));
       }
       weeks = inRange;
     } else {
-      diagnostics.add(
-        ImportDiagnostic(
-          kind: ImportDiagnosticKind.skipped,
-          record: record,
-          reason: '缺少周次',
-        ),
-      );
+      skip('缺少周次');
       return null;
     }
 

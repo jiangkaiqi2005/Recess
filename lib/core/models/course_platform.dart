@@ -73,18 +73,23 @@ CoursePlatformGroups parseCoursePlatformGroups(
   Object? raw, {
   List<ImportDiagnostic>? diagnostics,
 }) {
+  void skip(String record, String reason) => diagnostics?.add(
+        ImportDiagnostic(
+          kind: ImportDiagnosticKind.skipped,
+          record: record,
+          reason: reason,
+        ),
+      );
+
   final CoursePlatformGroups result = {};
   if (raw is! Map) return result;
   for (final entry in raw.entries) {
     final courseName = entry.key.toString().trim();
     final items = entry.value;
     if (courseName.isEmpty || items is! List) {
-      diagnostics?.add(
-        ImportDiagnostic(
-          kind: ImportDiagnosticKind.skipped,
-          record: courseName.isEmpty ? '课程平台' : '课程平台「$courseName」',
-          reason: '分组格式非法',
-        ),
+      skip(
+        courseName.isEmpty ? '课程平台' : '课程平台「$courseName」',
+        '分组格式非法',
       );
       continue;
     }
@@ -92,13 +97,7 @@ CoursePlatformGroups parseCoursePlatformGroups(
       final record = '课程平台「$courseName」第${i + 1}条';
       final item = items[i];
       if (item is! Map) {
-        diagnostics?.add(
-          ImportDiagnostic(
-            kind: ImportDiagnosticKind.skipped,
-            record: record,
-            reason: '非对象',
-          ),
-        );
+        skip(record, '非对象');
         continue;
       }
       final purpose = CoursePlatformPurpose.fromKey(
@@ -106,25 +105,17 @@ CoursePlatformGroups parseCoursePlatformGroups(
       );
       final name = item['name']?.toString().trim() ?? '';
       if (purpose == null || name.isEmpty) {
-        diagnostics?.add(
-          ImportDiagnostic(
-            kind: ImportDiagnosticKind.skipped,
-            record: record,
-            reason: '用途或平台名非法',
-          ),
-        );
+        skip(record, '用途或平台名非法');
         continue;
       }
       var url = item['url']?.toString().trim();
       if (url != null && url.isNotEmpty && !isAllowedPlatformUrl(url)) {
         url = null;
-        diagnostics?.add(
-          ImportDiagnostic(
-            kind: ImportDiagnosticKind.partial,
-            record: record,
-            reason: '链接协议不允许，已忽略',
-          ),
-        );
+        diagnostics?.add(ImportDiagnostic(
+          kind: ImportDiagnosticKind.partial,
+          record: record,
+          reason: '链接协议不允许，已忽略',
+        ));
       }
       result
           .putIfAbsent(courseName, () => [])
