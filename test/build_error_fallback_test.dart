@@ -20,9 +20,19 @@ class _NormalPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: FilledButton(
-          onPressed: () => context.push('/fail'),
-          child: const Text('打开故障页'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FilledButton(
+              onPressed: () => context.push('/fail'),
+              child: const Text('打开故障页'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => context.push('/cramped'),
+              child: const Text('打开受限故障页'),
+            ),
+          ],
         ),
       ),
     );
@@ -39,6 +49,19 @@ class _FailPage extends StatelessWidget {
   }
 }
 
+/// 受限故障页面：失败区域 320x190（宽度足够、高度低于完整说明的最小
+/// 内容高度但高于课程卡），用于验证空间判断按内容实际需要降级。
+class _CrampedFailPage extends StatelessWidget {
+  const _CrampedFailPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: SizedBox(width: 320, height: 190, child: _FailPage())),
+    );
+  }
+}
+
 Widget _hostApp(String initialLocation, {ThemeMode themeMode = ThemeMode.light}) {
   return ProviderScope(
     child: MaterialApp.router(
@@ -50,6 +73,10 @@ Widget _hostApp(String initialLocation, {ThemeMode themeMode = ThemeMode.light})
         routes: [
           GoRoute(path: '/', builder: (context, state) => const _NormalPage()),
           GoRoute(path: '/fail', builder: (context, state) => const _FailPage()),
+          GoRoute(
+            path: '/cramped',
+            builder: (context, state) => const _CrampedFailPage(),
+          ),
         ],
       ),
     ),
@@ -72,6 +99,17 @@ Widget _hostLocalFailure(ThemeData theme) {
       ),
     ),
   );
+}
+
+/// 取指定文案所在错误兜底的背景色（最近的 ColoredBox 祖先）。
+Color _backgroundColorOf(WidgetTester tester, String text) {
+  return tester
+      .widget<ColoredBox>(
+        find
+            .ancestor(of: find.text(text), matching: find.byType(ColoredBox))
+            .first,
+      )
+      .color;
 }
 
 void main() {
@@ -162,15 +200,26 @@ void main() {
 
       final compact = tester.widget<Text>(find.text('暂时无法显示'));
       expect(compact.style?.color, AppColors.textMutedDark);
-      final box = tester.widget<ColoredBox>(
-        find
-            .ancestor(
-              of: find.text('暂时无法显示'),
-              matching: find.byType(ColoredBox),
-            )
-            .first,
-      );
-      expect(box.color, AppTheme.dark.colorScheme.surface);
+      expect(_backgroundColorOf(tester, '暂时无法显示'),
+          AppTheme.dark.colorScheme.surface);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('高度不足以容纳完整说明时降级为紧凑提示且不溢出', (tester) async {
+      await tester.pumpWidget(_hostApp('/'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('打开受限故障页'));
+      await tester.pump();
+      expect(tester.takeException(), isA<StateError>());
+      await tester.pumpAndSettle();
+
+      // 320x190 的区域放不下完整说明（默认字号下最小内容高度约 198），
+      // 应显示紧凑提示，而不是塞下完整态导致按钮被裁切。
+      expect(find.text('暂时无法显示'), findsOneWidget);
+      expect(find.text('页面暂时无法显示'), findsNothing);
+      expect(find.byType(FilledButton), findsNothing);
+      // 没有布局溢出等新异常。
       expect(tester.takeException(), isNull);
     });
   });
@@ -185,15 +234,8 @@ void main() {
       expect(title.style?.color, AppColors.textDark);
       final note = tester.widget<Text>(find.text('请重新打开应用'));
       expect(note.style?.color, AppColors.textMutedDark);
-      final background = tester.widget<ColoredBox>(
-        find
-            .ancestor(
-              of: find.text('页面暂时无法显示'),
-              matching: find.byType(ColoredBox),
-            )
-            .first,
-      );
-      expect(background.color, AppTheme.dark.scaffoldBackgroundColor);
+      expect(_backgroundColorOf(tester, '页面暂时无法显示'),
+          AppTheme.dark.scaffoldBackgroundColor);
       expect(tester.takeException(), isNull);
     });
   });

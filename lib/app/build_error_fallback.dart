@@ -17,8 +17,13 @@ class _BuildErrorFallback extends StatelessWidget {
   const _BuildErrorFallback();
 
   /// 完整说明（图标 + 标题 + 恢复说明 + 按钮）所需的最小空间。
+  ///
+  /// 高度按默认字号下完整态的最小内容高度推算：24x2 内边距 + 32 图标 +
+  /// 12+4+16 间距 + 标题行高约 24 + 说明行高约 16 + 按钮最小高 46 ≈ 198，
+  /// 取 200；不足时降级为紧凑态，避免按钮被裁切或 RenderFlex 溢出。
+  /// 宽度按最宽内容（标题 + 内边距）放宽到 220。
   static const double _fullMinWidth = 220;
-  static const double _fullMinHeight = 180;
+  static const double _fullMinHeight = 200;
 
   @override
   Widget build(BuildContext context) {
@@ -51,37 +56,42 @@ class _FullErrorView extends StatelessWidget {
     return ColoredBox(
       color: theme.scaffoldBackgroundColor,
       child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 32,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '页面暂时无法显示',
-                style: theme.textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                canGoBack ? '返回上一页后重试' : '请重新打开应用',
-                style: theme.textTheme.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-              if (canGoBack) ...[
-                const SizedBox(height: 16),
-                FilledButton(
-                  // 只退出当前失败页面，不重建、刷新或清空返回后的页面。
-                  onPressed: navigator.pop,
-                  child: const Text('返回上一页'),
+        // 大字号下完整内容仍可能略高于可用空间，整体等比缩小兜底，
+        // 保证完整态在任何足够触发它的空间里都不会溢出。
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 32,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
+                const SizedBox(height: 12),
+                Text(
+                  '页面暂时无法显示',
+                  style: theme.textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  canGoBack ? '返回上一页后重试' : '请重新打开应用',
+                  style: theme.textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                if (canGoBack) ...[
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    // 只退出当前失败页面，不重建、刷新或清空返回后的页面。
+                    onPressed: navigator.pop,
+                    child: const Text('返回上一页'),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
