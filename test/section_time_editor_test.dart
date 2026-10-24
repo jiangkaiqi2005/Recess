@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
 import 'package:recess/features/settings/presentation/section_time_editor.dart';
 
@@ -20,6 +21,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     return container;
+  }
+
+  /// 预置一份非默认的已保存节次时间（第 1 节 09:30，其余留空）。
+  Future<List<String>> seedCustomTimes() async {
+    final stored = List.generate(
+      AppConstants.maxSections,
+      (i) => i == 0 ? '09:30,45' : ',45',
+    );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('custom_section_times_v2', stored);
+    return stored;
   }
 
   Future<void> pickStart(
@@ -102,5 +114,119 @@ void main() {
     await tester.tap(find.text('知道了'));
     await tester.pumpAndSettle();
     expect(find.text('08:00'), findsOneWidget);
+  });
+
+  testWidgets('恢复默认先弹覆盖确认，取消后状态与已保存配置完全不变', (tester) async {
+    final stored = await seedCustomTimes();
+    final container = await openEditor(tester);
+    final before = container.read(sectionTimesProvider);
+    final prefs = await SharedPreferences.getInstance();
+
+    await tester.tap(find.text('恢复默认'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('恢复默认节次时间'), findsOneWidget);
+    expect(find.textContaining('全部节次时间将被覆盖'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('恢复默认节次时间'), findsNothing);
+    expect(container.read(sectionTimesProvider), same(before));
+    expect(container.read(sectionTimesProvider)[1]?.startTime, '09:30');
+    expect(find.text('09:30'), findsOneWidget);
+    expect(prefs.getStringList('custom_section_times_v2'), stored);
+  });
+
+  testWidgets('点击遮罩关闭恢复默认确认后不产生任何变化', (tester) async {
+    final stored = await seedCustomTimes();
+    final container = await openEditor(tester);
+    final before = container.read(sectionTimesProvider);
+    final prefs = await SharedPreferences.getInstance();
+
+    await tester.tap(find.text('恢复默认'));
+    await tester.pumpAndSettle();
+    // 点击对话框遮罩（对话框居中，四角必然在遮罩上）。
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+
+    expect(find.text('恢复默认节次时间'), findsNothing);
+    expect(container.read(sectionTimesProvider), same(before));
+    expect(prefs.getStringList('custom_section_times_v2'), stored);
+  });
+
+  testWidgets('确认恢复默认后回到默认节次时间并清除已保存配置', (tester) async {
+    await seedCustomTimes();
+    final container = await openEditor(tester);
+    final prefs = await SharedPreferences.getInstance();
+
+    await tester.tap(find.text('恢复默认'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('恢复'));
+    await tester.pumpAndSettle();
+
+    final times = container.read(sectionTimesProvider);
+    expect(times[1]?.timeRange, '08:00-08:45');
+    expect(times[2]?.timeRange, '08:55-09:40');
+    expect(find.text('08:00'), findsOneWidget);
+    expect(prefs.containsKey('custom_section_times_v2'), isFalse);
+  });
+
+  testWidgets('选定模板先弹应用确认，取消后状态与持久化不变', (tester) async {
+    final container = await openEditor(tester);
+    final before = container.read(sectionTimesProvider);
+    final prefs = await SharedPreferences.getInstance();
+
+    await tester.tap(find.text('模板'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('90 分钟大节课制'));
+    await tester.pumpAndSettle();
+
+    // 选择模板后先确认，确认文案包含模板名与覆盖说明。
+    expect(find.text('应用节次模板'), findsOneWidget);
+    expect(find.textContaining('90 分钟大节课制'), findsOneWidget);
+    expect(find.textContaining('全部节次时间将被覆盖'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(sectionTimesProvider), same(before));
+    expect(container.read(sectionTimesProvider)[2]?.startTime, '08:55');
+    expect(prefs.containsKey('custom_section_times_v2'), isFalse);
+  });
+
+  testWidgets('点击遮罩关闭模板应用确认后不应用模板', (tester) async {
+    final container = await openEditor(tester);
+    final before = container.read(sectionTimesProvider);
+    final prefs = await SharedPreferences.getInstance();
+
+    await tester.tap(find.text('模板'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('标准 45 分钟制'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+
+    expect(find.text('应用节次模板'), findsNothing);
+    expect(container.read(sectionTimesProvider), same(before));
+    expect(prefs.containsKey('custom_section_times_v2'), isFalse);
+  });
+
+  testWidgets('确认应用模板后按模板写入状态与持久化', (tester) async {
+    final container = await openEditor(tester);
+    final prefs = await SharedPreferences.getInstance();
+
+    await tester.tap(find.text('模板'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('90 分钟大节课制'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('应用'));
+    await tester.pumpAndSettle();
+
+    final times = container.read(sectionTimesProvider);
+    expect(times[1]?.timeRange, '08:00-09:30');
+    expect(times[2]?.timeRange, '09:45-11:15');
+    expect(times[7]?.startTime, isEmpty);
+    final saved = prefs.getStringList('custom_section_times_v2');
+    expect(saved?[0], '08:00,90');
+    expect(saved?[1], '09:45,90');
   });
 }

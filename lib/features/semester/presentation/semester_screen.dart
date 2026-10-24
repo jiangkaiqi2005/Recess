@@ -29,7 +29,13 @@ class SemesterScreen extends ConsumerWidget {
       ),
       body: semestersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败：$e')),
+        // 学期列表与当前学期任一失败都进入重试态；重试同时覆盖两个数据源。
+        error: (e, _) => _LoadFailedView(
+          onRetry: () {
+            ref.invalidate(activeSemesterProvider);
+            ref.invalidate(semestersProvider);
+          },
+        ),
         data: (semesters) {
           final activeId = activeAsync.whenOrNull(data: (s) => s?.id);
           if (semesters.isEmpty) {
@@ -72,6 +78,45 @@ class SemesterScreen extends ConsumerWidget {
         ref.invalidate(semesterFormProvider);
       }
     });
+  }
+}
+
+/// 学期加载失败状态：易懂的说明加重试入口，不展示原始异常。
+class _LoadFailedView extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _LoadFailedView({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.cloud_off_outlined, size: 48, color: theme.hintColor),
+          const SizedBox(height: 12),
+          Text(
+            '学期加载失败',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.hintColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '学期数据没有读取出来，点击重试重新加载',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.hintColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('重试'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

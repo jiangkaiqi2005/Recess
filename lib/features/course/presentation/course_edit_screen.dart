@@ -68,7 +68,12 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
           behavior: HitTestBehavior.translucent,
           child: initAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('加载失败：$e')),
+            // 初始化失败：易懂说明 + 重试；重试按当前路由参数重新执行初始化，
+            // 成功后仍走原有「仅初始化一次」的表单与课程平台流程。
+            error: (e, _) => _LoadFailedView(
+              onRetry: () =>
+                  ref.invalidate(courseInitialProvider(widget.courseId)),
+            ),
             data: (initial) {
               if (!_initialized) {
                 _initialized = true;
@@ -173,6 +178,45 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
       return;
     }
     if (context.mounted) context.pop();
+  }
+}
+
+/// 课程加载失败状态：易懂的说明加重试入口，不展示原始异常。
+class _LoadFailedView extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _LoadFailedView({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.cloud_off_outlined, size: 48, color: theme.hintColor),
+          const SizedBox(height: 12),
+          Text(
+            '课程加载失败',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.hintColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '课程数据没有读取出来，点击重试重新加载',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.hintColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('重试'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

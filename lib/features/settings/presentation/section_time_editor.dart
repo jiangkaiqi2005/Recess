@@ -42,15 +42,11 @@ class _SectionTimeEditorState extends ConsumerState<SectionTimeEditor> {
                 children: [
                   Text('节次时间设置', style: theme.textTheme.titleMedium),
                   TextButton(
-                    onPressed: () => _showTemplatePicker(context, ref),
+                    onPressed: () => _showTemplatePicker(context),
                     child: const Text('模板'),
                   ),
                   TextButton(
-                    onPressed:
-                        () =>
-                            ref
-                                .read(sectionTimesProvider.notifier)
-                                .resetToDefault(),
+                    onPressed: () => _resetToDefaultWithConfirm(),
                     child: const Text('恢复默认'),
                   ),
                 ],
@@ -212,7 +208,55 @@ class _SectionTimeEditorState extends ConsumerState<SectionTimeEditor> {
     }
   }
 
-  void _showTemplatePicker(BuildContext context, WidgetRef ref) {
+  /// 覆盖全部节次时间前先确认。取消、关闭对话框或点击遮罩都不执行任何变更。
+  Future<bool> _confirmOverwrite({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  /// 「恢复默认」：确认后才走既有重置流程，替换全部节次时间。
+  Future<void> _resetToDefaultWithConfirm() async {
+    final confirmed = await _confirmOverwrite(
+      title: '恢复默认节次时间',
+      message: '全部节次时间将被覆盖为默认作息，自定义设置将丢失。',
+      confirmLabel: '恢复',
+    );
+    if (!confirmed || !mounted) return;
+    await ref.read(sectionTimesProvider.notifier).resetToDefault();
+  }
+
+  /// 模板应用：选定具体模板后再确认，确认后才覆盖全部节次时间。
+  Future<void> _applyTemplateWithConfirm(SectionTimeTemplate template) async {
+    final confirmed = await _confirmOverwrite(
+      title: '应用节次模板',
+      message: '将应用「${template.name}」，全部节次时间将被覆盖。',
+      confirmLabel: '应用',
+    );
+    if (!confirmed || !mounted) return;
+    await ref.read(sectionTimesProvider.notifier).applyTemplate(template);
+  }
+
+  void _showTemplatePicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -236,10 +280,8 @@ class _SectionTimeEditorState extends ConsumerState<SectionTimeEditor> {
                   title: Text(template.name),
                   subtitle: Text('${template.duration} 分钟/节'),
                   onTap: () {
-                    ref
-                        .read(sectionTimesProvider.notifier)
-                        .applyTemplate(template);
                     Navigator.of(ctx).pop();
+                    _applyTemplateWithConfirm(template);
                   },
                 ),
               ),

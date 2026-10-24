@@ -53,7 +53,8 @@ class WeekView extends ConsumerWidget {
         (MediaQuery.textScalerOf(context).scale(12) / 12).clamp(1.0, 1.6);
 
     // 学期开学日期，用于推算选中周每天的实际日期。
-    final semester = ref.watch(activeSemesterProvider).valueOrNull;
+    final semesterAsync = ref.watch(activeSemesterProvider);
+    final semester = semesterAsync.valueOrNull;
     final semesterStart = semester?.startDate;
     // 仅当查看的是当前周时，才在表头标示"今天"（避免查看历史/未来周时
     // 误标某一天的日期）。学期外没有可高亮的当前教学周。
@@ -69,80 +70,92 @@ class WeekView extends ConsumerWidget {
           isCurrentWeek: isCurrentWeek,
         ),
         Expanded(
-          child: coursesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('加载失败：$e')),
-            data: (allCourses) {
-              final weekCourses = allCourses
-                  .where((c) => courseOnWeek(c.weeks, selectedWeek))
-                  .toList();
+          // 当前学期（上游）失败时不能当作无课程：同样进入失败重试状态。
+          child: semesterAsync.hasError && !semesterAsync.isLoading
+              ? _LoadFailedView(onRetry: () => _retryReload(ref))
+              : coursesAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => _LoadFailedView(
+                    onRetry: () => _retryReload(ref),
+                  ),
+                  data: (allCourses) {
+                    final weekCourses = allCourses
+                        .where((c) => courseOnWeek(c.weeks, selectedWeek))
+                        .toList();
 
-              if (weekCourses.isEmpty) {
-                return _EmptyWeekHint(
-                  hasAnyCourses: allCourses.isNotEmpty,
-                  onImport: onImport,
-                  onWebViewImport: onWebViewImport,
-                );
-              }
+                    if (weekCourses.isEmpty) {
+                      return _EmptyWeekHint(
+                        hasAnyCourses: allCourses.isNotEmpty,
+                        onImport: onImport,
+                        onWebViewImport: onWebViewImport,
+                      );
+                    }
 
-              final byDay = <int, List<Course>>{
-                for (var d = 1; d <= 7; d++) d: [],
-              };
-              for (final c in weekCourses) {
-                byDay[c.dayOfWeek]?.add(c);
-              }
+                    final byDay = <int, List<Course>>{
+                      for (var d = 1; d <= 7; d++) d: [],
+                    };
+                    for (final c in weekCourses) {
+                      byDay[c.dayOfWeek]?.add(c);
+                    }
 
-              final sectionCount = visibleSectionCount(
-                sectionTimes: sectionTimes,
-                courses: allCourses,
-              );
-              final totalHeight = sectionCount * sectionHeight;
-
-              return SingleChildScrollView(
-                key: const Key('week-view-vertical-scroll'),
-                scrollDirection: Axis.vertical,
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.paddingOf(context).bottom + _bottomGap,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TimeAxis(
-                      sectionCount: sectionCount,
-                      sectionHeight: sectionHeight,
+                    final sectionCount = visibleSectionCount(
                       sectionTimes: sectionTimes,
-                    ),
-                    Expanded(
+                      courses: allCourses,
+                    );
+                    final totalHeight = sectionCount * sectionHeight;
+
+                    return SingleChildScrollView(
+                      key: const Key('week-view-vertical-scroll'),
+                      scrollDirection: Axis.vertical,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.paddingOf(context).bottom + _bottomGap,
+                      ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: List.generate(7, (i) {
-                          final day = i + 1;
-                          return Expanded(
-                            child: _DayColumn(
-                              sectionHeight: sectionHeight,
-                              courses: byDay[day]!,
-                              totalHeight: totalHeight,
-                              onTapCourse: (course) =>
-                                  showCourseDetailSheet(context, course,
-                                      sectionTimes),
-                              onLongPressCourse: (course) => context.push(
-                                '/course/edit',
-                                extra: course.id,
-                              ),
+                        children: [
+                          _TimeAxis(
+                            sectionCount: sectionCount,
+                            sectionHeight: sectionHeight,
+                            sectionTimes: sectionTimes,
+                          ),
+                          Expanded(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: List.generate(7, (i) {
+                                final day = i + 1;
+                                return Expanded(
+                                  child: _DayColumn(
+                                    sectionHeight: sectionHeight,
+                                    courses: byDay[day]!,
+                                    totalHeight: totalHeight,
+                                    onTapCourse: (course) =>
+                                        showCourseDetailSheet(
+                                            context, course, sectionTimes),
+                                    onLongPressCourse: (course) => context.push(
+                                      '/course/edit',
+                                      extra: course.id,
+                                    ),
+                                  ),
+                                );
+                              }),
                             ),
-                          );
-                        }),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
+  }
+
+  /// 重试重新加载真正失败的数据源：课程流与当前学期（上游）一起失效，
+  /// 不把上游失败当成无课程。不会切换学期或重置查看周。
+  void _retryReload(WidgetRef ref) {
+    ref.invalidate(activeSemesterProvider);
+    ref.invalidate(scheduleCoursesProvider);
   }
 }
 
@@ -453,6 +466,45 @@ Color courseCardColor(Color base, Brightness brightness) {
 
 double _contrastWithWhite(Color background) =>
     1.05 / (background.computeLuminance() + 0.05);
+
+/// 课表加载失败状态：易懂的说明加重试入口，不展示原始异常。
+class _LoadFailedView extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _LoadFailedView({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.cloud_off_outlined, size: 48, color: theme.hintColor),
+          const SizedBox(height: 12),
+          Text(
+            '课表加载失败',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.hintColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '课程数据没有读取出来，点击重试重新加载',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.hintColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('重试'),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// 无课程时的友好空状态。区分"无任何课程"和"本周无课"。
 class _EmptyWeekHint extends StatelessWidget {

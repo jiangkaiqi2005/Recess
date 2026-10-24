@@ -141,6 +141,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('90 分钟大节课制'));
     await tester.pumpAndSettle();
+    // 选定模板后先确认覆盖，再实际应用。
+    expect(find.text('应用节次模板'), findsOneWidget);
+    await tester.tap(find.text('应用'));
+    await tester.pumpAndSettle();
     await pickStart(tester, '08', '30');
     expect(container.read(sectionTimesProvider)[2]?.timeRange, '10:15-11:45');
     expect(container.read(sectionTimesProvider)[7]?.startTime, isEmpty);
@@ -152,6 +156,10 @@ void main() {
     expect(find.text('08:30'), findsOneWidget);
     expect(find.text('10:15'), findsOneWidget);
     await tester.tap(find.text('恢复默认'));
+    await tester.pumpAndSettle();
+    // 恢复默认同样先确认覆盖。
+    expect(find.text('恢复默认节次时间'), findsOneWidget);
+    await tester.tap(find.text('恢复'));
     await tester.pumpAndSettle();
     expect(find.text('08:00'), findsOneWidget);
     expect(container.read(sectionTimesProvider)[2]?.timeRange, '08:55-09:40');
