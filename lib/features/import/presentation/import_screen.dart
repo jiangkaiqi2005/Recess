@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/application/import_provider.dart';
 import 'package:recess/features/import/domain/import_course.dart';
@@ -20,9 +21,9 @@ class ImportScreen extends ConsumerWidget {
       if (next.status == ImportStatus.preview &&
           next.errorMessage != null &&
           previous?.status == ImportStatus.importing) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.errorMessage!)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
       }
     });
     final state = ref.watch(importProvider);
@@ -72,28 +73,28 @@ class ImportScreen extends ConsumerWidget {
         return _PreviewList(state: state);
       case ImportStatus.done:
         return _DoneView(
+          mode: state.mode,
           count: state.importedCount,
+          diagnostics: state.diagnostics,
           onDone: () => Navigator.of(context).pop(),
         );
       case ImportStatus.error:
         return _ErrorView(
           message: state.errorMessage ?? '未知错误',
+          diagnostics: state.diagnostics,
           onRetry: () => ref.read(importProvider.notifier).reset(),
         );
     }
   }
 
-  Widget? _buildFab(
-    BuildContext context,
-    WidgetRef ref,
-    ImportState state,
-  ) {
+  Widget? _buildFab(BuildContext context, WidgetRef ref, ImportState state) {
     if (state.status != ImportStatus.preview) return null;
     final notifier = ref.read(importProvider.notifier);
     return FloatingActionButton.extended(
-      onPressed: state.selectedCount > 0
-          ? () => _confirmAndImport(context, ref, notifier)
-          : null,
+      onPressed:
+          state.selectedCount > 0
+              ? () => _confirmAndImport(context, ref, notifier)
+              : null,
       icon: const Icon(Icons.download_done),
       label: Text('导入 ${state.selectedCount} 门'),
     );
@@ -107,8 +108,10 @@ class ImportScreen extends ConsumerWidget {
   ) async {
     final submission = await notifier.prepareImport();
     if (submission == null || submission.courses.isEmpty) return;
-    final existing = (await ref.read(courseRepositoryProvider)
-        .getCourses(submission.semesterId)).length;
+    final existing =
+        (await ref
+            .read(courseRepositoryProvider)
+            .getCourses(submission.semesterId)).length;
     if (!context.mounted) return;
     final ok = await showImportConfirmDialog(
       context,
@@ -136,27 +139,32 @@ class _IdleView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.file_upload_outlined,
-                size: 72, color: theme.colorScheme.primary),
+            Icon(
+              Icons.file_upload_outlined,
+              size: 72,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(height: 24),
             Text('从文件导入课程', style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
               '支持 .ics（日历导出）与 .json（课程模板）。',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: busy ? null : onPick,
-              icon: busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.folder_open),
+              icon:
+                  busy
+                      ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : const Icon(Icons.folder_open),
               label: Text(busy ? '请选择文件…' : '选择文件'),
             ),
           ],
@@ -191,8 +199,10 @@ class _PreviewList extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(
             children: [
-              Text('共解析 ${state.courses.length} 门',
-                  style: theme.textTheme.titleSmall),
+              Text(
+                '共解析 ${state.courses.length} 门',
+                style: theme.textTheme.titleSmall,
+              ),
               const Spacer(),
               TextButton(
                 onPressed: () => notifier.setAllSelected(true),
@@ -243,12 +253,15 @@ class _PreviewList extends ConsumerWidget {
             ),
           ),
         ),
+        if (state.diagnostics.isNotEmpty)
+          ImportDiagnosticsCard(diagnostics: state.diagnostics),
         if (conflicts.isNotEmpty)
           ImportConflictBanner(
             names: conflicts,
-            reason: state.mode == ImportMode.merge
-                ? '与现有课程或彼此同时段重叠'
-                : '所选课程彼此同时段重叠',
+            reason:
+                state.mode == ImportMode.merge
+                    ? '与现有课程或彼此同时段重叠'
+                    : '所选课程彼此同时段重叠',
           ),
         const Divider(height: 1),
         Expanded(
@@ -263,10 +276,7 @@ class _PreviewList extends ConsumerWidget {
   }
 
   /// 返回存在时间冲突的已选课程名称集合（内部冲突 + 与现有课表冲突）。
-  Set<String> _conflictNames(
-    ImportState state,
-    List<Course> existingCourses,
-  ) {
+  Set<String> _conflictNames(ImportState state, List<Course> existingCourses) {
     final selected = state.courses.where((c) => c.selected).toList();
     final names = <String>{};
     for (var i = 0; i < selected.length; i++) {
@@ -288,10 +298,17 @@ class _PreviewList extends ConsumerWidget {
 }
 
 class _DoneView extends StatelessWidget {
+  final ImportMode mode;
   final int count;
+  final List<ImportDiagnostic> diagnostics;
   final VoidCallback onDone;
 
-  const _DoneView({required this.count, required this.onDone});
+  const _DoneView({
+    required this.mode,
+    required this.count,
+    required this.diagnostics,
+    required this.onDone,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -302,10 +319,23 @@ class _DoneView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle_outline,
-                size: 72, color: Color(0xFF34B37E)),
+            const Icon(
+              Icons.check_circle_outline,
+              size: 72,
+              color: Color(0xFF34B37E),
+            ),
             const SizedBox(height: 24),
-            Text('已用 $count 门课程替换当前课表', style: theme.textTheme.titleLarge),
+            Text(
+              mode == ImportMode.merge
+                  ? '已在现有课表中追加 $count 门课程'
+                  : '已用 $count 门课程替换当前课表',
+              style: theme.textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+            if (diagnostics.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ImportDiagnosticsCard(diagnostics: diagnostics),
+            ],
             const SizedBox(height: 24),
             FilledButton(onPressed: onDone, child: const Text('完成')),
           ],
@@ -317,9 +347,14 @@ class _DoneView extends StatelessWidget {
 
 class _ErrorView extends StatelessWidget {
   final String message;
+  final List<ImportDiagnostic> diagnostics;
   final VoidCallback onRetry;
 
-  const _ErrorView({required this.message, required this.onRetry});
+  const _ErrorView({
+    required this.message,
+    required this.diagnostics,
+    required this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -339,10 +374,101 @@ class _ErrorView extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
+            if (diagnostics.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ImportDiagnosticsCard(
+                diagnostics: diagnostics,
+                initiallyExpanded: true,
+              ),
+            ],
             const SizedBox(height: 24),
             FilledButton(onPressed: onRetry, child: const Text('返回')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 导入诊断摘要卡片：「N 条记录未完整导入」+ 可展开的逐条原因。
+///
+/// 预览、错误、完成页共用；只呈现信息，不阻断有效课程的导入。
+/// 错误页（零有效课程）用 [initiallyExpanded] 直接展开具体原因。
+class ImportDiagnosticsCard extends StatefulWidget {
+  final List<ImportDiagnostic> diagnostics;
+  final bool initiallyExpanded;
+
+  const ImportDiagnosticsCard({
+    super.key,
+    required this.diagnostics,
+    this.initiallyExpanded = false,
+  });
+
+  @override
+  State<ImportDiagnosticsCard> createState() => _ImportDiagnosticsCardState();
+}
+
+class _ImportDiagnosticsCardState extends State<ImportDiagnosticsCard> {
+  late bool _expanded = widget.initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final skipped =
+        widget.diagnostics
+            .where((d) => d.kind == ImportDiagnosticKind.skipped)
+            .length;
+    final partial = widget.diagnostics.length - skipped;
+    final parts = [
+      if (skipped > 0) '跳过 $skipped 条',
+      if (partial > 0) '部分忽略 $partial 条',
+    ];
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 18,
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '未完整导入：${parts.join('，')}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(_expanded ? '收起' : '查看原因'),
+              ),
+            ],
+          ),
+          if (_expanded)
+            ...widget.diagnostics.map(
+              (d) => Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  d.message,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

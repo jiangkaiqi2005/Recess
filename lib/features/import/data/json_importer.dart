@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/features/import/domain/import_course.dart';
 
 /// JSON 课程导入器。采用「显式领域模板」——字段与 App 内部模型一一对应，
@@ -33,18 +34,18 @@ import 'package:recess/features/import/domain/import_course.dart';
 /// `platforms` 可选，按课程名给出课程平台，`purpose` 取
 /// `online_course` / `lab` / `homework` / `group` / `other`。
 ///
-/// 容错策略：单条记录字段非法时跳过该条并计入 [skipped]，其余照常导入。
+/// 容错策略：单条记录字段非法时跳过该条并计入诊断（整条未导入）；
+/// 记录保留但部分信息无效时（如部分周次越界、平台链接协议不允许）
+/// 保留记录并记为「部分忽略」，不改变原有容错行为。
 class JsonCourseImporter {
-  /// 返回导入课程、按课程名分组的课程平台与跳过的条目（用于 UI 提示）。
+  /// 返回导入课程、按课程名分组的课程平台与逐条诊断（用于 UI 提示）。
   static ({
     List<ImportCourse> courses,
     CoursePlatformGroups platforms,
-    List<String> skipped,
-  }) parse(
-    String jsonText, {
-    int? totalWeeks,
-  }) {
-    final skipped = <String>[];
+    List<ImportDiagnostic> diagnostics,
+  })
+  parse(String jsonText, {int? totalWeeks}) {
+    final diagnostics = <ImportDiagnostic>[];
     final List<dynamic> rawList;
     Object? rawPlatforms;
 
@@ -68,32 +69,54 @@ class JsonCourseImporter {
     for (var i = 0; i < rawList.length; i++) {
       final item = rawList[i];
       if (item is! Map) {
-        skipped.add('第${i + 1}条：非对象');
+        diagnostics.add(
+          ImportDiagnostic(
+            kind: ImportDiagnosticKind.skipped,
+            record: '第${i + 1}条',
+            reason: '非对象',
+          ),
+        );
         continue;
       }
       final map = Map<String, dynamic>.from(item);
-      final course = _parseOne(map, i, totalWeeks, skipped);
+      final course = _parseOne(map, i, totalWeeks, diagnostics);
       if (course != null) result.add(course);
     }
-    final platforms = parseCoursePlatformGroups(rawPlatforms, skipped: skipped);
-    return (courses: result, platforms: platforms, skipped: skipped);
+    final platforms = parseCoursePlatformGroups(
+      rawPlatforms,
+      diagnostics: diagnostics,
+    );
+    return (courses: result, platforms: platforms, diagnostics: diagnostics);
   }
 
   static ImportCourse? _parseOne(
     Map<String, dynamic> m,
     int index,
     int? totalWeeks,
-    List<String> skipped,
+    List<ImportDiagnostic> diagnostics,
   ) {
+    final record = '第${index + 1}条';
     final name = m['name']?.toString().trim();
     if (name == null || name.isEmpty) {
-      skipped.add('第${index + 1}条：缺少 name');
+      diagnostics.add(
+        ImportDiagnostic(
+          kind: ImportDiagnosticKind.skipped,
+          record: record,
+          reason: '缺少 name',
+        ),
+      );
       return null;
     }
 
     final dayOfWeek = _toInt(m['dayOfWeek']);
     if (dayOfWeek == null || dayOfWeek < 1 || dayOfWeek > 7) {
-      skipped.add('第${index + 1}条：dayOfWeek 非法');
+      diagnostics.add(
+        ImportDiagnostic(
+          kind: ImportDiagnosticKind.skipped,
+          record: record,
+          reason: 'dayOfWeek 非法',
+        ),
+      );
       return null;
     }
     final startSection = _toInt(m['startSection']) ?? 1;
@@ -101,24 +124,65 @@ class JsonCourseImporter {
     if (startSection < 1 ||
         endSection > AppConstants.maxSections ||
         endSection < startSection) {
-      skipped.add('第${index + 1}条：节次非法');
+      diagnostics.add(
+        ImportDiagnostic(
+          kind: ImportDiagnosticKind.skipped,
+          record: record,
+          reason: '节次非法',
+        ),
+      );
       return null;
     }
 
     List<int> weeks;
     if (m['weeks'] is List) {
-      weeks = (m['weeks'] as List)
-          .map((w) => _toInt(w))
-          .where((w) => w != null)
-          .cast<int>()
-          .where((w) => w >= 1 && (totalWeeks == null || w <= totalWeeks))
-          .toList();
-      if (weeks.isEmpty) {
-        skipped.add('第${index + 1}条：周次为空');
+      final rawWeeks = (m['weeks'] as List).map(_toInt).toList();
+      final inRange =
+          rawWeeks
+              .where(
+                (w) =>
+                    w != null &&
+                    w >= 1 &&
+                    (totalWeeks == null || w <= totalWeeks),
+              )
+              .cast<int>()
+              .toList();
+      final outOfRange =
+          rawWeeks
+              .where(
+                (w) =>
+                    w != null &&
+                    (w < 1 || (totalWeeks != null && w > totalWeeks)),
+              )
+              .length;
+      if (inRange.isEmpty) {
+        diagnostics.add(
+          ImportDiagnostic(
+            kind: ImportDiagnosticKind.skipped,
+            record: record,
+            reason: '周次为空',
+          ),
+        );
         return null;
       }
+      if (outOfRange > 0) {
+        diagnostics.add(
+          ImportDiagnostic(
+            kind: ImportDiagnosticKind.partial,
+            record: record,
+            reason: '$outOfRange 个周次超出学期范围，已忽略',
+          ),
+        );
+      }
+      weeks = inRange;
     } else {
-      skipped.add('第${index + 1}条：缺少周次');
+      diagnostics.add(
+        ImportDiagnostic(
+          kind: ImportDiagnosticKind.skipped,
+          record: record,
+          reason: '缺少周次',
+        ),
+      );
       return null;
     }
 

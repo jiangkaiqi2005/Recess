@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/domain/import_course.dart';
@@ -29,7 +30,10 @@ class ImportState {
   final List<ImportCourse> courses;
   final String? errorMessage;
   final int importedCount;
-  final List<String> skipped;
+
+  /// 本次文件的逐条导入诊断：随预览、错误、提交失败与完成状态保留，
+  /// 选择新文件时整体清理（见 [ImportNotifier.pickAndParse]）。
+  final List<ImportDiagnostic> diagnostics;
   final int totalWeeks;
   final ImportMode mode;
 
@@ -41,7 +45,7 @@ class ImportState {
     this.courses = const [],
     this.errorMessage,
     this.importedCount = 0,
-    this.skipped = const [],
+    this.diagnostics = const [],
     this.totalWeeks = 18,
     this.mode = ImportMode.replace,
     this.platforms = const {},
@@ -52,27 +56,27 @@ class ImportState {
     List<ImportCourse>? courses,
     String? errorMessage,
     int? importedCount,
-    List<String>? skipped,
+    List<ImportDiagnostic>? diagnostics,
     int? totalWeeks,
     ImportMode? mode,
     CoursePlatformGroups? platforms,
-  }) =>
-      ImportState(
-        status: status ?? this.status,
-        courses: courses ?? this.courses,
-        errorMessage: errorMessage ?? this.errorMessage,
-        importedCount: importedCount ?? this.importedCount,
-        skipped: skipped ?? this.skipped,
-        totalWeeks: totalWeeks ?? this.totalWeeks,
-        mode: mode ?? this.mode,
-        platforms: platforms ?? this.platforms,
-      );
+  }) => ImportState(
+    status: status ?? this.status,
+    courses: courses ?? this.courses,
+    errorMessage: errorMessage ?? this.errorMessage,
+    importedCount: importedCount ?? this.importedCount,
+    diagnostics: diagnostics ?? this.diagnostics,
+    totalWeeks: totalWeeks ?? this.totalWeeks,
+    mode: mode ?? this.mode,
+    platforms: platforms ?? this.platforms,
+  );
 
   int get selectedCount => courses.where((c) => c.selected).length;
 }
 
-final importProvider =
-    StateNotifierProvider<ImportNotifier, ImportState>((ref) {
+final importProvider = StateNotifierProvider<ImportNotifier, ImportState>((
+  ref,
+) {
   return ImportNotifier(ref);
 });
 
@@ -89,7 +93,14 @@ class ImportNotifier extends StateNotifier<ImportState> {
         state.status != ImportStatus.done) {
       return;
     }
-    state = state.copyWith(status: ImportStatus.picking, errorMessage: null);
+    // 换文件：旧文件的课程、平台与诊断一并清理，避免跨文件串用。
+    state = state.copyWith(
+      status: ImportStatus.picking,
+      errorMessage: null,
+      courses: const [],
+      diagnostics: const [],
+      platforms: const {},
+    );
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -115,13 +126,16 @@ class ImportNotifier extends StateNotifier<ImportState> {
         return;
       }
 
-      final (courses, platforms, skipped) =
-          _parseByType(ext, content, semester);
+      final (courses, platforms, diagnostics) = _parseByType(
+        ext,
+        content,
+        semester,
+      );
       if (courses.isEmpty) {
         state = state.copyWith(
           status: ImportStatus.error,
           errorMessage: '未能从文件中解析出任何课程，请检查格式。',
-          skipped: skipped,
+          diagnostics: diagnostics,
         );
         return;
       }
@@ -129,13 +143,14 @@ class ImportNotifier extends StateNotifier<ImportState> {
         status: ImportStatus.preview,
         courses: courses,
         totalWeeks: semester.totalWeeks,
-        skipped: skipped,
+        diagnostics: diagnostics,
         platforms: platforms,
       );
     } catch (e) {
       state = state.copyWith(
         status: ImportStatus.error,
         errorMessage: '解析失败：${e.toString()}',
+        diagnostics: const [],
       );
     }
   }
@@ -201,37 +216,31 @@ class ImportNotifier extends StateNotifier<ImportState> {
     return repo.getActiveSemester();
   }
 
-  (List<ImportCourse>, CoursePlatformGroups, List<String>)
-      _parseByType(
-    String ext,
-    String content,
-    Semester semester,
-  ) {
+  (List<ImportCourse>, CoursePlatformGroups, List<ImportDiagnostic>)
+  _parseByType(String ext, String content, Semester semester) {
     switch (ext) {
       case 'json':
         final result = JsonCourseImporter.parse(
           content,
           totalWeeks: semester.totalWeeks,
         );
-        return (result.courses, result.platforms, result.skipped);
+        return (result.courses, result.platforms, result.diagnostics);
       case 'ics':
-        // ICS 不携带课程平台。
+        // ICS 不携带课程平台；无效事件的原因按源事件记入诊断。
+        final diagnostics = <ImportDiagnostic>[];
         return (
           IcsCourseParser.parse(
             content,
             semesterStart: semester.startDate,
             totalWeeks: semester.totalWeeks,
+            diagnostics: diagnostics,
           ),
           const {},
-          const <String>[],
+          diagnostics,
         );
       default:
         // 不支持的格式，返回空。
-        return (
-          const <ImportCourse>[],
-          const {},
-          const <String>[],
-        );
+        return (const <ImportCourse>[], const {}, const <ImportDiagnostic>[]);
     }
   }
 
@@ -247,18 +256,18 @@ class ImportNotifier extends StateNotifier<ImportState> {
 /// [ImportCourse] 的私有便捷复制（仅翻转 selected），避免对外暴露可变字段。
 extension _ImportCourseCopy on ImportCourse {
   ImportCourse _copyWithSelected(bool selected) => ImportCourse(
-        name: name,
-        teacher: teacher,
-        location: location,
-        dayOfWeek: dayOfWeek,
-        startSection: startSection,
-        endSection: endSection,
-        startTime: startTime,
-        endTime: endTime,
-        weeks: weeks,
-        colorValue: colorValue,
-        notes: notes,
-        source: source,
-        selected: selected,
-      );
+    name: name,
+    teacher: teacher,
+    location: location,
+    dayOfWeek: dayOfWeek,
+    startSection: startSection,
+    endSection: endSection,
+    startTime: startTime,
+    endTime: endTime,
+    weeks: weeks,
+    colorValue: colorValue,
+    notes: notes,
+    source: source,
+    selected: selected,
+  );
 }

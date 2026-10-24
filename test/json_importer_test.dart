@@ -2,21 +2,34 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/features/import/data/json_importer.dart';
 
 void main() {
   test('显式 JSON 颜色保留旧色和自定义 ARGB，不替换为显示色', () {
     const rawColors = ['#C08CE8', '#F08C7C', '#E3753F', '#80123456'];
-    final result = JsonCourseImporter.parse(jsonEncode({
-      'courses': [
-        for (var i = 0; i < rawColors.length; i++) {
-          'name': '课程$i', 'dayOfWeek': 1, 'startSection': 1,
-          'endSection': 2, 'weeks': [1], 'color': rawColors[i],
-        },
-      ],
-    }), totalWeeks: 18);
-    expect(result.courses.map((c) => c.colorValue),
-        [0xFFC08CE8, 0xFFF08C7C, 0xFFE3753F, 0x80123456]);
+    final result = JsonCourseImporter.parse(
+      jsonEncode({
+        'courses': [
+          for (var i = 0; i < rawColors.length; i++)
+            {
+              'name': '课程$i',
+              'dayOfWeek': 1,
+              'startSection': 1,
+              'endSection': 2,
+              'weeks': [1],
+              'color': rawColors[i],
+            },
+        ],
+      }),
+      totalWeeks: 18,
+    );
+    expect(result.courses.map((c) => c.colorValue), [
+      0xFFC08CE8,
+      0xFFF08C7C,
+      0xFFE3753F,
+      0x80123456,
+    ]);
   });
 
   group('JsonCourseImporter - 合法模板', () {
@@ -32,8 +45,8 @@ void main() {
           'weeks': [1, 2, 3, 4, 5],
           'color': '#5B8DEF',
           'notes': '带书',
-        }
-      ]
+        },
+      ],
     });
 
     final result = JsonCourseImporter.parse(json, totalWeeks: 18);
@@ -60,9 +73,21 @@ void main() {
     test('非法 dayOfWeek 被跳过并计入 skipped', () {
       final json = jsonEncode({
         'courses': [
-          {'name': '有效', 'dayOfWeek': 1, 'startSection': 1, 'endSection': 2, 'weeks': [1, 2, 3]},
-          {'name': '非法星期', 'dayOfWeek': 9, 'startSection': 1, 'endSection': 2, 'weeks': [1, 2, 3]},
-        ]
+          {
+            'name': '有效',
+            'dayOfWeek': 1,
+            'startSection': 1,
+            'endSection': 2,
+            'weeks': [1, 2, 3],
+          },
+          {
+            'name': '非法星期',
+            'dayOfWeek': 9,
+            'startSection': 1,
+            'endSection': 2,
+            'weeks': [1, 2, 3],
+          },
+        ],
       });
       final result = JsonCourseImporter.parse(json, totalWeeks: 18);
       expect(result.courses, hasLength(1));
@@ -71,8 +96,13 @@ void main() {
     test('缺少 name 被跳过', () {
       final json = jsonEncode({
         'courses': [
-          {'dayOfWeek': 1, 'startSection': 1, 'endSection': 2, 'weeks': [1, 2, 3]},
-        ]
+          {
+            'dayOfWeek': 1,
+            'startSection': 1,
+            'endSection': 2,
+            'weeks': [1, 2, 3],
+          },
+        ],
       });
       final result = JsonCourseImporter.parse(json, totalWeeks: 18);
       expect(result.courses, isEmpty);
@@ -87,8 +117,8 @@ void main() {
             'startSection': 1,
             'endSection': 2,
             'weeks': [1, 2, 30],
-          }
-        ]
+          },
+        ],
       });
       final result = JsonCourseImporter.parse(json, totalWeeks: 18);
       expect(result.courses.first.weeks, [1, 2]);
@@ -98,7 +128,13 @@ void main() {
   group('JsonCourseImporter - 顶层为数组', () {
     test('直接数组也可解析', () {
       final json = jsonEncode([
-        {'name': 'A', 'dayOfWeek': 1, 'startSection': 1, 'endSection': 2, 'weeks': [1, 2, 3]}
+        {
+          'name': 'A',
+          'dayOfWeek': 1,
+          'startSection': 1,
+          'endSection': 2,
+          'weeks': [1, 2, 3],
+        },
       ]);
       final result = JsonCourseImporter.parse(json, totalWeeks: 18);
       expect(result.courses, hasLength(1));
@@ -111,11 +147,21 @@ void main() {
     test('顶层 platforms 按课程名解析，非法条目跳过并计入 skipped', () {
       final json = jsonEncode({
         'courses': [
-          {'name': '操作系统', 'dayOfWeek': 2, 'startSection': 3, 'endSection': 4, 'weeks': [1, 2]},
+          {
+            'name': '操作系统',
+            'dayOfWeek': 2,
+            'startSection': 3,
+            'endSection': 4,
+            'weeks': [1, 2],
+          },
         ],
         'platforms': {
           '操作系统': [
-            {'purpose': 'online_course', 'name': '学习通', 'url': 'https://mooc1.chaoxing.com'},
+            {
+              'purpose': 'online_course',
+              'name': '学习通',
+              'url': 'https://mooc1.chaoxing.com',
+            },
             {'purpose': 'group', 'name': 'QQ 群', 'url': ''},
             {'purpose': '网课', 'name': '用了中文用途'},
             {'purpose': 'lab'},
@@ -137,18 +183,101 @@ void main() {
           CoursePlatform(purpose: CoursePlatformPurpose.group, name: 'QQ 群'),
         ],
       });
-      expect(result.skipped, hasLength(3));
+      expect(result.diagnostics, hasLength(3));
     });
 
     test('没有 platforms 字段时平台为空', () {
       final json = jsonEncode({
         'courses': [
-          {'name': 'A', 'dayOfWeek': 1, 'startSection': 1, 'endSection': 2, 'weeks': [1]},
+          {
+            'name': 'A',
+            'dayOfWeek': 1,
+            'startSection': 1,
+            'endSection': 2,
+            'weeks': [1],
+          },
         ],
       });
       final result = JsonCourseImporter.parse(json, totalWeeks: 18);
       expect(result.platforms, isEmpty);
-      expect(result.skipped, isEmpty);
+      expect(result.diagnostics, isEmpty);
+    });
+  });
+
+  group('JsonCourseImporter - 诊断原因矩阵', () {
+    Map<String, Object> course(Map<String, Object> overrides) => {
+      'name': '课程',
+      'dayOfWeek': 1,
+      'startSection': 1,
+      'endSection': 2,
+      'weeks': [1, 2],
+      ...overrides,
+    };
+
+    List<ImportDiagnostic> diagnose(List<Object> courses) =>
+        JsonCourseImporter.parse(
+          jsonEncode({'courses': courses}),
+          totalWeeks: 18,
+        ).diagnostics;
+
+    test('各跳过原因按源记录序号如实给出', () {
+      expect(
+        diagnose([
+          course({'name': ''}),
+          course({'dayOfWeek': 8}),
+          course({'endSection': 99}),
+          course({'weeks': <int>[]}),
+          course({'weeks': 'not-a-list'}),
+          'not-a-map',
+        ]).map((d) => (d.kind, d.record, d.reason)),
+        [
+          (ImportDiagnosticKind.skipped, '第1条', '缺少 name'),
+          (ImportDiagnosticKind.skipped, '第2条', 'dayOfWeek 非法'),
+          (ImportDiagnosticKind.skipped, '第3条', '节次非法'),
+          (ImportDiagnosticKind.skipped, '第4条', '周次为空'),
+          (ImportDiagnosticKind.skipped, '第5条', '缺少周次'),
+          (ImportDiagnosticKind.skipped, '第6条', '非对象'),
+        ],
+      );
+    });
+
+    test('部分周次越界：记录保留，仅记部分忽略', () {
+      final diagnostics = diagnose([
+        course({
+          'weeks': [1, 19, 30, 'x'],
+        }),
+      ]);
+      expect(diagnostics, hasLength(1));
+      expect(
+        (diagnostics.single.kind, diagnostics.single.record),
+        (ImportDiagnosticKind.partial, '第1条'),
+      );
+      expect(diagnostics.single.reason, contains('2 个周次'));
+    });
+
+    test('课程平台诊断区分整条跳过与仅链接被忽略', () {
+      final diagnostics =
+          JsonCourseImporter.parse(
+            jsonEncode({
+              'courses': [course({})],
+              'platforms': {
+                '课程': [
+                  'not-a-map',
+                  {'purpose': 'unknown', 'name': '学习通'},
+                  {'purpose': 'lab'},
+                  {'purpose': 'other', 'name': '群', 'url': 'intent://bad'},
+                ],
+              },
+            }),
+            totalWeeks: 18,
+          ).diagnostics;
+
+      expect(diagnostics.map((d) => (d.kind, d.record, d.reason)), [
+        const (ImportDiagnosticKind.skipped, '课程平台「课程」第1条', '非对象'),
+        const (ImportDiagnosticKind.skipped, '课程平台「课程」第2条', '用途或平台名非法'),
+        const (ImportDiagnosticKind.skipped, '课程平台「课程」第3条', '用途或平台名非法'),
+        const (ImportDiagnosticKind.partial, '课程平台「课程」第4条', '链接协议不允许，已忽略'),
+      ]);
     });
   });
 }

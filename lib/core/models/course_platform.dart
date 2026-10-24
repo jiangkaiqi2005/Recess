@@ -1,3 +1,5 @@
+import 'import_diagnostic.dart';
+
 /// 课程平台的用途。[key] 是持久化与备份 JSON 中使用的稳定键，不随文案变化。
 enum CoursePlatformPurpose {
   onlineCourse('online_course', '网课'),
@@ -64,11 +66,12 @@ bool isAllowedPlatformUrl(String url) {
 /// 解析 JSON 中的 `platforms` 字段：`{"<课程名>": [{"purpose", "name", "url"}]}`。
 ///
 /// 备份恢复与 JSON 课表导入共用。用途键未知、平台名为空或条目不是对象时跳过
-/// 该条，并把原因追加到 [skipped]；链接协议非 http/https 时保留条目但忽略
-/// 链接，同样记入 [skipped]；字段整体不是对象时视为没有平台。
+/// 该条（整条未导入，记 [ImportDiagnosticKind.skipped]）；链接协议非
+/// http/https 时保留条目但忽略链接，同样记入 [diagnostics]
+///（[ImportDiagnosticKind.partial]）；字段整体不是对象时视为没有平台。
 CoursePlatformGroups parseCoursePlatformGroups(
   Object? raw, {
-  List<String>? skipped,
+  List<ImportDiagnostic>? diagnostics,
 }) {
   final CoursePlatformGroups result = {};
   if (raw is! Map) return result;
@@ -76,13 +79,26 @@ CoursePlatformGroups parseCoursePlatformGroups(
     final courseName = entry.key.toString().trim();
     final items = entry.value;
     if (courseName.isEmpty || items is! List) {
-      skipped?.add('课程平台「$courseName」：格式非法');
+      diagnostics?.add(
+        ImportDiagnostic(
+          kind: ImportDiagnosticKind.skipped,
+          record: courseName.isEmpty ? '课程平台' : '课程平台「$courseName」',
+          reason: '分组格式非法',
+        ),
+      );
       continue;
     }
     for (var i = 0; i < items.length; i++) {
+      final record = '课程平台「$courseName」第${i + 1}条';
       final item = items[i];
       if (item is! Map) {
-        skipped?.add('课程平台「$courseName」第${i + 1}条：非对象');
+        diagnostics?.add(
+          ImportDiagnostic(
+            kind: ImportDiagnosticKind.skipped,
+            record: record,
+            reason: '非对象',
+          ),
+        );
         continue;
       }
       final purpose = CoursePlatformPurpose.fromKey(
@@ -90,13 +106,25 @@ CoursePlatformGroups parseCoursePlatformGroups(
       );
       final name = item['name']?.toString().trim() ?? '';
       if (purpose == null || name.isEmpty) {
-        skipped?.add('课程平台「$courseName」第${i + 1}条：用途或平台名非法');
+        diagnostics?.add(
+          ImportDiagnostic(
+            kind: ImportDiagnosticKind.skipped,
+            record: record,
+            reason: '用途或平台名非法',
+          ),
+        );
         continue;
       }
       var url = item['url']?.toString().trim();
       if (url != null && url.isNotEmpty && !isAllowedPlatformUrl(url)) {
         url = null;
-        skipped?.add('课程平台「$courseName」第${i + 1}条：链接协议不允许，已忽略');
+        diagnostics?.add(
+          ImportDiagnostic(
+            kind: ImportDiagnosticKind.partial,
+            record: record,
+            reason: '链接协议不允许，已忽略',
+          ),
+        );
       }
       result
           .putIfAbsent(courseName, () => [])

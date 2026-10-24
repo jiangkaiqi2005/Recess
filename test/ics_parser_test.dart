@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/features/import/data/ics_parser.dart';
 
 /// 学期：2024-09-02（周一）开学，18 周。
@@ -22,8 +23,11 @@ END:VEVENT
 END:VCALENDAR
 ''';
 
-    final courses =
-        IcsCourseParser.parse(ics, semesterStart: _start, totalWeeks: _totalWeeks);
+    final courses = IcsCourseParser.parse(
+      ics,
+      semesterStart: _start,
+      totalWeeks: _totalWeeks,
+    );
 
     test('解析出一门课', () {
       expect(courses, hasLength(1));
@@ -62,8 +66,11 @@ RRULE:FREQ=WEEKLY;BYDAY=MO,WE;COUNT=18
 END:VEVENT
 END:VCALENDAR
 ''';
-    final courses =
-        IcsCourseParser.parse(ics, semesterStart: _start, totalWeeks: _totalWeeks);
+    final courses = IcsCourseParser.parse(
+      ics,
+      semesterStart: _start,
+      totalWeeks: _totalWeeks,
+    );
 
     test('MO/WE 各生成一条', () {
       expect(courses, hasLength(2));
@@ -84,14 +91,16 @@ RRULE:FREQ=WEEKLY;BYDAY=TU;INTERVAL=2;COUNT=9
 END:VEVENT
 END:VCALENDAR
 ''';
-    final courses =
-        IcsCourseParser.parse(ics, semesterStart: _start, totalWeeks: _totalWeeks);
+    final courses = IcsCourseParser.parse(
+      ics,
+      semesterStart: _start,
+      totalWeeks: _totalWeeks,
+    );
 
     test('生成 9 条且为奇数周', () {
       expect(courses, hasLength(1));
       expect(courses.first.dayOfWeek, 2); // 周二
-      expect(courses.first.weeks,
-          [1, 3, 5, 7, 9, 11, 13, 15, 17]);
+      expect(courses.first.weeks, [1, 3, 5, 7, 9, 11, 13, 15, 17]);
     });
   });
 
@@ -107,8 +116,11 @@ RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=18
 END:VEVENT
 END:VCALENDAR
 ''';
-    final courses =
-        IcsCourseParser.parse(ics, semesterStart: _start, totalWeeks: _totalWeeks);
+    final courses = IcsCourseParser.parse(
+      ics,
+      semesterStart: _start,
+      totalWeeks: _totalWeeks,
+    );
 
     test('折叠行被合并解析', () {
       expect(courses, hasLength(1));
@@ -128,11 +140,96 @@ RRULE:FREQ=WEEKLY;BYDAY=TH;COUNT=18
 END:VEVENT
 END:VCALENDAR
 ''';
-    final courses =
-        IcsCourseParser.parse(ics, semesterStart: _start, totalWeeks: _totalWeeks);
+    final courses = IcsCourseParser.parse(
+      ics,
+      semesterStart: _start,
+      totalWeeks: _totalWeeks,
+    );
 
     test('开学前的课程被跳过', () {
       expect(courses, isEmpty);
+    });
+  });
+
+  group('IcsCourseParser - 诊断', () {
+    String vevent({
+      String? summary,
+      String? dtstart,
+      String? dtend,
+      String rrule = 'RRULE:FREQ=WEEKLY;COUNT=2',
+    }) => [
+      'BEGIN:VEVENT',
+      if (summary != null) 'SUMMARY:$summary',
+      if (dtstart != null) 'DTSTART:$dtstart',
+      if (dtend != null) 'DTEND:$dtend',
+      rrule,
+      'END:VEVENT',
+    ].join('\n');
+
+    List<ImportDiagnostic> diagnose(List<String> events) {
+      final diagnostics = <ImportDiagnostic>[];
+      IcsCourseParser.parse(
+        'BEGIN:VCALENDAR\n${events.join('\n')}\nEND:VCALENDAR',
+        semesterStart: _start,
+        totalWeeks: _totalWeeks,
+        diagnostics: diagnostics,
+      );
+      return diagnostics;
+    }
+
+    test('各跳过原因按源事件序号如实给出', () {
+      expect(
+        diagnose([
+          vevent(summary: '无开始时间', dtend: '20240902T094000'),
+          vevent(summary: '坏时间', dtstart: 'not-a-date'),
+          vevent(summary: '提前课', dtstart: '20240801T080000'),
+          vevent(summary: '超学期', dtstart: '20250106T080000'),
+          vevent(
+            summary: '倒置',
+            dtstart: '20240902T100000',
+            dtend: '20240902T080000',
+          ),
+          vevent(
+            summary: '好课',
+            dtstart: '20240902T080000',
+            dtend: '20240902T094000',
+          ),
+        ]).map((d) => (d.kind, d.record, d.reason)),
+        [
+          const (ImportDiagnosticKind.skipped, '第1个事件「无开始时间」', '缺少开始时间'),
+          const (ImportDiagnosticKind.skipped, '第2个事件「坏时间」', '开始时间无法解析'),
+          const (ImportDiagnosticKind.skipped, '第3个事件「提前课」', '开始日期早于开学日'),
+          const (ImportDiagnosticKind.skipped, '第4个事件「超学期」', '上课日期未落在学期周次内'),
+          const (ImportDiagnosticKind.skipped, '第5个事件「倒置」', '结束时间早于开始时间'),
+        ],
+      );
+    });
+
+    test('BYDAY 展开前的跳过按源事件计数，不按展开后的课程数放大', () {
+      final diagnostics = diagnose([
+        vevent(
+          summary: '双日提前课',
+          dtstart: '20240801T080000',
+          dtend: '20240801T094000',
+          rrule: 'RRULE:FREQ=WEEKLY;BYDAY=MO,WE;COUNT=2',
+        ),
+      ]);
+      expect(diagnostics, hasLength(1));
+      expect(diagnostics.single.record, '第1个事件「双日提前课」');
+    });
+
+    test('全部事件有效时无诊断，无 SUMMARY 的事件用序号标识', () {
+      expect(
+        diagnose([
+          vevent(dtstart: '20240902T080000', dtend: '20240902T094000'),
+          vevent(
+            summary: '好课',
+            dtstart: '20240903T080000',
+            dtend: '20240903T094000',
+          ),
+        ]),
+        isEmpty,
+      );
     });
   });
 }
