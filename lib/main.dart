@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:recess/app/build_error_fallback.dart';
 import 'package:recess/app/router.dart';
 import 'package:recess/core/theme/app_theme.dart';
 import 'package:recess/features/notification/application/notification_service.dart';
@@ -24,6 +25,9 @@ class RecessApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 应用根部统一安装界面构建失败兜底：异常仍走 Flutter 原有错误通道，
+    // 这里只接管出错位置的显示（路由错误页与数据加载重试各自独立处理）。
+    ErrorWidget.builder = buildErrorFallback;
     final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'Recess',
