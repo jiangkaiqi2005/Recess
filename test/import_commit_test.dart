@@ -21,6 +21,8 @@ import 'package:recess/features/import/application/webview_import_provider.dart'
 import 'package:recess/features/import/application/course_capture_orientation.dart';
 import 'package:recess/features/import/presentation/webview_import_screen.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
+import 'package:recess/features/course/domain/course_clock.dart';
+import 'package:recess/features/settings/application/section_times_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -71,6 +73,179 @@ void main() {
     }
     await semesters.setActive('s1');
   });
+
+  for (final sample in [
+    (
+      name: '无钟点',
+      start: null,
+      end: null,
+      explicit: false,
+      range: ('08:00', '09:40'),
+    ),
+    (
+      name: '只开始',
+      start: '08:30',
+      end: null,
+      explicit: true,
+      range: ('08:30', '09:40'),
+    ),
+    (
+      name: '只结束',
+      start: null,
+      end: '09:00',
+      explicit: true,
+      range: ('08:00', '09:00'),
+    ),
+    (
+      name: '完整钟点',
+      start: '08:30',
+      end: '09:00',
+      explicit: true,
+      range: ('08:30', '09:00'),
+    ),
+    (
+      name: '坏钟点',
+      start: '不是钟点',
+      end: null,
+      explicit: true,
+      range: ('不是钟点', '09:40'),
+    ),
+  ]) {
+    test('普通JSON ${sample.name}经勾选与提交后保留独立端点语义', () async {
+      picker.content = jsonEncode({
+        'courses': [
+          {
+            'name': sample.name,
+            'dayOfWeek': 1,
+            'startSection': 1,
+            'endSection': 2,
+            'weeks': [1],
+            'startTime': sample.start,
+            'endTime': sample.end,
+          },
+        ],
+      });
+      final notifier = container.read(importProvider.notifier);
+      await notifier.pickAndParse();
+      notifier.toggleSelected(0);
+      notifier.toggleSelected(0);
+      await notifier.confirmImport();
+      await container.read(sectionTimesProvider.notifier).setAllTimes(const {
+        1: SectionTime('08:00', 45),
+        2: SectionTime('08:55', 45),
+      });
+      final course =
+          (await container.read(courseRepositoryProvider).getCourses('s1'))
+              .single;
+      expect(course.useExplicitTimes, sample.explicit);
+      final clock = CourseClock(course, container.read(sectionTimesProvider));
+      expect((clock.startTime, clock.endTime), sample.range);
+    });
+  }
+
+  for (final app in ['recess', 'hormone']) {
+    test('$app旧课程列表备份不把旧快照当作普通JSON独立钟点', () async {
+      picker.content = jsonEncode({
+        'app': app,
+        'courses': [_jsonCourse('旧快照')],
+      });
+      final notifier = container.read(importProvider.notifier);
+      await notifier.pickAndParse();
+      notifier.setAllSelected(false);
+      notifier.setAllSelected(true);
+      await notifier.confirmImport();
+      final course =
+          (await container.read(courseRepositoryProvider).getCourses('s1'))
+              .single;
+      expect(course.useExplicitTimes, false);
+      expect((course.startTime, course.endTime), ('10:05', '11:40'));
+      final clock = CourseClock(course, const {
+        3: SectionTime('08:00', 45),
+        4: SectionTime('08:55', 45),
+      });
+      expect((clock.startTime, clock.endTime), ('08:00', '09:40'));
+    });
+  }
+
+  test('Recess课程列表中的明确独立钟点经文件勾选与提交保留', () async {
+    picker.content = jsonEncode({
+      'app': 'recess',
+      'courses': [
+        {..._jsonCourse('独立钟点'), 'useExplicitTimes': true},
+      ],
+    });
+    final notifier = container.read(importProvider.notifier);
+    await notifier.pickAndParse();
+    notifier.setAllSelected(false);
+    notifier.setAllSelected(true);
+    await notifier.confirmImport();
+    final course =
+        (await container.read(courseRepositoryProvider).getCourses('s1'))
+            .single;
+    expect(course.useExplicitTimes, true);
+    final clock = CourseClock(course, const {
+      3: SectionTime('08:00', 45),
+      4: SectionTime('08:55', 45),
+    });
+    expect((clock.startTime, clock.endTime), ('10:05', '11:40'));
+  });
+
+  test('ICS只有开始钟点时，修改作息仍保留开始并逐端回退结束', () async {
+    picker.extension = 'ics';
+    picker.content = '''BEGIN:VCALENDAR
+BEGIN:VEVENT
+SUMMARY:只有开始
+DTSTART:20260907T090500
+END:VEVENT
+END:VCALENDAR''';
+    final notifier = container.read(importProvider.notifier);
+    await notifier.pickAndParse();
+    await notifier.confirmImport();
+    final course =
+        (await container.read(courseRepositoryProvider).getCourses('s1'))
+            .single;
+    expect(course.useExplicitTimes, true);
+    expect((course.startSection, course.endSection), (2, 2));
+    final clock = CourseClock(course, const {2: SectionTime('10:00', 45)});
+    expect((clock.startTime, clock.endTime), ('09:05', '10:45'));
+  });
+
+  test('完整Recess备份从文件入口拒绝并指向恢复入口，原课表保持', () async {
+    picker.content = await container
+        .read(backupRepositoryProvider)
+        .exportJson();
+    final notifier = container.read(importProvider.notifier);
+    await notifier.pickAndParse();
+    expect(container.read(importProvider).status, ImportStatus.error);
+    expect(container.read(importProvider).errorMessage, contains('从备份恢复'));
+    await notifier.confirmImport();
+    expect(
+      (await container.read(courseRepositoryProvider).getCourses('s1'))
+          .single
+          .id,
+      'old-s1',
+    );
+  });
+
+  for (final unsupported in ['unknown-clock-mode', 1, null]) {
+    test('文件未知钟点语义 $unsupported 在写库前拒绝', () async {
+      picker.content = jsonEncode({
+        'courses': [
+          {..._jsonCourse('未知'), 'useExplicitTimes': unsupported},
+        ],
+      });
+      final notifier = container.read(importProvider.notifier);
+      await notifier.pickAndParse();
+      expect(container.read(importProvider).status, ImportStatus.error);
+      await notifier.confirmImport();
+      expect(
+        (await container.read(courseRepositoryProvider).getCourses('s1'))
+            .single
+            .id,
+        'old-s1',
+      );
+    });
+  }
 
   testWidgets('教务预览显示跳过原因和周次冲突并阻止提交', (tester) async {
     await tester.runAsync(() async {
@@ -279,7 +454,6 @@ void main() {
       semesterId: semester.id,
       mode: ImportMode.replace,
       courses: notifier.state.courses,
-      sectionTimes: const {},
       previewContext: preview.context,
     );
     expect(submission.courses.length, notifier.state.selectedCount);
@@ -316,7 +490,6 @@ void main() {
       semesterId: semester.id,
       mode: ImportMode.replace,
       courses: preview.courses,
-      sectionTimes: const {},
       previewContext: preview.context,
     );
     await expectLater(
@@ -346,7 +519,6 @@ void main() {
       semesterId: semester.id,
       mode: ImportMode.replace,
       courses: corrected.courses,
-      sectionTimes: const {},
       previewContext: corrected.context,
     );
     expect(await container.read(importCommitProvider).commit(fresh), 1);
@@ -470,11 +642,11 @@ void main() {
       final physics = courses.singleWhere((c) => c.name == '物理');
       expect(
         (math.startTime, math.endTime, math.colorValue),
-        ('10:00', '11:40', 0xFF4399F1),
+        (null, null, 0xFF4399F1),
       );
       expect(
         (physics.startTime, physics.endTime, physics.colorValue),
-        ('08:00', '09:40', 0xFF4BA89A),
+        (null, null, 0xFF4BA89A),
       );
       expect(
         (await container
@@ -685,6 +857,9 @@ END:VCALENDAR''';
       ('高数', '09:05', '10:40'),
     );
     expect(course.weeks, [1]);
+    expect(course.useExplicitTimes, true);
+    final clock = CourseClock(course, const {1: SectionTime('07:00', 45), 3: SectionTime('11:00', 45)});
+    expect((clock.startTime, clock.endTime), ('09:05', '10:40'));
     expect(container.read(importProvider).importedCount, 1);
     expect(
       await container
@@ -767,7 +942,6 @@ END:VCALENDAR''';
       semesterId: 's1',
       mode: ImportMode.replace,
       courses: preview.courses,
-      sectionTimes: const {},
       previewContext: preview.context,
     );
     expect(await container.read(importCommitProvider).commit(submission), 0);

@@ -383,6 +383,75 @@ void main() {
     );
   });
 
+  test('新备份往返保留逐门钟点语义，跟随课程的旧钟点原样保留', () async {
+    await semesters.upsert(
+      Semester(
+        id: 's',
+        name: '学期',
+        startDate: DateTime(2026, 9, 7),
+        totalWeeks: 18,
+      ),
+      activate: true,
+    );
+    const following = Course(
+      id: 'follow',
+      semesterId: 's',
+      name: '教务课程',
+      dayOfWeek: 7,
+      startSection: 6,
+      endSection: 9,
+      weeks: [7],
+      startTime: '14:55',
+      endTime: '19:45',
+    );
+    final independent = following.copyWith(
+      id: 'file',
+      name: '独立钟点课程',
+      useExplicitTimes: true,
+    );
+    await courses.upsert(following);
+    await courses.upsert(independent);
+    final invalid = independent.copyWith(
+      id: 'invalid',
+      name: '原始空钟点',
+      startTime: '',
+      endTime: '不是钟点',
+    );
+    await courses.upsert(invalid);
+    final exported = await backup.exportJson();
+    await backup.restore(exported);
+    expect(await courses.getCourse('follow'), following);
+    expect(await courses.getCourse('file'), independent);
+    expect(await courses.getCourse('invalid'), invalid);
+  });
+
+  test('旧备份缺少钟点语义时默认跟随，原钟点不丢失', () async {
+    await backup.restore(exportFixture());
+    final course = (await courses.getCourse('c1'))!;
+    expect(course.useExplicitTimes, false);
+    expect((course.startTime, course.endTime), ('08:00', '09:35'));
+    final exported = await backup.exportJson();
+    await backup.restore(exported);
+    expect(await courses.getCourse('c1'), course);
+  });
+
+  for (final unsupported in ['independent-v2', 1, null]) {
+    test('未知钟点语义 $unsupported 在覆盖前拒绝，原课程完整保留', () async {
+      await backup.restore(exportFixture());
+      final original = await courses.getCourse('c1');
+      final data = jsonDecode(exportFixture()) as Map<String, dynamic>;
+      ((data['semesters'] as List).first['courses'] as List)
+              .first['useExplicitTimes'] =
+          unsupported;
+      await expectLater(
+        backup.restore(jsonEncode(data)),
+        throwsFormatException,
+      );
+      expect(await courses.getCourse('c1'), original);
+      expect((await semesters.getActiveSemester())?.id, 's1');
+    });
+  }
+
   test('含重复学期 id 的备份抛出异常', () async {
     final data = {
       'app': 'recess',

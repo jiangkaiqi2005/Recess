@@ -20,9 +20,9 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
-  /// 版本 2：新增课程平台表。
+  /// 版本 3：明确课程是否使用独立钟点，旧记录默认跟随节次作息。
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -30,6 +30,7 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           // 1 → 2 只新建课程平台表，已有课程与学期保持不动。
           if (from < 2) await m.createTable(coursePlatforms);
+          if (from < 3) await m.addColumn(courses, courses.useExplicitTimes);
         },
       );
 

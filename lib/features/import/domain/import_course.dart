@@ -15,6 +15,7 @@ class ImportCourse {
   final int endSection;
   final String? startTime; // "08:00"
   final String? endTime; // "08:45"
+  final bool useExplicitTimes;
   final List<int> weeks;
   final int colorValue;
   final String? notes;
@@ -30,12 +31,14 @@ class ImportCourse {
     required this.endSection,
     this.startTime,
     this.endTime,
+    bool? useExplicitTimes,
     this.weeks = const [],
     this.colorValue = AppConstants.defaultCourseColor,
     this.notes,
     required this.source,
     this.selected = true,
-  });
+  }) : useExplicitTimes = useExplicitTimes ??
+            (startTime != null || endTime != null);
 
   /// 转换为领域模型 [Course]（生成新 id，归属指定学期）。
   Course toCourse(String semesterId) => Course(
@@ -49,6 +52,7 @@ class ImportCourse {
         endSection: endSection,
         startTime: startTime,
         endTime: endTime,
+        useExplicitTimes: useExplicitTimes,
         weeks: weeks,
         colorValue: colorValue,
         notes: notes,
@@ -58,7 +62,7 @@ class ImportCourse {
   String get sectionLabel {
     const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     final day = dayOfWeek >= 1 && dayOfWeek <= 7 ? days[dayOfWeek - 1] : '?';
-    final time = (startTime != null && endTime != null)
+    final time = (useExplicitTimes && startTime != null && endTime != null)
         ? ' $startTime-$endTime'
         : '';
     return '$day 第$startSection-${endSection}节$time';

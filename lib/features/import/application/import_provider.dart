@@ -269,6 +269,7 @@ extension _ImportCourseCopy on ImportCourse {
         endSection: endSection,
         startTime: startTime,
         endTime: endTime,
+        useExplicitTimes: useExplicitTimes,
         weeks: weeks,
         colorValue: colorValue,
         notes: notes,

@@ -75,7 +75,9 @@ void main() {
 
   testWidgets('详情优先显示课程显式钟点，而不是冲突的全局节次钟点', (tester) async {
     await openSheet(tester,
-      withoutPlatforms.copyWith(startTime: '08:30', endTime: '09:00'),
+      withoutPlatforms.copyWith(
+        startTime: '08:30', endTime: '09:00', useExplicitTimes: true,
+      ),
       sectionTimes: const {1: SectionTime('08:00', 45), 2: SectionTime('08:55', 45)},
     );
     expect(find.text('周二 第1-2节 (08:30-09:00)'), findsOneWidget);
@@ -91,7 +93,9 @@ void main() {
   ]) {
     testWidgets('详情逐端来源及原有文字降级：${sample.start}/${sample.end}', (tester) async {
       await openSheet(tester,
-        withoutPlatforms.copyWith(startTime: sample.start, endTime: sample.end),
+        withoutPlatforms.copyWith(
+          startTime: sample.start, endTime: sample.end, useExplicitTimes: true,
+        ),
         sectionTimes: const {1: SectionTime('08:00', 45), 2: SectionTime('08:55', 45)},
       );
       expect(find.text('周二 第1-2节${sample.text}'), findsOneWidget);

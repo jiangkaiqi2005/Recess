@@ -113,6 +113,7 @@ ImportCourse _withSelected(ImportCourse c, [bool selected = true]) =>
       endSection: c.endSection,
       startTime: c.startTime,
       endTime: c.endTime,
+      useExplicitTimes: c.useExplicitTimes,
       weeks: c.weeks,
       colorValue: c.colorValue,
       notes: c.notes,

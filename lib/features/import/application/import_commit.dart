@@ -11,7 +11,6 @@ import 'package:recess/data/repositories/semester_repository.dart';
 import 'package:recess/data/repositories/course_platform_repository.dart';
 import 'package:recess/features/import/domain/import_course.dart';
 import 'package:recess/features/import/domain/webview_preview_context.dart';
-import 'package:recess/features/settings/domain/section_time.dart';
 
 /// 一次确认使用的快照，确认弹窗和写入过程不再读取预览的可变状态。
 class ImportSubmission {
@@ -58,7 +57,6 @@ class ImportSubmission {
     required String semesterId,
     required ImportMode mode,
     required Iterable<ImportCourse> courses,
-    required Map<int, SectionTime> sectionTimes,
     required WebviewPreviewContext previewContext,
   }) {
     final replacements = <Course>[];
@@ -73,8 +71,6 @@ class ImportSubmission {
           dayOfWeek: c.dayOfWeek,
           startSection: c.startSection,
           endSection: c.endSection,
-          startTime: sectionTimes[c.startSection]?.startTime,
-          endTime: sectionTimes[c.endSection]?.endTime,
           weeks: c.weeks,
           colorValue: AppConstants.courseAutoColor(replacements.length),
         ),

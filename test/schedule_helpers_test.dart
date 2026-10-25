@@ -67,6 +67,7 @@ void main() {
       endSection: 1,
       startTime: '08:30',
       endTime: '09:00',
+      useExplicitTimes: true,
       weeks: [1],
     );
     final slots = todayCourseSlots(
@@ -98,7 +99,7 @@ void main() {
   });
 
   test('今日状态逐端回退，空串或不可解析显式端保持未开始降级', () {
-    final base = _c('x', DateTime.monday, 1, 2);
+    final base = _c('x', DateTime.monday, 1, 2).copyWith(useExplicitTimes: true);
     final slots = todayCourseSlots(
       courses: [
         base.copyWith(id: 'start', startTime: '08:30'),

@@ -22,10 +22,13 @@ class Courses extends Table {
 
   IntColumn get endSection => integer()();
 
-  /// "08:00" 可选，未填写时由节次时间表推算。
+  /// "08:00" 原始钟点，仅 [useExplicitTimes] 为 true 时参与求值。
   TextColumn get startTime => text().nullable()();
 
   TextColumn get endTime => text().nullable()();
+
+  BoolColumn get useExplicitTimes =>
+      boolean().withDefault(const Constant(false))();
 
   /// 上课周次 CSV，如 "1,2,3,16"。空串表示未设置。
   TextColumn get weeks => text().withDefault(const Constant(''))();

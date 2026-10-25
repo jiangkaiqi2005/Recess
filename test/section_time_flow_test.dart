@@ -28,6 +28,8 @@ void main() {
     dayOfWeek: DateTime.monday,
     startSection: 2,
     endSection: 3,
+    startTime: '08:55',
+    endTime: '10:45',
     weeks: [1],
   );
 
@@ -92,10 +94,11 @@ void main() {
   Future<void> pickStart(
     WidgetTester tester,
     String hour,
-    String minute,
-  ) async {
-    await tester.ensureVisible(find.byKey(const ValueKey('section-start-1')));
-    await tester.tap(find.byKey(const ValueKey('section-start-1')));
+    String minute, {
+    int section = 1,
+  }) async {
+    await tester.ensureVisible(find.byKey(ValueKey('section-start-$section')));
+    await tester.tap(find.byKey(ValueKey('section-start-$section')));
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.keyboard_outlined));
     await tester.pumpAndSettle();
@@ -163,6 +166,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('08:00'), findsOneWidget);
     expect(container.read(sectionTimesProvider)[2]?.timeRange, '08:55-09:40');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('单节开始与时长编辑后，课程详情跟随更新且不恢复旧快照', (tester) async {
+    final (container, router) = await openSettings(tester);
+    await pickStart(tester, '09', '10', section: 2);
+    final row = find
+        .ancestor(of: find.text('第 3 节'), matching: find.byType(Wrap))
+        .first;
+    final duration = find.descendant(
+      of: row,
+      matching: find.byType(DropdownButton<int>),
+    );
+    await tester.ensureVisible(duration);
+    await tester.tap(duration);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('60 分').last);
+    await tester.pumpAndSettle();
+    expect(container.read(sectionTimesProvider)[3]?.endTime, '11:00');
+    Navigator.of(tester.element(find.byType(SectionTimeEditor))).pop();
+    await tester.pumpAndSettle();
+    router.pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('功能测试课'));
+    await tester.pumpAndSettle();
+    expect(find.text('周一 第2-3节 (09:10-11:00)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

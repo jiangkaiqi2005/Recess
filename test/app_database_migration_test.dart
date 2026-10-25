@@ -7,7 +7,7 @@ import 'package:recess/data/repositories/course_repository.dart';
 import 'package:recess/data/repositories/semester_repository.dart';
 
 void main() {
-  test('数据库从版本 1 升到 2：已有学期和课程保留，课程平台表可用', () async {
+  test('数据库从版本 1 升到 3：已有学期和课程保留，课程平台表可用', () async {
     // 按版本 1 的表结构建库并写入数据，模拟老用户升级。
     final database = db.AppDatabase(
       NativeDatabase.memory(
@@ -65,6 +65,6 @@ void main() {
         .customSelect('PRAGMA user_version')
         .getSingle()
         .then((row) => row.read<int>('user_version'));
-    expect(version, 2);
+    expect(version, 3);
   });
 }

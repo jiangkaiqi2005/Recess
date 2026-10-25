@@ -88,6 +88,7 @@ void main() {
       startSection: 3,
       endSection: 4,
       startTime: '09:30',
+      useExplicitTimes: true,
       weeks: [1],
     );
     final now = DateTime(2026, 8, 30);
@@ -125,7 +126,7 @@ void main() {
   });
 
   test('提醒只需可解析开始端，不回退空串或无效显式值', () {
-    final base = makeM1().copyWith(weeks: [1]);
+    final base = makeM1().copyWith(weeks: [1], useExplicitTimes: true);
     final reminders = computeReminders(
       courses: [
         base.copyWith(name: '冲突显式', startTime: '08:30', endTime: '09:00'),
@@ -150,7 +151,9 @@ void main() {
 
   test('提醒保留既有小时分钟溢出的日期归一化', () {
     final reminders = computeReminders(
-      courses: [makeM1().copyWith(startTime: '25:75', weeks: [1])],
+      courses: [makeM1().copyWith(
+        startTime: '25:75', weeks: [1], useExplicitTimes: true,
+      )],
       semester: semester,
       sectionTimes: sectionTimes,
       now: DateTime(2026, 8, 30),

@@ -50,9 +50,17 @@ class JsonCourseImporter {
     final diagnostics = <ImportDiagnostic>[];
     final List<dynamic> rawList;
     Object? rawPlatforms;
+    var isBackup = false;
 
     try {
       final decoded = jsonDecode(jsonText);
+      if (decoded is Map &&
+          (decoded['app'] == 'recess' || decoded['app'] == 'hormone')) {
+        isBackup = true;
+        if (decoded['semesters'] is List) {
+          throw const FormatException('Recess 备份请通过设置中的“从备份恢复”导入');
+        }
+      }
       if (decoded is List) {
         rawList = decoded;
       } else if (decoded is Map && decoded['courses'] is List) {
@@ -79,7 +87,7 @@ class JsonCourseImporter {
         continue;
       }
       final map = Map<String, dynamic>.from(item);
-      final course = _parseOne(map, i, totalWeeks, diagnostics);
+      final course = _parseOne(map, i, totalWeeks, diagnostics, isBackup);
       if (course != null) result.add(course);
     }
     final platforms =
@@ -92,7 +100,11 @@ class JsonCourseImporter {
     int index,
     int? totalWeeks,
     List<ImportDiagnostic> diagnostics,
+    bool isBackup,
   ) {
+    if (m.containsKey('useExplicitTimes') && m['useExplicitTimes'] is! bool) {
+      throw const FormatException('文件中存在无法识别的课程钟点使用方式');
+    }
     final record = '第${index + 1}条';
     void skip(String reason) => diagnostics.add(ImportDiagnostic(
           kind: ImportDiagnosticKind.skipped,
@@ -159,6 +171,8 @@ class JsonCourseImporter {
       endSection: endSection,
       startTime: _toStringOrNull(m['startTime']),
       endTime: _toStringOrNull(m['endTime']),
+      useExplicitTimes: m['useExplicitTimes'] as bool? ??
+          (isBackup ? false : null),
       weeks: weeks,
       colorValue: colorValue,
       notes: _toStringOrNull(m['notes']),

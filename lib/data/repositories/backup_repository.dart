@@ -100,6 +100,10 @@ class BackupFile {
         for (final rc in rawCourses) {
           if (rc is! Map) continue;
           final map = rc as Map<String, dynamic>;
+          if (map.containsKey('useExplicitTimes') &&
+              map['useExplicitTimes'] is! bool) {
+            throw const FormatException('备份中存在无法识别的课程钟点使用方式');
+          }
           final cid = map['id']?.toString() ?? '';
           if (cid.isEmpty) continue; // 旧版导出无 id 的兜底：丢弃该条
           final cname = map['name']?.toString() ?? '';
@@ -118,8 +122,9 @@ class BackupFile {
             dayOfWeek: day,
             startSection: start,
             endSection: end,
-            startTime: _optString(map['startTime']),
-            endTime: _optString(map['endTime']),
+            startTime: map['startTime']?.toString(),
+            endTime: map['endTime']?.toString(),
+            useExplicitTimes: map['useExplicitTimes'] as bool? ?? false,
             weeks: _weeks(map['weeks']),
             colorValue: _toInt(map['colorValue']) ??
                 _parseColor(map['color']?.toString()),
@@ -191,7 +196,7 @@ class BackupRepository {
     final semesters = await semesterRepo.getSemesters();
     final data = <String, dynamic>{
       'app': 'recess',
-      'version': 1,
+      'version': 2,
       'exportedAt': DateTime.now().toIso8601String(),
       'semesters': <Map<String, dynamic>>[],
     };
@@ -217,6 +222,7 @@ class BackupRepository {
                   'endSection': c.endSection,
                   'startTime': c.startTime,
                   'endTime': c.endTime,
+                  'useExplicitTimes': c.useExplicitTimes,
                   'weeks': c.weeks,
                   'colorValue': c.colorValue,
                   'notes': c.notes,

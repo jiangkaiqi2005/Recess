@@ -24,6 +24,7 @@ extension CourseEntityMapper on db.Course {
         endSection: endSection,
         startTime: startTime,
         endTime: endTime,
+        useExplicitTimes: useExplicitTimes,
         weeks: weeks.isEmpty
             ? const []
             : weeks
@@ -49,6 +50,7 @@ extension CourseDomainMapper on Course {
         endSection: Value(endSection),
         startTime: Value(startTime),
         endTime: Value(endTime),
+        useExplicitTimes: Value(useExplicitTimes),
         weeks: Value(weeks.isEmpty ? '' : weeks.join(',')),
         colorValue: Value(colorValue),
         notes: Value(notes),

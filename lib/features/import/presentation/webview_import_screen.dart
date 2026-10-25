@@ -14,7 +14,6 @@ import 'package:recess/features/import/application/course_capture_orientation.da
 import 'package:recess/features/import/application/webview_import_provider.dart';
 import 'package:recess/features/import/domain/import_course.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
-import 'package:recess/features/settings/application/section_times_provider.dart';
 import '../data/school_adapter.dart';
 import 'import_confirm_dialog.dart';
 import 'import_preview_list.dart';
@@ -796,7 +795,6 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
       semesterId: semester.id,
       mode: state.mode,
       courses: state.courses,
-      sectionTimes: ref.read(sectionTimesProvider),
     );
     if (submission.courses.isEmpty) return;
     final existing = (await ref.read(courseRepositoryProvider)

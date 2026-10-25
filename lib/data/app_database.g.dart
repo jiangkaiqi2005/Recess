@@ -114,6 +114,21 @@ class $CoursesTable extends Courses with TableInfo<$CoursesTable, Course> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _useExplicitTimesMeta = const VerificationMeta(
+    'useExplicitTimes',
+  );
+  @override
+  late final GeneratedColumn<bool> useExplicitTimes = GeneratedColumn<bool>(
+    'use_explicit_times',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("use_explicit_times" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _weeksMeta = const VerificationMeta('weeks');
   @override
   late final GeneratedColumn<String> weeks = GeneratedColumn<String>(
@@ -157,6 +172,7 @@ class $CoursesTable extends Courses with TableInfo<$CoursesTable, Course> {
     endSection,
     startTime,
     endTime,
+    useExplicitTimes,
     weeks,
     colorValue,
     notes,
@@ -245,6 +261,15 @@ class $CoursesTable extends Courses with TableInfo<$CoursesTable, Course> {
         endTime.isAcceptableOrUnknown(data['end_time']!, _endTimeMeta),
       );
     }
+    if (data.containsKey('use_explicit_times')) {
+      context.handle(
+        _useExplicitTimesMeta,
+        useExplicitTimes.isAcceptableOrUnknown(
+          data['use_explicit_times']!,
+          _useExplicitTimesMeta,
+        ),
+      );
+    }
     if (data.containsKey('weeks')) {
       context.handle(
         _weeksMeta,
@@ -318,6 +343,11 @@ class $CoursesTable extends Courses with TableInfo<$CoursesTable, Course> {
         DriftSqlType.string,
         data['${effectivePrefix}end_time'],
       ),
+      useExplicitTimes:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}use_explicit_times'],
+          )!,
       weeks:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
@@ -353,9 +383,10 @@ class Course extends DataClass implements Insertable<Course> {
   final int startSection;
   final int endSection;
 
-  /// "08:00" 可选，未填写时由节次时间表推算。
+  /// "08:00" 原始钟点，仅 [useExplicitTimes] 为 true 时参与求值。
   final String? startTime;
   final String? endTime;
+  final bool useExplicitTimes;
 
   /// 上课周次 CSV，如 "1,2,3,16"。空串表示未设置。
   final String weeks;
@@ -374,6 +405,7 @@ class Course extends DataClass implements Insertable<Course> {
     required this.endSection,
     this.startTime,
     this.endTime,
+    required this.useExplicitTimes,
     required this.weeks,
     required this.colorValue,
     this.notes,
@@ -399,6 +431,7 @@ class Course extends DataClass implements Insertable<Course> {
     if (!nullToAbsent || endTime != null) {
       map['end_time'] = Variable<String>(endTime);
     }
+    map['use_explicit_times'] = Variable<bool>(useExplicitTimes);
     map['weeks'] = Variable<String>(weeks);
     map['color_value'] = Variable<int>(colorValue);
     if (!nullToAbsent || notes != null) {
@@ -431,6 +464,7 @@ class Course extends DataClass implements Insertable<Course> {
           endTime == null && nullToAbsent
               ? const Value.absent()
               : Value(endTime),
+      useExplicitTimes: Value(useExplicitTimes),
       weeks: Value(weeks),
       colorValue: Value(colorValue),
       notes:
@@ -454,6 +488,7 @@ class Course extends DataClass implements Insertable<Course> {
       endSection: serializer.fromJson<int>(json['endSection']),
       startTime: serializer.fromJson<String?>(json['startTime']),
       endTime: serializer.fromJson<String?>(json['endTime']),
+      useExplicitTimes: serializer.fromJson<bool>(json['useExplicitTimes']),
       weeks: serializer.fromJson<String>(json['weeks']),
       colorValue: serializer.fromJson<int>(json['colorValue']),
       notes: serializer.fromJson<String?>(json['notes']),
@@ -473,6 +508,7 @@ class Course extends DataClass implements Insertable<Course> {
       'endSection': serializer.toJson<int>(endSection),
       'startTime': serializer.toJson<String?>(startTime),
       'endTime': serializer.toJson<String?>(endTime),
+      'useExplicitTimes': serializer.toJson<bool>(useExplicitTimes),
       'weeks': serializer.toJson<String>(weeks),
       'colorValue': serializer.toJson<int>(colorValue),
       'notes': serializer.toJson<String?>(notes),
@@ -490,6 +526,7 @@ class Course extends DataClass implements Insertable<Course> {
     int? endSection,
     Value<String?> startTime = const Value.absent(),
     Value<String?> endTime = const Value.absent(),
+    bool? useExplicitTimes,
     String? weeks,
     int? colorValue,
     Value<String?> notes = const Value.absent(),
@@ -504,6 +541,7 @@ class Course extends DataClass implements Insertable<Course> {
     endSection: endSection ?? this.endSection,
     startTime: startTime.present ? startTime.value : this.startTime,
     endTime: endTime.present ? endTime.value : this.endTime,
+    useExplicitTimes: useExplicitTimes ?? this.useExplicitTimes,
     weeks: weeks ?? this.weeks,
     colorValue: colorValue ?? this.colorValue,
     notes: notes.present ? notes.value : this.notes,
@@ -525,6 +563,10 @@ class Course extends DataClass implements Insertable<Course> {
           data.endSection.present ? data.endSection.value : this.endSection,
       startTime: data.startTime.present ? data.startTime.value : this.startTime,
       endTime: data.endTime.present ? data.endTime.value : this.endTime,
+      useExplicitTimes:
+          data.useExplicitTimes.present
+              ? data.useExplicitTimes.value
+              : this.useExplicitTimes,
       weeks: data.weeks.present ? data.weeks.value : this.weeks,
       colorValue:
           data.colorValue.present ? data.colorValue.value : this.colorValue,
@@ -545,6 +587,7 @@ class Course extends DataClass implements Insertable<Course> {
           ..write('endSection: $endSection, ')
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
+          ..write('useExplicitTimes: $useExplicitTimes, ')
           ..write('weeks: $weeks, ')
           ..write('colorValue: $colorValue, ')
           ..write('notes: $notes')
@@ -564,6 +607,7 @@ class Course extends DataClass implements Insertable<Course> {
     endSection,
     startTime,
     endTime,
+    useExplicitTimes,
     weeks,
     colorValue,
     notes,
@@ -582,6 +626,7 @@ class Course extends DataClass implements Insertable<Course> {
           other.endSection == this.endSection &&
           other.startTime == this.startTime &&
           other.endTime == this.endTime &&
+          other.useExplicitTimes == this.useExplicitTimes &&
           other.weeks == this.weeks &&
           other.colorValue == this.colorValue &&
           other.notes == this.notes);
@@ -598,6 +643,7 @@ class CoursesCompanion extends UpdateCompanion<Course> {
   final Value<int> endSection;
   final Value<String?> startTime;
   final Value<String?> endTime;
+  final Value<bool> useExplicitTimes;
   final Value<String> weeks;
   final Value<int> colorValue;
   final Value<String?> notes;
@@ -613,6 +659,7 @@ class CoursesCompanion extends UpdateCompanion<Course> {
     this.endSection = const Value.absent(),
     this.startTime = const Value.absent(),
     this.endTime = const Value.absent(),
+    this.useExplicitTimes = const Value.absent(),
     this.weeks = const Value.absent(),
     this.colorValue = const Value.absent(),
     this.notes = const Value.absent(),
@@ -629,6 +676,7 @@ class CoursesCompanion extends UpdateCompanion<Course> {
     required int endSection,
     this.startTime = const Value.absent(),
     this.endTime = const Value.absent(),
+    this.useExplicitTimes = const Value.absent(),
     this.weeks = const Value.absent(),
     this.colorValue = const Value.absent(),
     this.notes = const Value.absent(),
@@ -650,6 +698,7 @@ class CoursesCompanion extends UpdateCompanion<Course> {
     Expression<int>? endSection,
     Expression<String>? startTime,
     Expression<String>? endTime,
+    Expression<bool>? useExplicitTimes,
     Expression<String>? weeks,
     Expression<int>? colorValue,
     Expression<String>? notes,
@@ -666,6 +715,7 @@ class CoursesCompanion extends UpdateCompanion<Course> {
       if (endSection != null) 'end_section': endSection,
       if (startTime != null) 'start_time': startTime,
       if (endTime != null) 'end_time': endTime,
+      if (useExplicitTimes != null) 'use_explicit_times': useExplicitTimes,
       if (weeks != null) 'weeks': weeks,
       if (colorValue != null) 'color_value': colorValue,
       if (notes != null) 'notes': notes,
@@ -684,6 +734,7 @@ class CoursesCompanion extends UpdateCompanion<Course> {
     Value<int>? endSection,
     Value<String?>? startTime,
     Value<String?>? endTime,
+    Value<bool>? useExplicitTimes,
     Value<String>? weeks,
     Value<int>? colorValue,
     Value<String?>? notes,
@@ -700,6 +751,7 @@ class CoursesCompanion extends UpdateCompanion<Course> {
       endSection: endSection ?? this.endSection,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
+      useExplicitTimes: useExplicitTimes ?? this.useExplicitTimes,
       weeks: weeks ?? this.weeks,
       colorValue: colorValue ?? this.colorValue,
       notes: notes ?? this.notes,
@@ -740,6 +792,9 @@ class CoursesCompanion extends UpdateCompanion<Course> {
     if (endTime.present) {
       map['end_time'] = Variable<String>(endTime.value);
     }
+    if (useExplicitTimes.present) {
+      map['use_explicit_times'] = Variable<bool>(useExplicitTimes.value);
+    }
     if (weeks.present) {
       map['weeks'] = Variable<String>(weeks.value);
     }
@@ -768,6 +823,7 @@ class CoursesCompanion extends UpdateCompanion<Course> {
           ..write('endSection: $endSection, ')
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
+          ..write('useExplicitTimes: $useExplicitTimes, ')
           ..write('weeks: $weeks, ')
           ..write('colorValue: $colorValue, ')
           ..write('notes: $notes, ')
@@ -1700,6 +1756,7 @@ typedef $$CoursesTableCreateCompanionBuilder =
       required int endSection,
       Value<String?> startTime,
       Value<String?> endTime,
+      Value<bool> useExplicitTimes,
       Value<String> weeks,
       Value<int> colorValue,
       Value<String?> notes,
@@ -1717,6 +1774,7 @@ typedef $$CoursesTableUpdateCompanionBuilder =
       Value<int> endSection,
       Value<String?> startTime,
       Value<String?> endTime,
+      Value<bool> useExplicitTimes,
       Value<String> weeks,
       Value<int> colorValue,
       Value<String?> notes,
@@ -1779,6 +1837,11 @@ class $$CoursesTableFilterComposer
 
   ColumnFilters<String> get endTime => $composableBuilder(
     column: $table.endTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get useExplicitTimes => $composableBuilder(
+    column: $table.useExplicitTimes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1857,6 +1920,11 @@ class $$CoursesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get useExplicitTimes => $composableBuilder(
+    column: $table.useExplicitTimes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get weeks => $composableBuilder(
     column: $table.weeks,
     builder: (column) => ColumnOrderings(column),
@@ -1918,6 +1986,11 @@ class $$CoursesTableAnnotationComposer
   GeneratedColumn<String> get endTime =>
       $composableBuilder(column: $table.endTime, builder: (column) => column);
 
+  GeneratedColumn<bool> get useExplicitTimes => $composableBuilder(
+    column: $table.useExplicitTimes,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get weeks =>
       $composableBuilder(column: $table.weeks, builder: (column) => column);
 
@@ -1968,6 +2041,7 @@ class $$CoursesTableTableManager
                 Value<int> endSection = const Value.absent(),
                 Value<String?> startTime = const Value.absent(),
                 Value<String?> endTime = const Value.absent(),
+                Value<bool> useExplicitTimes = const Value.absent(),
                 Value<String> weeks = const Value.absent(),
                 Value<int> colorValue = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
@@ -1983,6 +2057,7 @@ class $$CoursesTableTableManager
                 endSection: endSection,
                 startTime: startTime,
                 endTime: endTime,
+                useExplicitTimes: useExplicitTimes,
                 weeks: weeks,
                 colorValue: colorValue,
                 notes: notes,
@@ -2000,6 +2075,7 @@ class $$CoursesTableTableManager
                 required int endSection,
                 Value<String?> startTime = const Value.absent(),
                 Value<String?> endTime = const Value.absent(),
+                Value<bool> useExplicitTimes = const Value.absent(),
                 Value<String> weeks = const Value.absent(),
                 Value<int> colorValue = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
@@ -2015,6 +2091,7 @@ class $$CoursesTableTableManager
                 endSection: endSection,
                 startTime: startTime,
                 endTime: endTime,
+                useExplicitTimes: useExplicitTimes,
                 weeks: weeks,
                 colorValue: colorValue,
                 notes: notes,
@@ -2025,12 +2102,8 @@ class $$CoursesTableTableManager
                   p0
                       .map(
                         (e) => (
-                          e.readTable<$CoursesTable, Course>(table),
-                          BaseReferences<_$AppDatabase, $CoursesTable, Course>(
-                            db,
-                            table,
-                            e,
-                          ),
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
                         ),
                       )
                       .toList(),
@@ -2253,12 +2326,8 @@ class $$SemestersTableTableManager
                   p0
                       .map(
                         (e) => (
-                          e.readTable<$SemestersTable, Semester>(table),
-                          BaseReferences<
-                            _$AppDatabase,
-                            $SemestersTable,
-                            Semester
-                          >(db, table, e),
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
                         ),
                       )
                       .toList(),
@@ -2510,14 +2579,8 @@ class $$CoursePlatformsTableTableManager
                   p0
                       .map(
                         (e) => (
-                          e.readTable<$CoursePlatformsTable, CoursePlatform>(
-                            table,
-                          ),
-                          BaseReferences<
-                            _$AppDatabase,
-                            $CoursePlatformsTable,
-                            CoursePlatform
-                          >(db, table, e),
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
                         ),
                       )
                       .toList(),

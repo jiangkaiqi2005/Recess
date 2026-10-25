@@ -8,8 +8,11 @@ class CourseClock {
 
   CourseClock(Course course, Map<int, SectionTime> sectionTimes)
     : startTime =
-          course.startTime ?? sectionTimes[course.startSection]?.startTime,
-      endTime = course.endTime ?? sectionTimes[course.endSection]?.endTime;
+          (course.useExplicitTimes ? course.startTime : null) ??
+          sectionTimes[course.startSection]?.startTime,
+      endTime =
+          (course.useExplicitTimes ? course.endTime : null) ??
+          sectionTimes[course.endSection]?.endTime;
 
   (int, int)? get start => _parse(startTime);
   (int, int)? get end => _parse(endTime);
