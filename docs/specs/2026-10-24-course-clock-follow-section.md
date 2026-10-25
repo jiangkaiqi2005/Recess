@@ -1,6 +1,6 @@
 # Spec：教务课程随学校作息更新，统一课表、详情、提醒与小组件
 
-> 状态：规格已整理，尚未实施。本文取代旧规格中“教务导入时保存节次钟点快照，之后继续优先使用”的规则。
+> 状态：已实施并完成双轴评审，修复 1 轮；详见[实施与评审报告](../2026-10-24-course-clock-follow-section-implementation-review.md)。本文取代旧规格中“教务导入时保存节次钟点快照，之后继续优先使用”的规则。
 
 > GitHub：[Issue #7](https://github.com/jiangkaiqi2005/Recess/issues/7)，标签 `ready-for-agent`。
 
