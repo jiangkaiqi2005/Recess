@@ -102,7 +102,8 @@ class JsonCourseImporter {
     List<ImportDiagnostic> diagnostics,
     bool isBackup,
   ) {
-    if (m.containsKey('useExplicitTimes') && m['useExplicitTimes'] is! bool) {
+    final hasTimeSemantics = m.containsKey('useExplicitTimes');
+    if (hasTimeSemantics && m['useExplicitTimes'] is! bool) {
       throw const FormatException('文件中存在无法识别的课程钟点使用方式');
     }
     final record = '第${index + 1}条';
@@ -169,8 +170,12 @@ class JsonCourseImporter {
       dayOfWeek: dayOfWeek,
       startSection: startSection,
       endSection: endSection,
-      startTime: _toStringOrNull(m['startTime']),
-      endTime: _toStringOrNull(m['endTime']),
+      startTime: hasTimeSemantics
+          ? m['startTime']?.toString()
+          : _toStringOrNull(m['startTime']),
+      endTime: hasTimeSemantics
+          ? m['endTime']?.toString()
+          : _toStringOrNull(m['endTime']),
       useExplicitTimes: m['useExplicitTimes'] as bool? ??
           (isBackup ? false : null),
       weeks: weeks,

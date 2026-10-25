@@ -11,6 +11,9 @@ import 'package:recess/data/repositories/backup_repository.dart';
 import 'package:recess/data/repositories/course_platform_repository.dart';
 import 'package:recess/data/repositories/course_repository.dart';
 import 'package:recess/data/repositories/semester_repository.dart';
+import 'package:recess/features/notification/application/reminder_scheduler.dart';
+import 'package:recess/features/schedule/domain/schedule_helpers.dart';
+import 'package:recess/features/settings/domain/section_time.dart';
 
 void main() {
   late db.AppDatabase database;
@@ -430,6 +433,27 @@ void main() {
     final course = (await courses.getCourse('c1'))!;
     expect(course.useExplicitTimes, false);
     expect((course.startTime, course.endTime), ('08:00', '09:35'));
+    final semester = (await semesters.getActiveSemester())!;
+    const times = {1: SectionTime('14:25', 45), 2: SectionTime('17:20', 45)};
+    expect(
+      computeReminders(
+        courses: [course],
+        semester: semester,
+        sectionTimes: times,
+        now: DateTime(2026, 9, 7, 12),
+        leadMinutes: 10,
+      ).first.trigger,
+      DateTime(2026, 9, 7, 14, 15),
+    );
+    expect(
+      todayCourseSlots(
+        courses: [course],
+        currentWeek: 3,
+        sectionTimes: times,
+        now: DateTime(2026, 9, 7, 17),
+      ).single.status,
+      CourseStatus.ongoing,
+    );
     final exported = await backup.exportJson();
     await backup.restore(exported);
     expect(await courses.getCourse('c1'), course);

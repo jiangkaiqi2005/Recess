@@ -14,6 +14,7 @@ import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/application/import_commit.dart';
 import 'package:recess/features/import/domain/import_course.dart';
 import 'package:recess/features/import/domain/webview_course_parser.dart';
+import 'package:recess/features/import/data/json_importer.dart';
 import 'package:recess/features/notification/application/reminder_scheduler.dart';
 import 'package:recess/features/schedule/domain/schedule_helpers.dart';
 import 'package:recess/features/schedule/presentation/course_detail_sheet.dart';
@@ -77,6 +78,99 @@ void main() {
     container.dispose();
     await database.close();
   });
+
+  for (final app in [null, 'recess']) {
+    test('${app ?? '普通JSON'}明确空开始端导入后不回退或生成臆造提醒', () async {
+      final binding = TestWidgetsFlutterBinding.ensureInitialized();
+      final saved = <String, Object?>{};
+      const channel = MethodChannel('home_widget');
+      const updates = MethodChannel('home_widget/updates');
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        if (call.method == 'saveWidgetData') {
+          final args = call.arguments as Map;
+          saved[args['id'] as String] = args['data'];
+        }
+        return true;
+      });
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        updates,
+        (_) async => null,
+      );
+      addTearDown(() {
+        binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+        binding.defaultBinaryMessenger.setMockMethodCallHandler(updates, null);
+      });
+      final semester = Semester(
+        id: 's',
+        name: '测试学期',
+        startDate: DateTime(2026, 9, 7),
+        totalWeeks: 18,
+      );
+      await container
+          .read(semesterRepositoryProvider)
+          .upsert(semester, activate: true);
+      await container.read(sectionTimesProvider.notifier).setAllTimes(const {
+        6: SectionTime('14:25', 45),
+        9: SectionTime('17:20', 45),
+      });
+      final imported = JsonCourseImporter.parse(
+        jsonEncode({
+          if (app != null) 'app': app,
+          'courses': [
+            {
+              'name': '明确空钟点',
+              'dayOfWeek': 7,
+              'startSection': 6,
+              'endSection': 9,
+              'weeks': [7],
+              'useExplicitTimes': true,
+              'startTime': '',
+              'endTime': '19:45',
+            },
+          ],
+        }),
+      );
+      await container
+          .read(importCommitProvider)
+          .commit(
+            ImportSubmission.file(
+              semesterId: 's',
+              mode: ImportMode.replace,
+              courses: imported.courses,
+            ),
+          );
+      final courses = await container
+          .read(courseRepositoryProvider)
+          .getCourses('s');
+      final times = container.read(sectionTimesProvider);
+      expect(
+        computeReminders(
+          courses: courses,
+          semester: semester,
+          sectionTimes: times,
+          now: DateTime(2026, 10, 25, 12),
+          leadMinutes: 10,
+        ),
+        isEmpty,
+      );
+      expect(
+        todayCourseSlots(
+          courses: courses,
+          currentWeek: 7,
+          sectionTimes: times,
+          now: DateTime(2026, 10, 25, 15),
+        ).single.status,
+        CourseStatus.upcoming,
+      );
+      await container.read(widgetServiceProvider).updateWidget();
+      final payload =
+          (jsonDecode(saved['occurrences'] as String) as List).single as Map;
+      expect(payload['start'], '');
+      expect(payload['end'], '2026-10-25T19:45');
+    });
+  }
 
   for (final order in ['导入前', '导入后']) {
     testWidgets('$order修改学校作息，第6–9节详情、今日、提醒和小组件一致', (tester) async {
