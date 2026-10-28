@@ -42,6 +42,9 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
     final isCopy = widget.courseId?.startsWith('copy:') ?? false;
     final isEdit = widget.courseId != null && widget.courseId!.isNotEmpty && !isCopy;
     final hasChanges = _hasUnsavedChanges();
+    // 平台区块在列表底部，首帧可能不在屏内而未构建；由页面持有平台表单，
+    // 避免 autoDispose 在 init 解析期间回收它，滚到区块时拿到空白的新实例。
+    ref.watch(coursePlatformsFormProvider.notifier);
 
     return PopScope<Object?>(
       // 路由级退出保护：关闭按钮、系统返回键与返回手势都经过这里。

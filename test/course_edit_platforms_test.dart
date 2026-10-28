@@ -42,8 +42,9 @@ void main() {
   Future<void> pumpEdit(
     WidgetTester tester, {
     Future<void> Function()? seed,
+    Size surfaceSize = const Size(400, 1600),
   }) async {
-    await tester.binding.setSurfaceSize(const Size(400, 1600));
+    await tester.binding.setSurfaceSize(surfaceSize);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.runAsync(() async {
@@ -149,5 +150,48 @@ void main() {
     expect(find.text('本学期所有名为“编译原理”的课程共享这些平台'), findsOneWidget);
     expect(find.text('实验 · 头歌'), findsOneWidget);
     expect(find.text('网课 · 学习通'), findsNothing);
+  });
+
+  testWidgets('平台区块初始不在屏内时也显示已有平台，添加后保存不丢原有平台',
+      (tester) async {
+    const existing = CoursePlatform(
+      purpose: CoursePlatformPurpose.onlineCourse,
+      name: '学习通',
+    );
+    // 手机尺寸：平台区块在列表底部，首帧不会被 ListView 构建。
+    await pumpEdit(
+      tester,
+      surfaceSize: const Size(400, 500),
+      seed: () => CoursePlatformRepository(database)
+          .replacePlatforms('s1', '操作系统', const [existing]),
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('添加平台'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('网课 · 学习通'), findsOneWidget);
+
+    await tester.tap(find.text('添加平台'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, '平台名'), '雨课堂');
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('保存'));
+    await tester.pumpAndSettle();
+
+    final saved = await tester.runAsync(
+      () => CoursePlatformRepository(database).getPlatforms('s1', '操作系统'),
+    );
+    expect(saved, const [
+      existing,
+      CoursePlatform(
+        purpose: CoursePlatformPurpose.onlineCourse,
+        name: '雨课堂',
+      ),
+    ]);
   });
 }
