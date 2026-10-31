@@ -79,3 +79,6 @@ skills-lock.json
 
 # Qoder CLI local state
 .qoder/
+
+# Promo video project (local only)
+promo/
