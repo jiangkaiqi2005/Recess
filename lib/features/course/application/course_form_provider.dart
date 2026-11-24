@@ -72,12 +72,16 @@ class CourseFormNotifier extends StateNotifier<Course> {
   /// 编辑已有课程时的原课程名，保存时据此判断是否改名；新建/复制时为 null。
   String? _originalName;
 
+  /// 打开表单时的颜色；保存时颜色变了才同步到同名课程。
+  int? _originalColor;
+
   /// 用解析出的初始课程填充表单（仅一次，避免覆盖用户已输入内容）。
   void init(Course initial) {
     if (_initialized) return;
     _initialized = true;
     state = initial;
     _originalName = initial.id.isEmpty ? null : initial.name;
+    _originalColor = initial.colorValue;
   }
 
   void setName(String v) => state = state.copyWith(name: v);
@@ -148,7 +152,8 @@ class CourseFormNotifier extends StateNotifier<Course> {
   /// DB 错误时抛出异常由 UI 捕获。
   ///
   /// 课程名变了时先把旧名下的平台迁移到新名下；[platforms] 非 null 表示
-  /// 用户在编辑页改过平台，整体写到当前课程名下。课程与平台在同一事务内写入。
+  /// 用户在编辑页改过平台，整体写到当前课程名下。颜色改了时同步到本学期
+  /// 同名的全部课程和整周课。课程、平台与颜色在同一事务内写入。
   Future<bool?> save({List<CoursePlatform>? platforms}) async {
     if (state.semesterId.isEmpty) return false;
     if (state.weeks.isEmpty) return null;
@@ -158,6 +163,7 @@ class CourseFormNotifier extends StateNotifier<Course> {
       toSave,
       renamedFrom: _originalName,
       platforms: platforms,
+      syncColor: toSave.colorValue != _originalColor,
     );
     return true;
   }

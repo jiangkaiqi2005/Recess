@@ -2,9 +2,11 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/repositories/course_platform_repository.dart';
 import 'package:recess/data/repositories/course_repository.dart';
+import 'package:recess/data/repositories/full_week_course_repository.dart';
 import 'package:recess/features/course/application/course_form_provider.dart';
 import 'package:recess/features/course/application/course_platforms_provider.dart';
 
@@ -184,5 +186,52 @@ void main() {
     await expectLater(form.save(platforms: [homework]), throwsA(anything));
 
     expect((await courses.getCourse('c1'))?.name, '操作系统');
+  });
+
+  group('颜色同步', () {
+    const red = 0xFFE36679;
+    const teal = 0xFF4BA89A;
+    final sibling = existing.copyWith(id: 'c2', dayOfWeek: 3);
+    final other = existing.copyWith(id: 'c3', name: '计算机网络');
+    final otherSemester = existing.copyWith(id: 'c4', semesterId: 's2');
+    const fullWeek = FullWeekCourse(
+      id: 'f1',
+      semesterId: 's1',
+      name: '操作系统',
+      weeks: [18],
+    );
+
+    setUp(() async {
+      for (final c in [sibling, other, otherSemester]) {
+        await courses.upsert(c);
+      }
+      await FullWeekCourseRepository(database).addAll('s1', [fullWeek]);
+    });
+
+    test('改颜色后本学期同名课程和整周课一起变色，其他课程不变', () async {
+      final (form, platformForm) = await openForm(existing);
+      form.setColor(red);
+      await save(form, platformForm);
+
+      expect((await courses.getCourse('c1'))?.colorValue, red);
+      expect((await courses.getCourse('c2'))?.colorValue, red);
+      expect(
+        (await FullWeekCourseRepository(database).getAll('s1'))
+            .single
+            .colorValue,
+        red,
+      );
+      expect((await courses.getCourse('c3'))?.colorValue, existing.colorValue);
+      expect((await courses.getCourse('c4'))?.colorValue, existing.colorValue);
+    });
+
+    test('没改颜色时保存不改同名课程的颜色', () async {
+      await courses.upsert(sibling.copyWith(colorValue: teal));
+      final (form, platformForm) = await openForm(existing);
+      form.setLocation('D1210');
+      await save(form, platformForm);
+
+      expect((await courses.getCourse('c2'))?.colorValue, teal);
+    });
   });
 }
