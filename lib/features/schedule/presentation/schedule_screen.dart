@@ -1,11 +1,13 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
-import 'package:recess/core/models/semester.dart';
+import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/core/utils/week_calculator.dart';
-import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/features/course/domain/course_clock.dart';
+import 'package:recess/features/semester/application/semester_mutations.dart';
 import 'package:recess/features/schedule/domain/schedule_helpers.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
 import '../application/schedule_providers.dart';
@@ -16,7 +18,9 @@ import 'week_view.dart';
 
 /// 课程表主页：日期 + 查看周标题（点开为周操作菜单）+ 可左右滑动的周视图。
 class ScheduleScreen extends ConsumerStatefulWidget {
-  const ScheduleScreen({super.key});
+  const ScheduleScreen({super.key, this.now});
+
+  final DateTime Function()? now;
 
   @override
   ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -43,14 +47,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   Widget build(BuildContext context) {
     final semester = ref.watch(activeSemesterProvider).valueOrNull;
     final totalWeeks = semester?.totalWeeks ?? 18;
-    final now = DateTime.now();
+    final now = (widget.now ?? DateTime.now)();
     // 开学前或学期已结束时没有可翻到的「本周」，不显示后缀与「回到本周」。
-    final computedWeek = semester == null ? null : currentWeekOf(semester, now);
-    final currentWeek = computedWeek != null &&
-            computedWeek >= 1 &&
-            computedWeek <= totalWeeks
-        ? computedWeek
-        : null;
+    final currentWeek = semester == null ? null : teachingWeekOf(semester, now);
     final theme = Theme.of(context);
     // 顶栏高度随系统字号缩放，避免两行标题在大字号下被挤压。
     final textScale =
@@ -62,17 +61,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       _schedulePageSync(next);
     });
     _schedulePageSync(ref.read(selectedWeekProvider));
-
-    // 在设置里切换了激活学期：查看周重置到新学期的当前周。
-    ref.listen<AsyncValue<Semester?>>(activeSemesterProvider, (prev, next) {
-      final before = prev?.valueOrNull;
-      final after = next.valueOrNull;
-      if (before == null || after == null || before.id == after.id) return;
-      ref.read(selectedWeekProvider.notifier).goTo(
-            currentWeekOf(after, DateTime.now()),
-            totalWeeks: after.totalWeeks,
-          );
-    });
 
     return Scaffold(
       appBar: AppBar(
@@ -279,10 +267,18 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   Future<void> _setCurrentWeek(int week) async {
     final semester = ref.read(activeSemesterProvider).valueOrNull;
     if (semester == null) return;
-    await ref
-        .read(semesterRepositoryProvider)
-        .upsert(semester.copyWith(currentWeekOverride: week));
-    ref.invalidate(activeSemesterProvider);
+    try {
+      await ref
+          .read(semesterMutationsProvider)
+          .save(semester.copyWith(currentWeekOverride: week));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败：$e')),
+        );
+      }
+      return;
+    }
     if (!mounted) return;
     _animateToWeek(week, semester.totalWeeks);
     ScaffoldMessenger.of(context)
@@ -382,7 +378,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   /// 所有显式跳周都使用同一套动画；距离越远动画略长，但设置上限避免拖沓。
   /// 系统要求减少动态效果时直接跳转，尊重无障碍偏好。
   void _animateToWeek(int week, int totalWeeks) {
-    final safeWeek = week.clamp(1, totalWeeks);
+    final safeWeek = clampWeek(week, totalWeeks);
     final targetPage = safeWeek - 1;
     if (!_pageController.hasClients ||
         MediaQuery.of(context).disableAnimations) {
@@ -412,17 +408,27 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final courses =
         ref.read(scheduleCoursesProvider).value ?? const <Course>[];
     final sectionTimes = ref.read(sectionTimesProvider);
-    final now = DateTime.now();
-    final currentWeek = semester == null ? 0 : currentWeekOf(semester, now);
-    final slots = todayCourseSlots(
-      courses: courses,
-      currentWeek: currentWeek,
-      now: now,
-      sectionTimes: sectionTimes,
-    );
+    final now = (widget.now ?? DateTime.now)();
+    final currentWeek = semester == null ? null : teachingWeekOf(semester, now);
+    final beforeStart = semester == null || currentWeekOf(semester, now) < 1;
+    final slots = currentWeek == null
+        ? const <TodayCourseSlot>[]
+        : todayCourseSlots(
+            courses: courses,
+            currentWeek: currentWeek,
+            now: now,
+            sectionTimes: sectionTimes,
+          );
+    // 整周课没有具体时刻，排在今日课程最前面。
+    final fullWeekToday = currentWeek == null
+        ? const <FullWeekCourse>[]
+        : (ref.read(scheduleFullWeekCoursesProvider).value ??
+                const <FullWeekCourse>[])
+            .where((c) => courseOnWeek(c.weeks, currentWeek))
+            .toList();
 
     final theme = Theme.of(context);
-    final todayLabel = _dayLabels[now.weekday - 1];
+    final todayLabel = AppConstants.weekdayLabels[now.weekday - 1];
     final dateLabel = '${now.month}月${now.day}日';
 
     await showModalBottomSheet<void>(
@@ -445,7 +451,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                     Text('今日课程', style: theme.textTheme.titleLarge),
                     const Spacer(),
                     Text(
-                      currentWeek >= 1 ? '第 $currentWeek 周 · 周$todayLabel $dateLabel' : '尚未开学',
+                      currentWeek != null
+                          ? '第 $currentWeek 周 · 周$todayLabel $dateLabel'
+                          : (beforeStart ? '尚未开学' : '学期已结束'),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -454,11 +462,13 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 ),
               ),
               const Divider(height: 1),
-              if (slots.isEmpty)
+              if (slots.isEmpty && fullWeekToday.isEmpty)
                 Expanded(
                   child: Center(
                     child: Text(
-                      currentWeek >= 1 ? '今天没有课程' : '开学后再来看看',
+                      currentWeek != null
+                          ? '今天没有课程'
+                          : (beforeStart ? '开学后再来看看' : '本学期课程已结束'),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -469,9 +479,35 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: slots.length,
+                    itemCount: fullWeekToday.length + slots.length,
                     itemBuilder: (context, i) {
-                      final slot = slots[i];
+                      if (i < fullWeekToday.length) {
+                        final c = fullWeekToday[i];
+                        return ListTile(
+                          leading: SizedBox(
+                            width: 64,
+                            child: Text(
+                              '整周',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          title: Text(c.name),
+                          subtitle: Text(
+                            [
+                              if (c.location != null && c.location!.isNotEmpty)
+                                c.location!,
+                              if (c.teacher != null && c.teacher!.isNotEmpty)
+                                c.teacher!,
+                            ].join(' · '),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          onTap: () =>
+                              showFullWeekCourseDetailSheet(context, c),
+                        );
+                      }
+                      final slot = slots[i - fullWeekToday.length];
                       final c = slot.course;
                       return ListTile(
                         leading: SizedBox(
@@ -509,8 +545,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 
   String _slotClock(Course c, Map<int, SectionTime> sectionTimes) {
-    final start = c.startTime ?? sectionTimes[c.startSection]?.startTime;
-    final end = c.endTime ?? sectionTimes[c.endSection]?.endTime;
+    final clock = CourseClock(c, sectionTimes);
+    final start = clock.startTime;
+    final end = clock.endTime;
     if (start != null && end != null) return '$start-$end';
     return '第${c.startSection}-${c.endSection}节';
   }
@@ -576,8 +613,6 @@ class _ScheduleMenuItem extends StatelessWidget {
     );
   }
 }
-
-const _dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
 
 /// 今日课程时间线的状态标签。
 class _StatusChip extends StatelessWidget {

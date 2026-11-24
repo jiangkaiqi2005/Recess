@@ -1,12 +1,14 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/core/widgets/load_failed_view.dart';
 import 'package:recess/features/schedule/domain/schedule_helpers.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
@@ -38,8 +40,6 @@ class WeekView extends ConsumerWidget {
     this.onWebViewImport,
   });
 
-  static const _dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final coursesAsync = ref.watch(scheduleCoursesProvider);
@@ -53,12 +53,19 @@ class WeekView extends ConsumerWidget {
         (MediaQuery.textScalerOf(context).scale(12) / 12).clamp(1.0, 1.6);
 
     // 学期开学日期，用于推算选中周每天的实际日期。
-    final semester = ref.watch(activeSemesterProvider).valueOrNull;
+    final semesterAsync = ref.watch(activeSemesterProvider);
+    final semester = semesterAsync.valueOrNull;
     final semesterStart = semester?.startDate;
     // 仅当查看的是当前周时，才在表头标示"今天"（避免查看历史/未来周时
-    // 误标某一天的日期）。currentWeek>0 防御开学前误判。
-    final currentWeek = semester != null ? currentWeekOf(semester, now) : 0;
-    final isCurrentWeek = currentWeek > 0 && currentWeek == selectedWeek;
+    // 误标某一天的日期）。学期外没有可高亮的当前教学周。
+    final currentWeek = semester != null ? teachingWeekOf(semester, now) : null;
+    final isCurrentWeek = currentWeek != null && currentWeek == selectedWeek;
+
+    final allFullWeek =
+        ref.watch(scheduleFullWeekCoursesProvider).valueOrNull ?? const [];
+    final weekFullWeek = allFullWeek
+        .where((c) => courseOnWeek(c.weeks, selectedWeek))
+        .toList();
 
     return Column(
       children: [
@@ -68,80 +75,205 @@ class WeekView extends ConsumerWidget {
           selectedWeek: selectedWeek,
           isCurrentWeek: isCurrentWeek,
         ),
+        if (weekFullWeek.isNotEmpty) _AllDayRow(courses: weekFullWeek),
         Expanded(
-          child: coursesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('加载失败：$e')),
-            data: (allCourses) {
-              final weekCourses = allCourses
-                  .where((c) => courseOnWeek(c.weeks, selectedWeek))
-                  .toList();
+          // 当前学期（上游）失败时不能当作无课程：同样进入失败重试状态。
+          child: semesterAsync.hasError && !semesterAsync.isLoading
+              ? LoadFailedView(
+                  title: '课表加载失败',
+                  message: '课程数据没有读取出来，点击重试重新加载',
+                  onRetry: () => _retryReload(ref),
+                )
+              : coursesAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => LoadFailedView(
+                    title: '课表加载失败',
+                    message: '课程数据没有读取出来，点击重试重新加载',
+                    onRetry: () => _retryReload(ref),
+                  ),
+                  data: (allCourses) {
+                    final weekCourses = allCourses
+                        .where((c) => courseOnWeek(c.weeks, selectedWeek))
+                        .toList();
 
-              if (weekCourses.isEmpty) {
-                return _EmptyWeekHint(
-                  hasAnyCourses: allCourses.isNotEmpty,
-                  onImport: onImport,
-                  onWebViewImport: onWebViewImport,
-                );
-              }
+                    if (weekCourses.isEmpty) {
+                      // 只有整周课的周：全天行已经显示课程，这里不能再说“暂无课程”。
+                      if (weekFullWeek.isNotEmpty) {
+                        return const _NoSectionCoursesHint();
+                      }
+                      return _EmptyWeekHint(
+                        hasAnyCourses:
+                            allCourses.isNotEmpty || allFullWeek.isNotEmpty,
+                        onImport: onImport,
+                        onWebViewImport: onWebViewImport,
+                      );
+                    }
 
-              final byDay = <int, List<Course>>{
-                for (var d = 1; d <= 7; d++) d: [],
-              };
-              for (final c in weekCourses) {
-                byDay[c.dayOfWeek]?.add(c);
-              }
+                    final byDay = <int, List<Course>>{
+                      for (var d = 1; d <= 7; d++) d: [],
+                    };
+                    for (final c in weekCourses) {
+                      byDay[c.dayOfWeek]?.add(c);
+                    }
 
-              final sectionCount = visibleSectionCount(
-                sectionTimes: sectionTimes,
-                courses: allCourses,
-              );
-              final totalHeight = sectionCount * sectionHeight;
-
-              return SingleChildScrollView(
-                key: const Key('week-view-vertical-scroll'),
-                scrollDirection: Axis.vertical,
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.paddingOf(context).bottom + _bottomGap,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TimeAxis(
-                      sectionCount: sectionCount,
-                      sectionHeight: sectionHeight,
+                    final sectionCount = visibleSectionCount(
                       sectionTimes: sectionTimes,
-                    ),
-                    Expanded(
+                      courses: allCourses,
+                    );
+                    final totalHeight = sectionCount * sectionHeight;
+
+                    return SingleChildScrollView(
+                      key: const Key('week-view-vertical-scroll'),
+                      scrollDirection: Axis.vertical,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.paddingOf(context).bottom + _bottomGap,
+                      ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: List.generate(7, (i) {
-                          final day = i + 1;
-                          return Expanded(
-                            child: _DayColumn(
-                              sectionHeight: sectionHeight,
-                              courses: byDay[day]!,
-                              totalHeight: totalHeight,
-                              onTapCourse: (course) =>
-                                  showCourseDetailSheet(context, course,
-                                      sectionTimes),
-                              onLongPressCourse: (course) => context.push(
-                                '/course/edit',
-                                extra: course.id,
-                              ),
+                        children: [
+                          _TimeAxis(
+                            sectionCount: sectionCount,
+                            sectionHeight: sectionHeight,
+                            sectionTimes: sectionTimes,
+                          ),
+                          Expanded(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: List.generate(7, (i) {
+                                final day = i + 1;
+                                return Expanded(
+                                  child: _DayColumn(
+                                    sectionHeight: sectionHeight,
+                                    courses: byDay[day]!,
+                                    totalHeight: totalHeight,
+                                    onTapCourse: (course) =>
+                                        showCourseDetailSheet(
+                                            context, course, sectionTimes),
+                                    onLongPressCourse: (course) => context.push(
+                                      '/course/edit',
+                                      extra: course.id,
+                                    ),
+                                  ),
+                                );
+                              }),
                             ),
-                          );
-                        }),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
+    );
+  }
+
+  /// 重试重新加载真正失败的数据源：课程流与当前学期（上游）一起失效，
+  /// 不把上游失败当成无课程。不会切换学期或重置查看周。
+  void _retryReload(WidgetRef ref) {
+    ref.invalidate(activeSemesterProvider);
+    ref.invalidate(scheduleCoursesProvider);
+    ref.invalidate(scheduleFullWeekCoursesProvider);
+  }
+}
+
+/// 星期表头下方的全天行：本周的整周课各占一条横跨 7 列的色条。
+class _AllDayRow extends StatelessWidget {
+  final List<FullWeekCourse> courses;
+  const _AllDayRow({required this.courses});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const Key('week-view-all-day-row'),
+      padding: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: _timeAxisWidth,
+            height: 28,
+            child: Center(
+              child: Text(
+                '全天',
+                softWrap: false,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                for (final c in courses)
+                  Padding(
+                    padding: const EdgeInsets.all(_cardInset),
+                    child: Semantics(
+                      button: true,
+                      excludeSemantics: true,
+                      label: '${c.name}，整周',
+                      hint: '点击查看详情',
+                      child: Material(
+                        color: courseCardColor(
+                          Color(c.colorValue),
+                          theme.brightness,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () =>
+                              showFullWeekCourseDetailSheet(context, c),
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 24),
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${c.name} · 整周',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 本周只有整周课时的网格区提示。
+class _NoSectionCoursesHint extends StatelessWidget {
+  const _NoSectionCoursesHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Align(
+      alignment: const Alignment(0, -0.6),
+      child: Text(
+        '本周没有按节次安排的课程',
+        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+      ),
     );
   }
 }
@@ -201,7 +333,7 @@ class _DayHeaderRow extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '周${WeekView._dayLabels[i]}',
+                      '周${AppConstants.weekdayLabels[i]}',
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight:
                             isToday ? FontWeight.bold : FontWeight.normal,
@@ -419,7 +551,7 @@ class CourseCard extends StatelessWidget {
   String get _semanticLabel {
     final details = <String>[
       course.name,
-      '周${WeekView._dayLabels[course.dayOfWeek - 1]}',
+      '周${AppConstants.weekdayLabels[course.dayOfWeek - 1]}',
       '第${course.startSection}到${course.endSection}节',
       if (course.location != null && course.location!.trim().isNotEmpty)
         course.location!.trim(),

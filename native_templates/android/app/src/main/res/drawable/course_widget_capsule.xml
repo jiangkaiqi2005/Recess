@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  下一节课日期胶囊：主题色实心圆角，颜色随系统深浅色切换。
+  复制到 android/app/src/main/res/drawable/course_widget_capsule.xml
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_capsule_background" />
+    <corners android:radius="999dp" />
+</shape>

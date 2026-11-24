@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/data/app_database.dart' as db;
 
@@ -24,16 +25,45 @@ extension CourseEntityMapper on db.Course {
         endSection: endSection,
         startTime: startTime,
         endTime: endTime,
-        weeks: weeks.isEmpty
-            ? const []
-            : weeks
-                .split(',')
-                .where((e) => e.isNotEmpty)
-                .map((e) => int.tryParse(e.trim()))
-                .whereType<int>()
-                .toList(),
+        useExplicitTimes: useExplicitTimes,
+        weeks: _weeksFromCsv(weeks),
         colorValue: colorValue,
         notes: notes,
+      );
+}
+
+List<int> _weeksFromCsv(String weeks) => weeks.isEmpty
+    ? const []
+    : weeks
+        .split(',')
+        .where((e) => e.isNotEmpty)
+        .map((e) => int.tryParse(e.trim()))
+        .whereType<int>()
+        .toList();
+
+extension FullWeekCourseEntityMapper on db.FullWeekCourse {
+  FullWeekCourse toDomain() => FullWeekCourse(
+        id: id,
+        semesterId: semesterId,
+        name: name,
+        teacher: teacher,
+        location: location,
+        weeks: _weeksFromCsv(weeks),
+        colorValue: colorValue,
+        notes: notes,
+      );
+}
+
+extension FullWeekCourseDomainMapper on FullWeekCourse {
+  db.FullWeekCoursesCompanion toCompanion() => db.FullWeekCoursesCompanion(
+        id: Value(id),
+        semesterId: Value(semesterId),
+        name: Value(name),
+        teacher: Value(teacher),
+        location: Value(location),
+        weeks: Value(weeks.join(',')),
+        colorValue: Value(colorValue),
+        notes: Value(notes),
       );
 }
 
@@ -49,6 +79,7 @@ extension CourseDomainMapper on Course {
         endSection: Value(endSection),
         startTime: Value(startTime),
         endTime: Value(endTime),
+        useExplicitTimes: Value(useExplicitTimes),
         weeks: Value(weeks.isEmpty ? '' : weeks.join(',')),
         colorValue: Value(colorValue),
         notes: Value(notes),

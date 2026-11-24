@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import 'tables/course_platform_table.dart';
 import 'tables/course_table.dart';
+import 'tables/full_week_course_table.dart';
 import 'tables/semester_table.dart';
 
 part 'app_database.g.dart';
@@ -16,13 +17,15 @@ part 'app_database.g.dart';
 ///
 /// 首次启动无学期时，[seedDefaultSemester] 写入一个默认激活学期，
 /// 让用户立刻拥有可操作的「当前周」，避免空状态困惑。
-@DriftDatabase(tables: [Courses, Semesters, CoursePlatforms])
+@DriftDatabase(
+    tables: [Courses, Semesters, CoursePlatforms, FullWeekCourses])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
-  /// 版本 2：新增课程平台表。
+  /// 版本 3：明确课程是否使用独立钟点，旧记录默认跟随节次作息。
+  /// 版本 4：新增整周课表。
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -30,26 +33,14 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           // 1 → 2 只新建课程平台表，已有课程与学期保持不动。
           if (from < 2) await m.createTable(coursePlatforms);
+          if (from < 3) await m.addColumn(courses, courses.useExplicitTimes);
+          if (from < 4) await m.createTable(fullWeekCourses);
         },
       );
 
-  /// 序列化并发播种，避免首启瞬间多次调用导致写入多个学期。
-  Future<void>? _seedFuture;
-
   /// 若不存在任何学期，写入一个默认激活学期（开学日取最近周一，18 周）。
-  /// 设计为幂等：多次调用安全。
+  /// 每次检查；数据库事务串行执行，避免并发读取重复播种。
   Future<void> seedDefaultSemester() async {
-    if (_seedFuture != null) return _seedFuture!;
-    _seedFuture = _doSeed();
-    try {
-      await _seedFuture;
-    } catch (_) {
-      _seedFuture = null;
-      rethrow;
-    }
-  }
-
-  Future<void> _doSeed() async {
     await transaction(() async {
       final count = await (select(semesters)
             ..where((s) => s.isActive.equals(true)))

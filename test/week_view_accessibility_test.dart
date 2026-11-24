@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,6 +33,9 @@ void main() {
       ProviderScope(
         overrides: [
           activeSemesterProvider.overrideWith((ref) async => semester),
+          scheduleFullWeekCoursesProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           scheduleCoursesProvider.overrideWith(
             (ref) => Stream.value(const [course]),
           ),

@@ -4,6 +4,7 @@ import 'package:recess/data/app_database.dart';
 import 'package:recess/data/repositories/backup_repository.dart';
 import 'package:recess/data/repositories/course_platform_repository.dart';
 import 'package:recess/data/repositories/course_repository.dart';
+import 'package:recess/data/repositories/full_week_course_repository.dart';
 import 'package:recess/data/repositories/semester_repository.dart';
 
 /// 进程级单例数据库。懒加载，首次访问时打开 SQLite 文件。
@@ -24,6 +25,11 @@ final semesterRepositoryProvider = Provider<SemesterRepository>((ref) {
 final coursePlatformRepositoryProvider =
     Provider<CoursePlatformRepository>((ref) {
   return CoursePlatformRepository(ref.watch(appDatabaseProvider));
+});
+
+final fullWeekCourseRepositoryProvider =
+    Provider<FullWeekCourseRepository>((ref) {
+  return FullWeekCourseRepository(ref.watch(appDatabaseProvider));
 });
 
 final backupRepositoryProvider = Provider<BackupRepository>((ref) {

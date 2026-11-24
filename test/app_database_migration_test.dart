@@ -1,13 +1,15 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/full_week_course.dart';
+import 'package:recess/data/repositories/full_week_course_repository.dart';
 import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/repositories/course_platform_repository.dart';
 import 'package:recess/data/repositories/course_repository.dart';
 import 'package:recess/data/repositories/semester_repository.dart';
 
 void main() {
-  test('数据库从版本 1 升到 2：已有学期和课程保留，课程平台表可用', () async {
+  test('数据库从版本 1 升到 4：已有学期和课程保留，课程平台表和整周课表可用', () async {
     // 按版本 1 的表结构建库并写入数据，模拟老用户升级。
     final database = db.AppDatabase(
       NativeDatabase.memory(
@@ -65,6 +67,16 @@ void main() {
         .customSelect('PRAGMA user_version')
         .getSingle()
         .then((row) => row.read<int>('user_version'));
-    expect(version, 2);
+    expect(version, 4);
+
+    const fullWeek = FullWeekCourse(
+      id: 'f1',
+      semesterId: 's1',
+      name: '课程设计',
+      weeks: [17],
+    );
+    final fullWeekRepo = FullWeekCourseRepository(database);
+    await fullWeekRepo.addAll('s1', const [fullWeek]);
+    expect(await fullWeekRepo.getAll('s1'), [fullWeek]);
   });
 }

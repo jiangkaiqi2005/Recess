@@ -67,6 +67,7 @@ void main() {
       endSection: 1,
       startTime: '08:30',
       endTime: '09:00',
+      useExplicitTimes: true,
       weeks: [1],
     );
     final slots = todayCourseSlots(
@@ -95,6 +96,29 @@ void main() {
       sectionTimes: sectionTimes,
     );
     expect(slots.single.status, CourseStatus.upcoming);
+  });
+
+  test('今日状态逐端回退，空串或不可解析显式端保持未开始降级', () {
+    final base = _c('x', DateTime.monday, 1, 2).copyWith(useExplicitTimes: true);
+    final slots = todayCourseSlots(
+      courses: [
+        base.copyWith(id: 'start', startTime: '08:30'),
+        base.copyWith(id: 'end', endTime: '09:00'),
+        base.copyWith(id: 'empty', startTime: ''),
+        base.copyWith(id: 'bad', endTime: '不是钟点'),
+        base.copyWith(id: 'missing', endSection: 16),
+      ],
+      currentWeek: 1,
+      now: DateTime(2026, 8, 31, 9, 5),
+      sectionTimes: sectionTimes,
+    );
+    expect({for (final slot in slots) slot.course.id: slot.status}, {
+      'start': CourseStatus.ongoing,
+      'end': CourseStatus.done,
+      'empty': CourseStatus.upcoming,
+      'bad': CourseStatus.upcoming,
+      'missing': CourseStatus.upcoming,
+    });
   });
 
   test('filterCourses 按名称/教师/教室模糊匹配（不区分大小写）', () {

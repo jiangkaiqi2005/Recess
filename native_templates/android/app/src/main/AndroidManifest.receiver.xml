@@ -1,5 +1,5 @@
 <!--
-  把下面这段 <receiver> 合并进 android/app/src/main/AndroidManifest.xml 的
+  把下面这些 <receiver> 合并进 android/app/src/main/AndroidManifest.xml 的
   <application> 标签内（与已有的 <activity> 同级）。
 
   注意 android:name=".CourseWidgetProvider" 中的前缀 "." 表示使用
@@ -9,11 +9,60 @@
 -->
 <receiver
     android:name=".CourseWidgetProvider"
-    android:exported="true">
+    android:exported="true"
+    android:label="今日课程">
     <intent-filter>
         <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
     </intent-filter>
     <meta-data
         android:name="android.appwidget.provider"
         android:resource="@xml/course_widget_info" />
+</receiver>
+
+<receiver
+    android:name=".CourseWidget3x2Provider"
+    android:exported="true"
+    android:label="今日课程 3×2">
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/course_widget_3x2_info" />
+</receiver>
+
+<receiver
+    android:name=".CourseWidget2x3Provider"
+    android:exported="true"
+    android:label="今日课程 2×3">
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/course_widget_2x3_info" />
+</receiver>
+
+<receiver
+    android:name=".CourseWidget4x2Provider"
+    android:exported="true"
+    android:label="今日课程 4×2">
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/course_widget_4x2_info" />
+</receiver>
+
+<receiver
+    android:name=".CourseWidget4x4Provider"
+    android:exported="true"
+    android:label="今日课程 4×4">
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/course_widget_4x4_info" />
 </receiver>

@@ -3,12 +3,13 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/domain/import_course.dart';
+import 'package:recess/features/import/application/import_commit.dart';
 import 'package:recess/features/import/data/ics_parser.dart';
 import 'package:recess/features/import/data/json_importer.dart';
 
@@ -29,8 +30,10 @@ class ImportState {
   final List<ImportCourse> courses;
   final String? errorMessage;
   final int importedCount;
-  final List<String> skipped;
-  final int totalWeeks;
+
+  /// 本次文件的逐条导入诊断：随预览、错误、提交失败与完成状态保留，
+  /// 选择新文件时整体清理（见 [ImportNotifier.pickAndParse]）。
+  final List<ImportDiagnostic> diagnostics;
   final ImportMode mode;
 
   /// JSON 文件里按课程名给出的课程平台，确认导入时写入目标学期。
@@ -41,8 +44,7 @@ class ImportState {
     this.courses = const [],
     this.errorMessage,
     this.importedCount = 0,
-    this.skipped = const [],
-    this.totalWeeks = 18,
+    this.diagnostics = const [],
     this.mode = ImportMode.replace,
     this.platforms = const {},
   });
@@ -52,8 +54,7 @@ class ImportState {
     List<ImportCourse>? courses,
     String? errorMessage,
     int? importedCount,
-    List<String>? skipped,
-    int? totalWeeks,
+    List<ImportDiagnostic>? diagnostics,
     ImportMode? mode,
     CoursePlatformGroups? platforms,
   }) =>
@@ -62,8 +63,7 @@ class ImportState {
         courses: courses ?? this.courses,
         errorMessage: errorMessage ?? this.errorMessage,
         importedCount: importedCount ?? this.importedCount,
-        skipped: skipped ?? this.skipped,
-        totalWeeks: totalWeeks ?? this.totalWeeks,
+        diagnostics: diagnostics ?? this.diagnostics,
         mode: mode ?? this.mode,
         platforms: platforms ?? this.platforms,
       );
@@ -89,7 +89,14 @@ class ImportNotifier extends StateNotifier<ImportState> {
         state.status != ImportStatus.done) {
       return;
     }
-    state = state.copyWith(status: ImportStatus.picking, errorMessage: null);
+    // 换文件：旧文件的课程、平台与诊断一并清理，避免跨文件串用。
+    state = state.copyWith(
+      status: ImportStatus.picking,
+      errorMessage: null,
+      courses: const [],
+      diagnostics: const [],
+      platforms: const {},
+    );
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -115,27 +122,27 @@ class ImportNotifier extends StateNotifier<ImportState> {
         return;
       }
 
-      final (courses, platforms, skipped) =
+      final (courses, platforms, diagnostics) =
           _parseByType(ext, content, semester);
       if (courses.isEmpty) {
         state = state.copyWith(
           status: ImportStatus.error,
           errorMessage: '未能从文件中解析出任何课程，请检查格式。',
-          skipped: skipped,
+          diagnostics: diagnostics,
         );
         return;
       }
       state = state.copyWith(
         status: ImportStatus.preview,
         courses: courses,
-        totalWeeks: semester.totalWeeks,
-        skipped: skipped,
+        diagnostics: diagnostics,
         platforms: platforms,
       );
     } catch (e) {
       state = state.copyWith(
         status: ImportStatus.error,
         errorMessage: '解析失败：${e.toString()}',
+        diagnostics: const [],
       );
     }
   }
@@ -143,56 +150,53 @@ class ImportNotifier extends StateNotifier<ImportState> {
   void toggleSelected(int index) {
     if (index < 0 || index >= state.courses.length) return;
     final list = [...state.courses];
-    list[index] = list[index]._copyWithSelected(!list[index].selected);
+    list[index] = list[index].withSelected(!list[index].selected);
     state = state.copyWith(courses: list);
   }
 
   void setAllSelected(bool selected) {
     state = state.copyWith(
-      courses: state.courses.map((c) => c._copyWithSelected(selected)).toList(),
+      courses: state.courses.map((c) => c.withSelected(selected)).toList(),
     );
   }
 
   /// 用勾选的课程替换当前学期课表（每条生成新 id）。
   void setMode(ImportMode mode) => state = state.copyWith(mode: mode);
 
-  Future<void> confirmImport() async {
-    final toImport = state.courses.where((c) => c.selected).toList();
-    if (toImport.isEmpty) return;
-
+  Future<ImportSubmission?> prepareImport() async {
+    final snapshot = state;
+    if (snapshot.selectedCount == 0 ||
+        snapshot.status == ImportStatus.importing) {
+      return null;
+    }
     final semester = await _activeSemester();
-    if (semester == null) return;
-    final repo = _ref.read(courseRepositoryProvider);
-
-    state = state.copyWith(status: ImportStatus.importing);
-    final uuid = const Uuid();
-    final replacements = toImport
-        .map((course) => course.toCourse(semester.id).copyWith(id: uuid.v4()))
-        .toList(growable: false);
-
-    // 合并：保留现有课程；替换：整体覆盖，都不影响其他学期课程。
-    if (state.mode == ImportMode.merge) {
-      await repo.addCourses(semester.id, replacements);
-    } else {
-      await repo.replaceForSemester(semester.id, replacements);
-    }
-    // 平台按课程名归属，替换课程不会删除已有平台；文件里给出的平台按课程名
-    // 整体覆盖到目标学期，但只写实际导入的课程。
-    final platformRepo = _ref.read(coursePlatformRepositoryProvider);
-    final platforms = platformsForImportedCourses(state.platforms, toImport);
-    for (final entry in platforms.entries) {
-      await platformRepo.replacePlatforms(semester.id, entry.key, entry.value);
-    }
-    final count = replacements.length;
-
-    // 课程流由 drift watch 自动发射新数据，无需手动 invalidate；
-    // 桌面小组件刷新由根部的 _AppEffects 集中监听，这里不再单独触发。
-
-    state = state.copyWith(
-      status: ImportStatus.done,
-      importedCount: count,
-      courses: const [],
+    if (semester == null) return null;
+    return ImportSubmission.file(
+      semesterId: semester.id,
+      mode: snapshot.mode,
+      courses: snapshot.courses,
+      platforms: snapshot.platforms,
     );
+  }
+
+  Future<void> confirmImport([ImportSubmission? submission]) async {
+    if (state.status == ImportStatus.importing) return;
+    submission ??= await prepareImport();
+    if (submission == null || submission.courses.isEmpty) return;
+    state = state.copyWith(status: ImportStatus.importing);
+    try {
+      final count = await _ref.read(importCommitProvider).commit(submission);
+      state = state.copyWith(
+        status: ImportStatus.done,
+        importedCount: count,
+        courses: const [],
+      );
+    } catch (e) {
+      state = state.copyWith(
+        status: ImportStatus.preview,
+        errorMessage: '导入失败：$e',
+      );
+    }
   }
 
   void reset() => state = const ImportState();
@@ -204,7 +208,7 @@ class ImportNotifier extends StateNotifier<ImportState> {
     return repo.getActiveSemester();
   }
 
-  (List<ImportCourse>, CoursePlatformGroups, List<String>)
+  (List<ImportCourse>, CoursePlatformGroups, List<ImportDiagnostic>)
       _parseByType(
     String ext,
     String content,
@@ -216,24 +220,26 @@ class ImportNotifier extends StateNotifier<ImportState> {
           content,
           totalWeeks: semester.totalWeeks,
         );
-        return (result.courses, result.platforms, result.skipped);
+        return (result.courses, result.platforms, result.diagnostics);
       case 'ics':
-        // ICS 不携带课程平台。
+        // ICS 不携带课程平台；无效事件的原因按源事件记入诊断。
+        final diagnostics = <ImportDiagnostic>[];
         return (
           IcsCourseParser.parse(
             content,
             semesterStart: semester.startDate,
             totalWeeks: semester.totalWeeks,
+            diagnostics: diagnostics,
           ),
           const {},
-          const <String>[],
+          diagnostics,
         );
       default:
         // 不支持的格式，返回空。
         return (
           const <ImportCourse>[],
           const {},
-          const <String>[],
+          const <ImportDiagnostic>[],
         );
     }
   }
@@ -245,23 +251,4 @@ class ImportNotifier extends StateNotifier<ImportState> {
     // withData:true 应始终提供字节；缺失视为错误。
     throw Exception('无法读取文件内容，请重试。');
   }
-}
-
-/// [ImportCourse] 的私有便捷复制（仅翻转 selected），避免对外暴露可变字段。
-extension _ImportCourseCopy on ImportCourse {
-  ImportCourse _copyWithSelected(bool selected) => ImportCourse(
-        name: name,
-        teacher: teacher,
-        location: location,
-        dayOfWeek: dayOfWeek,
-        startSection: startSection,
-        endSection: endSection,
-        startTime: startTime,
-        endTime: endTime,
-        weeks: weeks,
-        colorValue: colorValue,
-        notes: notes,
-        source: source,
-        selected: selected,
-      );
 }

@@ -1,23 +1,24 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-import 'package:recess/core/constants/app_constants.dart';
+import 'package:recess/features/import/application/import_commit.dart';
 import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/course_platform.dart';
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/import/application/course_capture_orientation.dart';
+import 'package:recess/features/import/application/webview_extraction_protocol.dart';
 import 'package:recess/features/import/application/webview_import_provider.dart';
 import 'package:recess/features/import/domain/import_course.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
-import 'package:recess/features/settings/application/section_times_provider.dart';
 import '../data/school_adapter.dart';
 import 'import_confirm_dialog.dart';
 import 'import_preview_list.dart';
+import 'import_target_semester.dart';
 
 /// Android WebView 会把无法重放的无缓存请求报为 ERR_CACHE_MISS。
 bool isWebViewCacheMiss(String description) =>
@@ -39,6 +40,7 @@ class WebviewImportScreen extends ConsumerStatefulWidget {
 
 class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
   late final CourseCaptureOrientationController _orientationController;
+  late final WebviewExtractionProtocol _extraction;
   SchoolAdapter? _adapter;
   WebViewController? _controller;
   bool _cacheMissRecoveryAttempted = false;
@@ -50,6 +52,39 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
     super.initState();
     _orientationController =
         widget.orientationController ?? CourseCaptureOrientationController();
+    _extraction = WebviewExtractionProtocol(
+      isReady: () => _adapter != null && _controller != null,
+      isMounted: () => mounted,
+      enterCaptureMode: _orientationController.enterCaptureMode,
+      leaveCaptureMode: _orientationController.leaveCaptureMode,
+      waitForLandscapeLayout: _waitForLandscapeLayout,
+      wait: (duration) => Future<void>.delayed(duration),
+      executeJs: (js) => _controller!.runJavaScriptReturningResult(js),
+      loadPreviewContext: () async {
+        final semester = await ref.read(activeSemesterProvider.future);
+        if (semester == null) throw StateError('请先创建学期');
+        return WebviewPreviewContext.fromSemester(semester);
+      },
+      buildExtractJs: (previewContext) =>
+          _adapter!.extractForSemester(previewContext.totalWeeks),
+      currentUrl: () async {
+        final controller = _controller;
+        return controller == null ? null : controller.currentUrl();
+      },
+      isSchedulePage: (url) => _adapter!.isSchedulePage(url),
+      onExtracting: (extracting) {
+        if (mounted) {
+          ref.read(webviewImportProvider.notifier).setExtracting(extracting);
+        }
+      },
+      onNotice: (message) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+        }
+      },
+    );
   }
 
   @override
@@ -62,6 +97,9 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(webviewImportProvider);
+    final semester = ref.watch(activeSemesterProvider).valueOrNull;
+    final previewReady = state.preview != null && state.preview!.canSubmit &&
+        state.preview!.context.matches(semester);
     return Scaffold(
       appBar: AppBar(
         title: Text(state.phase == WebviewPhase.select
@@ -92,7 +130,7 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
             ),
           if (state.phase == WebviewPhase.preview)
             TextButton(
-              onPressed: state.selectedCount == 0
+              onPressed: state.selectedCount == 0 || !previewReady
                   ? null
                   : () => _confirmAndImport(state),
               child: Text('导入 (${state.selectedCount})'),
@@ -124,6 +162,8 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const ImportTargetSemester(),
+        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -243,7 +283,7 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
   bool _matchesSchool(SchoolAdapter adapter, String query) {
     if (query.isEmpty) return true;
     return adapter.schoolName.toLowerCase().contains(query) ||
-        schoolAlphabeticalKey(adapter.schoolName).contains(query) ||
+        adapter.pinyin.contains(query) ||
         adapter.systemName.toLowerCase().contains(query) ||
         adapter.loginUrl.toLowerCase().contains(query);
   }
@@ -280,7 +320,7 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
 
   // ── 预览列表 ──
   Widget _buildPreview(WebviewImportState state) {
-    if (state.courses.isEmpty) {
+    if (state.courses.isEmpty && state.skippedCount == 0) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -315,7 +355,7 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
     final existingCourses = state.mode == ImportMode.merge
         ? ref.watch(scheduleCoursesProvider).valueOrNull ?? const <Course>[]
         : const <Course>[];
-    final conflictedNames = _conflictNames(state, existingCourses);
+    final conflictedNames = conflictNames(state.courses, existingCourses);
     return Column(
       children: [
         Container(
@@ -344,39 +384,9 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: SegmentedButton<ImportMode>(
-            segments: const [
-              ButtonSegment(
-                value: ImportMode.replace,
-                icon: Icon(Icons.restart_alt, size: 18),
-                label: Text('替换'),
-              ),
-              ButtonSegment(
-                value: ImportMode.merge,
-                icon: Icon(Icons.library_add_outlined, size: 18),
-                label: Text('合并'),
-              ),
-            ],
-            selected: {state.mode},
-            showSelectedIcon: false,
-            onSelectionChanged: (s) =>
-                ref.read(webviewImportProvider.notifier).setMode(s.first),
-          ),
-        ),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: theme.colorScheme.secondaryContainer,
-          child: Text(
-            state.mode == ImportMode.merge
-                ? '合并模式：保留现有课表，追加所选课程。'
-                : '替换模式：所选课程将替换当前学期的原有课表。',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSecondaryContainer,
-            ),
-          ),
+        ImportModeSelector(
+          mode: state.mode,
+          onChanged: notifier.setMode,
         ),
         if (state.skippedCount > 0)
           Container(
@@ -391,7 +401,8 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '有 ${state.skippedCount} 门课程无法识别星期，已跳过',
+                    '已跳过 ${state.skippedCount} 条课程记录：\n'
+                    '${state.preview?.skippedReasons.entries.map((e) => "${e.key}：${e.value}条").join("；") ?? "课程记录无效"}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.error,
                     ),
@@ -400,6 +411,23 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
               ],
             ),
           ),
+        if (state.preview != null && (!state.preview!.canSubmit ||
+            !state.preview!.context.matches(ref.watch(activeSemesterProvider).valueOrNull)))
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              state.preview!.canSubmit
+                  ? '学期设置已改变，请重新抓取并预览'
+                  : '${state.preview!.weekConflicts.join('；')}。请先核对调整学期并重新预览。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+        TextButton(
+          onPressed: notifier.backToLogin,
+          child: const Text('返回重新抓取'),
+        ),
         if (conflictedNames.isNotEmpty)
           ImportConflictBanner(
             names: conflictedNames,
@@ -416,30 +444,6 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
         ),
       ],
     );
-  }
-
-  /// 返回存在时间冲突的已选课程名称集合（内部冲突 + 与现有课表冲突）。
-  Set<String> _conflictNames(
-    WebviewImportState state,
-    List<Course> existingCourses,
-  ) {
-    final selected = state.courses.where((c) => c.selected).toList();
-    final names = <String>{};
-    for (var i = 0; i < selected.length; i++) {
-      for (var j = i + 1; j < selected.length; j++) {
-        if (coursesConflict(selected[i], selected[j])) {
-          names
-            ..add(selected[i].name)
-            ..add(selected[j].name);
-        }
-      }
-      for (final e in existingCourses) {
-        if (conflictsWithCourse(selected[i], e)) {
-          names.add(selected[i].name);
-        }
-      }
-    }
-    return names;
   }
 
   // ── 逻辑 ──
@@ -546,164 +550,62 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
 
   Future<void> _tryExtract() async {
     if (_adapter == null || _controller == null) return;
-    final notifier = ref.read(webviewImportProvider.notifier);
     if (ref.read(webviewImportProvider).extracting) {
       return; // 防止 onPageFinished 与手动点击并发
     }
-    notifier.setExtracting(true);
-
-    try {
-      // 登录和浏览阶段保持正常竖屏，只在坐标敏感的抓取瞬间临时横屏。
-      final landscapeReady = await _orientationController.enterCaptureMode();
-      if (!mounted) {
-        await _orientationController.leaveCaptureMode();
-        return;
-      }
-      if (!landscapeReady) {
+    final outcome = await _extraction.run();
+    if (!mounted) return;
+    switch (outcome) {
+      case WebviewExtractPreview(:final preview):
+        ref.read(webviewImportProvider.notifier).showValidatedPreview(preview);
+      case WebviewExtractNotFound(:final debugInfo):
+        _showNotFoundDialog(debugInfo);
+      case WebviewExtractNavFailed():
+        _showNavFailedDialog();
+      case WebviewExtractError(:final error):
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('无法自动切换横屏，请手动将手机旋转为横屏后再抓取')),
+          SnackBar(content: Text('抓取失败：$error')),
         );
-      } else {
-        // 等待 Android 完成 Activity 与 WebView 尺寸变更，避免读取旧的竖屏坐标。
-        final layoutChanged = await _waitForLandscapeLayout();
-        if (!mounted) {
-          await _orientationController.leaveCaptureMode();
-          return;
-        }
-        if (!layoutChanged) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('屏幕尚未切换为横屏，请手动旋转手机后再抓取')),
-          );
-        }
-      }
-
-      // 等待 SPA 动态渲染完成
-      await Future.delayed(const Duration(seconds: 2));
-
-      // 注入 JS 提取课程
-      final result =
-          await _controller!.runJavaScriptReturningResult(_adapter!.extractJs);
-      final decoded = decodeWebviewExtractResult(result);
-
-      // 适配器导航/等待信号：已跳转课表页或课表仍在加载，延迟后自动重试
-      if (decoded is Map<String, dynamic>) {
-        if (decoded['__nav'] == true || decoded['__pending'] == true) {
-          notifier.setExtracting(false);
-          if (notifier.navRetry >= 3) {
-            notifier.navRetry = 0;
-            await _orientationController.leaveCaptureMode();
-            if (!mounted) return;
-            _showNavFailedDialog();
-            return;
-          }
-          notifier.navRetry++;
-          await Future.delayed(
-            decoded['__nav'] == true
-                ? const Duration(seconds: 3)
-                : const Duration(seconds: 2),
-          );
-          if (mounted) await _tryExtract();
-          return;
-        }
-      }
-      notifier.navRetry = 0;
-      if (decoded == null) {
-        throw Exception('未抓取到课程数据，请确认已进入课表页面后重试');
-      }
-      if (decoded is! List) {
-        throw Exception('课表数据格式异常，请确认已进入课表页面后重试');
-      }
-
-      final (courses, skippedCount) = importCoursesFromDecoded(decoded);
-
-      if (courses.isEmpty) {
-        // 抓取为空，捕获调试信息
-        final debugInfo = await _controller!.runJavaScriptReturningResult(r'''
-          (function() {
-            var info = 'URL: ' + location.href + '\n\n';
-            var els = document.body.querySelectorAll('*');
-            var found = false;
-            for (var i = 0; i < els.length; i++) {
-              var t = (els[i].textContent || '');
-              if (/\[\d{4,}-\d{2,}/.test(t) && t.length < 300 && t.length > 10) {
-                info += '=== 课程元素 outerHTML ===\n';
-                info += els[i].outerHTML.substring(0, 800) + '\n\n';
-                info += '=== 父元素 outerHTML (前1500字符) ===\n';
-                var p = els[i].parentElement;
-                if (p) info += p.outerHTML.substring(0, 1500);
-                found = true;
-                break;
-              }
-            }
-            if (!found) {
-              info += '未找到含课程编号的元素\n\n';
-              info += '=== body.innerText 前1500字符 ===\n';
-              info += (document.body ? document.body.innerText : '').substring(0, 1500);
-            }
-            return info;
-          })()
-        ''');
-        final debugStr = debugInfo is String ? debugInfo : debugInfo.toString();
-        notifier.setExtracting(false);
-        await _orientationController.leaveCaptureMode();
-        if (!mounted) return;
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('未找到课程数据'),
-              content: const SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('请确认：'),
-                    SizedBox(height: 8),
-                    Text('1. 已成功登录教务系统'),
-                    Text('2. 当前页面是课程表页面'),
-                    Text('3. 点击右上角「抓取课表」重试'),
-                    SizedBox(height: 8),
-                    Text('如果仍无法抓取，说明你的学校教务系统暂不支持。'),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('关闭'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    _showDebugInfo(context, debugStr);
-                  },
-                  child: const Text('查看详情'),
-                ),
-              ],
-            ),
-          );
-        }
-        return;
-      }
-
-      await _orientationController.leaveCaptureMode();
-      if (!mounted) return;
-      notifier.showPreview(courses, skippedCount);
-    } catch (e) {
-      if (mounted) notifier.setExtracting(false);
-      await _orientationController.leaveCaptureMode();
-      if (!mounted) return;
-      // 跳转进行中注入异常（JS 上下文销毁）时静默等待，onPageFinished 会自动重试
-      final currentUrl = await _controller?.currentUrl();
-      if (currentUrl != null && _adapter!.isSchedulePage(currentUrl)) {
-        return;
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('抓取失败：$e')),
-        );
-      }
+      case WebviewExtractSilent():
+        break;
     }
+  }
+
+  void _showNotFoundDialog(String debugStr) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('未找到课程数据'),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('请确认：'),
+              SizedBox(height: 8),
+              Text('1. 已成功登录教务系统'),
+              Text('2. 当前页面是课程表页面'),
+              Text('3. 点击右上角「抓取课表」重试'),
+              SizedBox(height: 8),
+              Text('如果仍无法抓取，说明你的学校教务系统暂不支持。'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('关闭'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _showDebugInfo(context, debugStr);
+            },
+            child: const Text('查看详情'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 自动导航课表页多次仍失败时的提示。
@@ -748,27 +650,6 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
   }
 
   Future<void> _confirmAndImport(WebviewImportState state) async {
-    // 二次确认：替换/合并都先向用户说明影响面。
-    final existing = await _existingCourseCount();
-    if (!mounted) return;
-    final ok = await showImportConfirmDialog(
-      context,
-      mode: state.mode,
-      importCount: state.selectedCount,
-      existingCount: existing,
-    );
-    if (ok && mounted) await _importSelected();
-  }
-
-  Future<int> _existingCourseCount() async {
-    final repo = ref.read(courseRepositoryProvider);
-    final semester =
-        await ref.read(semesterRepositoryProvider).getActiveSemester();
-    if (semester == null) return 0;
-    return (await repo.getCourses(semester.id)).length;
-  }
-
-  Future<void> _importSelected() async {
     final semester = ref.read(activeSemesterProvider).value;
     if (semester == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -776,51 +657,54 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
       );
       return;
     }
-
-    final repo = ref.read(courseRepositoryProvider);
-    final sectionTimes = ref.read(sectionTimesProvider);
-    final uuid = const Uuid();
-    final state = ref.read(webviewImportProvider);
-    final replacements = <Course>[];
-    for (final c in state.courses.where((c) => c.selected)) {
-      if (c.name.isEmpty || c.weeks.isEmpty) continue;
-      // 教案上没有直接的时间，但节次时间表已知：startSection 对应开始时间，
-      // endSection 对应结束时间，补上后桌面小组件才能显示具体钟点。
-      final startTime = sectionTimes[c.startSection]?.startTime;
-      final endTime = sectionTimes[c.endSection]?.endTime;
-      replacements.add(Course(
-        id: uuid.v4(),
-        semesterId: semester.id,
-        name: c.name,
-        teacher: c.teacher,
-        location: c.location,
-        dayOfWeek: c.dayOfWeek,
-        startSection: c.startSection,
-        endSection: c.endSection,
-        startTime: startTime,
-        endTime: endTime,
-        weeks: c.weeks,
-        colorValue: AppConstants.courseAutoColor(replacements.length),
-      ));
+    final preview = state.preview;
+    if (preview == null || !preview.canSubmit || !preview.context.matches(semester)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请核对学期设置并重新抓取预览')),
+      );
+      return;
     }
+    final submission = ImportSubmission.webview(
+      previewContext: preview.context,
+      semesterId: semester.id,
+      mode: state.mode,
+      courses: state.courses,
+    );
+    if (submission.isEmpty) return;
+    final existing = (await ref.read(courseRepositoryProvider)
+            .getCourses(submission.semesterId))
+        .length +
+        (await ref.read(fullWeekCourseRepositoryProvider)
+            .getAll(submission.semesterId))
+        .length;
+    if (!mounted) return;
+    final ok = await showImportConfirmDialog(
+      context,
+      mode: submission.mode,
+      importCount: submission.count,
+      existingCount: existing,
+    );
+    if (ok && mounted) await _importSelected(submission);
+  }
 
-    if (replacements.isEmpty) return;
-    if (state.mode == ImportMode.merge) {
-      await repo.addCourses(semester.id, replacements);
-    } else {
-      await repo.replaceForSemester(semester.id, replacements);
-    }
-    final count = replacements.length;
-
-    if (mounted) {
+  Future<void> _importSelected(ImportSubmission submission) async {
+    try {
+      final count = await ref.read(importCommitProvider).commit(submission);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(state.mode == ImportMode.merge
+          content: Text(submission.mode == ImportMode.merge
               ? '已在现有课表中追加 $count 门课程'
               : '已用 $count 门课程替换当前课表'),
         ),
       );
       context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导入失败：$e')),
+      );
     }
   }
 }
@@ -1001,9 +885,8 @@ class _CustomUrlCardState extends State<_CustomUrlCard> {
                       keyboardType: TextInputType.url,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return '请输入 URL';
-                        final uri = Uri.tryParse(v.trim());
-                        if (uri == null || !uri.hasScheme) {
-                          return '请输入完整 URL（含 https://）';
+                        if (!isAllowedPlatformUrl(v)) {
+                          return '请输入 http(s):// 开头的完整 URL';
                         }
                         return null;
                       },

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:recess/features/import/application/webview_import_provider.dart';
+import 'support/webview_parse_helper.dart';
 import 'package:recess/features/import/data/cqu_adapter.dart';
 
 void main() {
@@ -10,10 +10,6 @@ void main() {
     final adapter = CquAdapter();
 
     expect(adapter.loginUrl, 'https://my.cqu.edu.cn');
-    expect(
-      adapter.scheduleUrl,
-      'https://my.cqu.edu.cn/tt/university-timetable',
-    );
     expect(
       adapter.isSchedulePage('https://my.cqu.edu.cn/tt/university-timetable'),
       isTrue,
@@ -34,6 +30,24 @@ void main() {
   });
 
   group('CquAdapter extractJs', () {
+    test('明确周次范围内筛选单双而不补到20周', () async {
+      final courses = await _runExtractor(r'''
+        const card = new FakeElement(
+          '本科 - 课程甲[992499-001]\n[1-8周，单周] [1-2节] D1210',
+          42, 101, {'data-day': '1'});
+        installDocument([card]);
+      ''');
+      expect(courses.single['weeks'], [1, 3, 5, 7]);
+    });
+    test('周次括号后的单双条件仍限制于该明确范围', () async {
+      final courses = await _runExtractor(r'''
+        const card = new FakeElement(
+          '本科 - 课程甲[992499-001]\n[1-8周]（单周） [1-2节] D1210',
+          42, 101, {'data-day': '1'});
+        installDocument([card]);
+      ''');
+      expect(courses.single['weeks'], [1, 3, 5, 7]);
+    });
     test('普通课旁的屏外教师详情不生成课程或计入无法识别星期', () async {
       final courses = await _runExtractor(r'''
         const headers = makeHeaders([
@@ -53,7 +67,7 @@ void main() {
       expect(courses.single['name'], '边缘计算');
       expect(courses.single['dayOfWeek'], DateTime.monday);
       expect(courses.single['teacher'], '汪成亮');
-      final (imported, skipped) = importCoursesFromDecoded(courses);
+      final (imported, skipped) = parseWebviewCourses(courses);
       expect(imported, hasLength(1));
       expect(imported.single.teacher, '汪成亮');
       expect(skipped, 0);
@@ -211,7 +225,7 @@ void main() {
       ''');
 
       expect(courses, hasLength(2));
-      final (imported, skipped) = importCoursesFromDecoded(courses);
+      final (imported, skipped) = parseWebviewCourses(courses);
       expect(skipped, 0);
       expect(imported.map((c) => c.name), [
         '操作系统[FUSE 用户空间文件系统管理 ]',
@@ -255,7 +269,7 @@ void main() {
 
       expect(courses, hasLength(3));
       expect(courses.first['name'], '操作系统');
-      final (imported, skipped) = importCoursesFromDecoded(courses);
+      final (imported, skipped) = parseWebviewCourses(courses);
       expect(skipped, 0);
       final labs = imported.where((c) => c.startSection == 6).toList();
       expect(labs, hasLength(2));
@@ -312,6 +326,43 @@ void main() {
       expect(courses.map((c) => c['endSection']), [9, 9, 7]);
     });
 
+    test('「整周」行里只有周次的课程卡片导出为整周课，不推断星期', () async {
+      final courses = await _runExtractor(r'''
+        const headers = makeHeaders([
+          [1, 100], [2, 200], [3, 300], [4, 400],
+          [5, 500], [6, 600], [7, 700]
+        ]);
+        installDocument(headers.concat([
+          new FakeElement('整周', 0, 30),
+          new FakeElement('本科 - 硬件综合设计[188242-001]\n[18-20周]', 80, 40),
+          new FakeElement('本科 - 操作系统课程设计[994790-001]\n[17周]', 180, 40),
+          new FakeElement('本科 - 边缘计算[992499-001]\n[4,6-14周] [1-2节] D1210', 80, 40)
+        ]));
+      ''');
+
+      expect(courses, hasLength(3));
+      final fullWeek = courses.where((c) => c['fullWeek'] == true).toList();
+      expect(fullWeek.map((c) => c['name']), ['硬件综合设计', '操作系统课程设计']);
+      expect(fullWeek.first['weeks'], [18, 19, 20]);
+      expect(fullWeek.first['dayOfWeek'], isNull);
+      expect(fullWeek.first['startSection'], isNull);
+      final lecture = courses.singleWhere((c) => c['name'] == '边缘计算');
+      expect(lecture['fullWeek'], isNull);
+      expect(lecture['startSection'], 1);
+    });
+
+    test('页面没有「整周」行时缺节次的卡片不当作整周课', () async {
+      final courses = await _runExtractor(r'''
+        installDocument([
+          new FakeElement('本科 - 硬件综合设计[188242-001]\n[18-20周]', 80, 40,
+              {'data-day': '1'})
+        ]);
+      ''');
+
+      expect(courses.single['fullWeek'], isNull);
+      expect(courses.single['startSection'], isNull);
+    });
+
     test('仅有周次节次和教室时不生成无名实验课', () async {
       final courses = await _runExtractor(r'''
         installDocument([
@@ -364,7 +415,7 @@ void main() {
 
       expect(courses, hasLength(1));
       expect(courses.single['dayOfWeek'], 0);
-      final (imported, skipped) = importCoursesFromDecoded(courses);
+      final (imported, skipped) = parseWebviewCourses(courses);
       expect(imported, isEmpty);
       expect(skipped, 1);
     });

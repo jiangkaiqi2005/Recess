@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  小组件深色配色，取自 AppColors 的深色主题（lib/core/theme/app_theme.dart）。
+  复制到 android/app/src/main/res/values-night/colors.xml
+-->
+<resources>
+    <color name="widget_surface">#FF141B27</color>
+    <color name="widget_text">#FFEDF2FC</color>
+    <color name="widget_text_muted">#FFA8B4C7</color>
+    <!-- 下一节课日期胶囊：AppColors.primaryDark + 原型里的深色胶囊文字。 -->
+    <color name="widget_capsule_background">#FF8AAEFF</color>
+    <color name="widget_capsule_text">#FF0B1B3A</color>
+</resources>

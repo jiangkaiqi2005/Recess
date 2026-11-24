@@ -1,5 +1,6 @@
 import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/features/import/domain/import_course.dart';
 
 /// 自包含的 ICS（iCalendar）课程解析器。
@@ -23,23 +24,47 @@ class IcsCourseParser {
   /// 解析整段 ICS 文本为导入课程列表。
   ///
   /// [semesterStart] 与 [totalWeeks] 用于把重复事件的真实日期映射到「教学周」。
+  /// 无效的源事件不产生课程，原因逐条记入 [diagnostics]；计数按源 VEVENT
+  /// 计算，一个事件经 BYDAY 展开为多门课程时不放大。
   static List<ImportCourse> parse(
     String ics, {
     required DateTime semesterStart,
     required int totalWeeks,
+    List<ImportDiagnostic>? diagnostics,
   }) {
     final blocks = _extractVevents(_unfold(ics));
     final result = <ImportCourse>[];
+    // 同名课程共用一个颜色，不同课程按首次出现的顺序取色。
+    final colors = <String, int>{};
 
-    for (final ev in blocks) {
+    void skip(int index, String summary, String reason) {
+      final name = summary.trim();
+      final record = name.isEmpty || name == '未命名课程'
+          ? '第${index + 1}个事件'
+          : '第${index + 1}个事件「$name」';
+      diagnostics?.add(ImportDiagnostic(
+        kind: ImportDiagnosticKind.skipped,
+        record: record,
+        reason: reason,
+      ));
+    }
+
+    for (var i = 0; i < blocks.length; i++) {
+      final ev = blocks[i];
       final summary = _decode(ev['SUMMARY'] ?? '未命名课程');
       final location = _decode(ev['LOCATION']);
       final description = _decode(ev['DESCRIPTION']);
       final dtstart = ev['DTSTART'];
-      if (dtstart == null) continue;
+      if (dtstart == null) {
+        skip(i, summary, '缺少开始时间');
+        continue;
+      }
 
       final start = _parseDateTime(dtstart);
-      if (start == null) continue;
+      if (start == null) {
+        skip(i, summary, '开始时间无法解析');
+        continue;
+      }
       final end = ev['DTEND'] != null ? _parseDateTime(ev['DTEND']!) : null;
 
       final rrule = ev['RRULE'];
@@ -50,7 +75,10 @@ class IcsCourseParser {
 
       // 首次上课所处的教学周。早于开学或无意义则跳过。
       final firstWeek = computeCurrentWeek(semesterStart, start);
-      if (firstWeek < 1) continue;
+      if (firstWeek < 1) {
+        skip(i, summary, '开始日期早于开学日');
+        continue;
+      }
 
       // 由 RRULE 推算所有上课周（每周一次，间隔 interval 周）。
       final weeks = _expandWeeks(
@@ -62,7 +90,10 @@ class IcsCourseParser {
         totalWeeks: totalWeeks,
         firstOccurrence: start,
       );
-      if (weeks.isEmpty) continue;
+      if (weeks.isEmpty) {
+        skip(i, summary, '上课日期未落在学期周次内');
+        continue;
+      }
 
       final startSection = _sectionFromTime(_hhmm(start));
       final endSection = end != null
@@ -70,6 +101,7 @@ class IcsCourseParser {
           : startSection;
       if (endSection < startSection) {
         // 容错：结束节次低于开始节次时跳过该事件，避免污染其余解析。
+        skip(i, summary, '结束时间早于开始时间');
         continue;
       }
 
@@ -86,7 +118,10 @@ class IcsCourseParser {
           startTime: _hhmm(start),
           endTime: end != null ? _hhmm(end) : null,
           weeks: weeks,
-          colorValue: _pickColor(result.length),
+          colorValue: colors.putIfAbsent(
+            summary,
+            () => AppConstants.courseAutoColor(colors.length),
+          ),
           notes: _stripTeacher(description),
           source: 'ics',
         ));
@@ -270,7 +305,4 @@ class IcsCourseParser {
         .replaceAll(RegExp(r'[\n\s]+'), ' ')
         .trim();
   }
-
-  static int _pickColor(int index) =>
-      AppConstants.courseAutoColor(index);
 }

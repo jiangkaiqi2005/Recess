@@ -1,3 +1,4 @@
+import 'school_extraction_runtime.dart';
 import 'school_adapter.dart';
 
 /// 江西财经大学教务管理系统专用适配器。
@@ -10,10 +11,10 @@ class JufeAdapter extends SchoolAdapter {
   String get schoolName => '江西财经大学';
 
   @override
-  String get loginUrl => 'http://xk.jxufe.edu.cn/';
+  String get pinyin => 'jiangxicaijingdaxue';
 
   @override
-  String get scheduleUrl => 'http://xk.jxufe.edu.cn/';
+  String get loginUrl => 'http://xk.jxufe.edu.cn/';
 
   @override
   bool isSchedulePage(String currentUrl) {
@@ -28,9 +29,9 @@ class JufeAdapter extends SchoolAdapter {
   @override
   String get extractJs => r'''
 (function() {
+''' + schoolExtractionRuntimeJs + r'''
   var results = [];
   var seen = {};
-  var dayMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':7,'天':7};
 
   function attr(el, names) {
     if (!el || !el.getAttribute) return '';
@@ -41,50 +42,23 @@ class JufeAdapter extends SchoolAdapter {
     return '';
   }
 
-  function parseWeeks(text) {
-    if (!text) return [];
-    var raw = String(text);
-    var odd = /单|奇/.test(raw) && !/双|偶/.test(raw);
-    var even = /双|偶/.test(raw) && !/单|奇/.test(raw);
-    var weeks = [];
-    raw.replace(/第|周|节|单|双|奇|偶|[()（）]/g, '')
-      .split(/[,，、\s]+/)
-      .forEach(function(part) {
-        var match = part.match(/(\d+)\s*[-–~至]\s*(\d+)/);
-        if (match) {
-          for (var w = parseInt(match[1]); w <= parseInt(match[2]); w++) {
-            weeks.push(w);
-          }
-        } else {
-          var value = parseInt(part);
-          if (!isNaN(value)) weeks.push(value);
-        }
-      });
-    return weeks.filter(function(value, index, all) {
-      if (value < 1 || value > 30 || all.indexOf(value) !== index) return false;
-      if (odd) return value % 2 === 1;
-      if (even) return value % 2 === 0;
-      return true;
-    }).sort(function(a, b) { return a - b; });
-  }
-
   function parseSections(text) {
     var match = String(text || '').match(
-        /第?\s*(\d+)\s*[-–~至]\s*(\d+)\s*节/);
-    if (match) return [parseInt(match[1]), parseInt(match[2])];
-    match = String(text || '').match(/第?\s*(\d+)\s*节/);
-    return match ? [parseInt(match[1]), parseInt(match[1])] : [];
+        /第([^节\r\n]*)节|(?:^|[\s(（])([+\-.\d][^节\r\n]*)节/);
+    if (!match) return [];
+    var values = schoolWeekNumbers(match[1] || match[2], true);
+    return [values[0], values[values.length - 1]];
   }
 
   function parseDay(text) {
-    var value = parseInt(text);
+    var value = schoolInteger(text);
     if (!isNaN(value)) {
       if (value === 0) return 1;
       if (value >= 1 && value <= 7) return value;
     }
     var match = String(text || '').match(
         /周([一二三四五六日天])|星期([一二三四五六日天])/);
-    return match ? dayMap[match[1] || match[2]] : 0;
+    return match ? schoolDayMap[match[1] || match[2]] : 0;
   }
 
   function parseCellText(text) {
@@ -104,7 +78,7 @@ class JufeAdapter extends SchoolAdapter {
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
       if (/\d+.*周|单周|双周|奇周|偶周/.test(line)) {
-        weeks = parseWeeks(line);
+        weeks = schoolParseWeeks(line);
       } else if (/^(任课)?教师[：:]/.test(line)) {
         teacher = line.replace(/^(任课)?教师[：:]\s*/, '') || null;
       } else if (/^(上课)?(地点|教室)[：:]/.test(line)) {
@@ -127,22 +101,13 @@ class JufeAdapter extends SchoolAdapter {
 
   function add(parsed, day, start, end) {
     if (!parsed.name || parsed.name.length < 2 || parsed.name.length > 80) return;
-    if (day < 1 || day > 7 || start < 1 || start > 20) return;
-    if (end < start) end = start;
-    if (end > 20) end = 20;
+
+
+
     var key = parsed.name + '|' + day + '|' + start + '|' + end + '|' +
         (parsed.location || '') + '|' + parsed.weeks.join(',');
-    if (seen[key]) return;
-    seen[key] = true;
-    results.push({
-      name: parsed.name,
-      teacher: parsed.teacher || null,
-      location: parsed.location || null,
-      dayOfWeek: day,
-      startSection: start,
-      endSection: end,
-      weeks: parsed.weeks
-    });
+    schoolPushCourse(results, seen, key, parsed.name, parsed.teacher,
+        parsed.location, day, [start, end], parsed.weeks);
   }
 
   function findTable(doc) {
@@ -173,12 +138,21 @@ class JufeAdapter extends SchoolAdapter {
           '[data-start-section]');
       for (var c = 0; c < cells.length; c++) {
         var cell = cells[c];
+        var dataFields = ['data-week', 'data-day', 'data-weekday',
+            'data-begin-unit', 'data-start-section', 'data-section-start',
+            'data-end-unit', 'data-end-section', 'data-section-end',
+            'data-section', 'data-sections'];
+        // 无 data 结构标记的单元格交给传统表格策略；标记值无效仍保留诊断。
+        if (!dataFields.some(function(name) {
+          return (cell.getAttribute && cell.getAttribute(name) !== null) ||
+              (row.getAttribute && row.getAttribute(name) !== null);
+        })) continue;
         var day = parseDay(attr(cell, ['data-week', 'data-day', 'data-weekday']) ||
             attr(row, ['data-week', 'data-day', 'data-weekday']));
-        var start = parseInt(attr(cell, ['data-begin-unit', 'data-start-section',
+        var start = schoolInteger(attr(cell, ['data-begin-unit', 'data-start-section',
             'data-section-start']) || attr(row, ['data-begin-unit',
             'data-start-section', 'data-section-start']));
-        var end = parseInt(attr(cell, ['data-end-unit', 'data-end-section',
+        var end = schoolInteger(attr(cell, ['data-end-unit', 'data-end-section',
             'data-section-end']) || attr(row, ['data-end-unit',
             'data-end-section', 'data-section-end']));
         var text = (cell.innerText || cell.textContent || '').trim();
@@ -186,8 +160,8 @@ class JufeAdapter extends SchoolAdapter {
             attr(cell, ['data-section', 'data-sections']) || text);
         if (isNaN(start) && sectionPair.length > 0) start = sectionPair[0];
         if (isNaN(end) && sectionPair.length > 0) end = sectionPair[1];
-        if (!day || isNaN(start) || !text) continue;
-        if (isNaN(end)) end = start;
+        if (!text) continue;
+
         add(parseCellText(text), day, start, end);
       }
     }
@@ -208,7 +182,7 @@ class JufeAdapter extends SchoolAdapter {
     for (var tr = 1; tr < tableRows.length; tr++) {
       var traditionalCells = tableRows[tr].querySelectorAll('td');
       if (traditionalCells.length < 2) continue;
-      var section = parseInt((traditionalCells[0].textContent || '').trim()) || tr;
+      var section = schoolWeekNumbers((traditionalCells[0].textContent || '').trim(), true)[0];
       for (var col = dayColumn;
           col < traditionalCells.length && col < dayColumn + 7; col++) {
         var traditionalCell = traditionalCells[col];
@@ -223,14 +197,7 @@ class JufeAdapter extends SchoolAdapter {
   }
 
   // 主文档和同源 iframe 都参与解析。
-  var docs = [document];
-  var frames = document.querySelectorAll
-      ? document.querySelectorAll('frame, iframe') : [];
-  for (var f = 0; f < frames.length; f++) {
-    try {
-      if (frames[f].contentDocument) docs.push(frames[f].contentDocument);
-    } catch (_) {}
-  }
+  var docs = schoolCollectDocuments();
   for (var d = 0; d < docs.length; d++) {
     var table = findTable(docs[d]);
     if (table) parseTable(table);
@@ -238,26 +205,18 @@ class JufeAdapter extends SchoolAdapter {
   if (results.length > 0) return JSON.stringify(results);
 
   // 页面已经出现课表容器但课程仍在异步渲染时，通知宿主稍后重试。
-  for (var p = 0; p < docs.length; p++) {
-    if (findTable(docs[p])) return JSON.stringify({__pending:true});
-  }
+  if (schoolAnyDoc(docs, findTable)) return JSON.stringify({__pending:true});
 
   // 官方指引中的入口名称：公共查询 / 网上选课 → 课程安排明细。
-  for (var n = 0; n < docs.length; n++) {
-    var links = docs[n].querySelectorAll
-        ? docs[n].querySelectorAll('a, [role="menuitem"], .menu-item, .el-menu-item')
-        : [];
-    for (var l = 0; l < links.length; l++) {
-      var text = ((links[l].textContent || '') + ' ' +
-          (attr(links[l], ['title']) || '')).trim();
-      var href = attr(links[l], ['href']);
-      if (/课程安排明细|学生个人课表|个人课表|我的课表/.test(text) ||
-          /xskbcx|kbcx|course.?schedule|course.?arrange/i.test(href)) {
-        try { links[l].click(); } catch (_) {}
-        return JSON.stringify({__nav:true});
-      }
-    }
-  }
+  var nav = schoolClickEntry(docs,
+      'a, [role="menuitem"], .menu-item, .el-menu-item', function(link) {
+    var text = ((link.textContent || '') + ' ' +
+        (attr(link, ['title']) || '')).trim();
+    var href = attr(link, ['href']);
+    return /课程安排明细|学生个人课表|个人课表|我的课表/.test(text) ||
+        /xskbcx|kbcx|course.?schedule|course.?arrange/i.test(href);
+  });
+  if (nav) return nav;
 
   return JSON.stringify([]);
 })();

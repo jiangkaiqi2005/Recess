@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,11 +7,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/full_week_course.dart';
+import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/course/application/course_platforms_provider.dart';
+import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/course/presentation/course_platform_display.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
-
-const _dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
 
 /// 弹出课程详情底部弹层（课程表点击与搜索结果共用）。
 ///
@@ -76,9 +77,9 @@ void showCourseDetailSheet(
             _DetailRow(
               icon: Icons.calendar_today_outlined,
               label: '时间',
-              value: '周${_dayLabels[course.dayOfWeek - 1]} '
+              value: '周${AppConstants.weekdayLabels[course.dayOfWeek - 1]} '
                   '第${course.startSection}-${course.endSection}节'
-                  '${_formatSectionTime(course.startSection, course.endSection, sectionTimes)}',
+                  '${_formatCourseTime(course, sectionTimes)}',
             ),
             _DetailRow(
               icon: Icons.date_range_outlined,
@@ -137,6 +138,110 @@ void showCourseDetailSheet(
   );
 }
 
+/// 整周课详情：没有星期和节次，只能查看和删除。
+void showFullWeekCourseDetailSheet(BuildContext context, FullWeekCourse course) {
+  final theme = Theme.of(context);
+  final color = Color(AppConstants.courseDisplayColor(
+    course.colorValue,
+    dark: theme.brightness == Brightness.dark,
+  ));
+  showModalBottomSheet(
+    context: context,
+    useSafeArea: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(course.name, style: theme.textTheme.titleLarge),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (course.teacher != null && course.teacher!.isNotEmpty)
+            _DetailRow(
+              icon: Icons.person_outline,
+              label: '教师',
+              value: course.teacher!,
+            ),
+          if (course.location != null && course.location!.isNotEmpty)
+            _DetailRow(
+              icon: Icons.room_outlined,
+              label: '教室',
+              value: course.location!,
+            ),
+          const _DetailRow(
+            icon: Icons.calendar_today_outlined,
+            label: '时间',
+            value: '整周，教务系统没有给出具体星期和节次',
+          ),
+          _DetailRow(
+            icon: Icons.date_range_outlined,
+            label: '周次',
+            value: _formatWeeks(course.weeks),
+          ),
+          if (course.notes != null && course.notes!.isNotEmpty)
+            _DetailRow(
+              icon: Icons.notes_outlined,
+              label: '备注',
+              value: course.notes!,
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: Consumer(
+              builder: (context, ref, _) => OutlinedButton.icon(
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: ctx,
+                    builder: (dialogCtx) => AlertDialog(
+                      title: const Text('删除整周课'),
+                      content: Text('确定删除“${course.name}”吗？'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogCtx).pop(false),
+                          child: const Text('取消'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogCtx).pop(true),
+                          child: const Text('删除'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
+                  await ref
+                      .read(fullWeekCourseRepositoryProvider)
+                      .delete(course.id);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('删除'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 /// 让面板里的 SnackBar 显示在弹层上方。
 ///
 /// 根 ScaffoldMessenger 会把 SnackBar 放进下层页面的 Scaffold，被弹层挡住；
@@ -185,10 +290,10 @@ String _formatWeeks(List<int> weeks) {
   return ranges.join(', ');
 }
 
-String _formatSectionTime(
-    int startSection, int endSection, Map<int, SectionTime> sectionTimes) {
-  final start = sectionTimes[startSection]?.startTime ?? '';
-  final end = sectionTimes[endSection]?.endTime ?? '';
+String _formatCourseTime(Course course, Map<int, SectionTime> sectionTimes) {
+  final clock = CourseClock(course, sectionTimes);
+  final start = clock.startTime ?? '';
+  final end = clock.endTime ?? '';
   if (start.isEmpty || end.isEmpty) return '';
   return ' ($start-$end)';
 }
@@ -244,13 +349,18 @@ class _PlatformSection extends ConsumerWidget {
                 subtitle: platform.url == null
                     ? null
                     : Text(
-                        platform.url!,
+                        platformUrlLabel(platform.url!),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                 trailing: platform.url == null
                     ? null
-                    : const Icon(Icons.open_in_new, size: 18),
+                    : Icon(
+                        isMailtoPlatformUrl(platform.url!)
+                            ? Icons.mail_outline
+                            : Icons.open_in_new,
+                        size: 18,
+                      ),
                 onTap: platform.url == null
                     ? null
                     : () => _open(context, platform.url!),
@@ -265,6 +375,10 @@ class _PlatformSection extends ConsumerWidget {
 
   Future<void> _open(BuildContext context, String url) async {
     final messenger = ScaffoldMessenger.of(context);
+    if (!isAllowedPlatformUrl(url)) {
+      messenger.showSnackBar(const SnackBar(content: Text('链接协议不允许打开')));
+      return;
+    }
     final uri = Uri.tryParse(url);
     var opened = false;
     try {
@@ -274,14 +388,21 @@ class _PlatformSection extends ConsumerWidget {
       opened = false;
     }
     if (!opened) {
-      messenger.showSnackBar(SnackBar(content: Text('无法打开链接：$url')));
+      messenger.showSnackBar(SnackBar(
+        content: Text(isMailtoPlatformUrl(url)
+            ? '没有可用的邮件应用，可长按复制邮箱'
+            : '无法打开链接：$url'),
+      ));
     }
   }
 
   Future<void> _copy(BuildContext context, String url) async {
     final messenger = ScaffoldMessenger.of(context);
-    await Clipboard.setData(ClipboardData(text: url));
-    messenger.showSnackBar(const SnackBar(content: Text('已复制链接')));
+    final isMail = isMailtoPlatformUrl(url);
+    await Clipboard.setData(ClipboardData(text: platformUrlLabel(url)));
+    messenger.showSnackBar(
+      SnackBar(content: Text(isMail ? '已复制邮箱' : '已复制链接')),
+    );
   }
 }
 

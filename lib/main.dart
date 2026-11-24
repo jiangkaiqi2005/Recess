@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:recess/app/build_error_fallback.dart';
 import 'package:recess/app/router.dart';
 import 'package:recess/core/theme/app_theme.dart';
 import 'package:recess/features/notification/application/notification_service.dart';
@@ -24,6 +25,9 @@ class RecessApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 应用根部统一安装界面构建失败兜底：异常仍走 Flutter 原有错误通道，
+    // 这里只接管出错位置的显示（路由错误页与数据加载重试各自独立处理）。
+    ErrorWidget.builder = buildErrorFallback;
     final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'Recess',
@@ -91,7 +95,7 @@ class _AppEffectsState extends ConsumerState<_AppEffects>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // 回到前台：可能跨越了午夜，立即补刷一次今日课程。
     if (state == AppLifecycleState.resumed) {
-      _service?.updateTodayWidget();
+      _service?.updateWidget();
       _scheduleReminderRefresh();
     }
   }
@@ -132,7 +136,7 @@ class _AppEffectsState extends ConsumerState<_AppEffects>
     _midnightTimer = Timer(
       nextMidnight.difference(now) + const Duration(seconds: 1),
       () {
-        _service?.updateTodayWidget();
+        _service?.updateWidget();
         _scheduleReminderRefresh();
         _scheduleMidnightRefresh();
       },

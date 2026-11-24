@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/import_diagnostic.dart';
 import 'package:recess/features/import/data/json_importer.dart';
 
 void main() {
@@ -137,7 +138,7 @@ void main() {
           CoursePlatform(purpose: CoursePlatformPurpose.group, name: 'QQ 群'),
         ],
       });
-      expect(result.skipped, hasLength(3));
+      expect(result.diagnostics, hasLength(3));
     });
 
     test('没有 platforms 字段时平台为空', () {
@@ -148,7 +149,88 @@ void main() {
       });
       final result = JsonCourseImporter.parse(json, totalWeeks: 18);
       expect(result.platforms, isEmpty);
-      expect(result.skipped, isEmpty);
+      expect(result.diagnostics, isEmpty);
+    });
+  });
+
+  group('JsonCourseImporter - 诊断原因矩阵', () {
+    Map<String, Object> course(Map<String, Object> overrides) => {
+          'name': '课程',
+          'dayOfWeek': 1,
+          'startSection': 1,
+          'endSection': 2,
+          'weeks': [1, 2],
+          ...overrides,
+        };
+
+    List<ImportDiagnostic> diagnose(List<Object> courses) =>
+        JsonCourseImporter.parse(
+          jsonEncode({'courses': courses}),
+          totalWeeks: 18,
+        ).diagnostics;
+
+    test('各跳过原因按源记录序号如实给出', () {
+      expect(
+        diagnose([
+          course({'name': ''}),
+          course({'dayOfWeek': 8}),
+          course({'endSection': 99}),
+          course({'weeks': <int>[]}),
+          course({'weeks': 'not-a-list'}),
+          'not-a-map',
+        ]).map((d) => (d.kind, d.record, d.reason)),
+        [
+          (ImportDiagnosticKind.skipped, '第1条', '缺少 name'),
+          (ImportDiagnosticKind.skipped, '第2条', 'dayOfWeek 非法'),
+          (ImportDiagnosticKind.skipped, '第3条', '节次非法'),
+          (ImportDiagnosticKind.skipped, '第4条', '周次为空'),
+          (ImportDiagnosticKind.skipped, '第5条', '缺少周次'),
+          (ImportDiagnosticKind.skipped, '第6条', '非对象'),
+        ],
+      );
+    });
+
+    test('部分周次越界：记录保留，仅记部分忽略', () {
+      final diagnostics = diagnose([
+        course({'weeks': [1, 19, 30, 'x']}),
+      ]);
+      expect(diagnostics, hasLength(1));
+      expect(
+        (diagnostics.single.kind, diagnostics.single.record),
+        (ImportDiagnosticKind.partial, '第1条'),
+      );
+      expect(diagnostics.single.reason, contains('2 个周次'));
+    });
+
+    test('课程平台诊断区分整条跳过与仅链接被忽略', () {
+      final diagnostics = JsonCourseImporter.parse(
+        jsonEncode({
+          'courses': [course({})],
+          'platforms': {
+            '课程': [
+              'not-a-map',
+              {'purpose': 'unknown', 'name': '学习通'},
+              {'purpose': 'lab'},
+              {
+                'purpose': 'other',
+                'name': '群',
+                'url': 'intent://bad',
+              },
+            ],
+          },
+        }),
+        totalWeeks: 18,
+      ).diagnostics;
+
+      expect(
+        diagnostics.map((d) => (d.kind, d.record, d.reason)),
+        const [
+          (ImportDiagnosticKind.skipped, '课程平台「课程」第1条', '非对象'),
+          (ImportDiagnosticKind.skipped, '课程平台「课程」第2条', '用途或平台名非法'),
+          (ImportDiagnosticKind.skipped, '课程平台「课程」第3条', '用途或平台名非法'),
+          (ImportDiagnosticKind.partial, '课程平台「课程」第4条', '链接协议不允许，已忽略'),
+        ],
+      );
     });
   });
 }

@@ -1,3 +1,4 @@
+import 'school_extraction_runtime.dart';
 import 'school_adapter.dart';
 
 /// 重庆大学（金智教务 XCampus）适配器。
@@ -13,14 +14,14 @@ class CquAdapter extends SchoolAdapter {
   String get schoolName => '重庆大学';
 
   @override
+  String get pinyin => 'chongqingdaxue';
+
+  @override
   String get loginUrl => 'https://my.cqu.edu.cn';
 
   // 校外未连 VPN 时教务系统直接显示 Page Not Found，而不是登录页。
   @override
   String get accessNote => '校外需先连接校园网或 aTrust VPN';
-
-  @override
-  String get scheduleUrl => 'https://my.cqu.edu.cn/tt/university-timetable';
 
   @override
   bool isSchedulePage(String currentUrl) {
@@ -31,8 +32,8 @@ class CquAdapter extends SchoolAdapter {
   @override
   String get extractJs => r'''
 (function() {
+''' + schoolExtractionRuntimeJs + r'''
   var results = [];
-  var dayMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':7,'天':7};
   var _dayHeaders = null; // 日期表头缓存（闭包变量，每次提取刷新）
 
   // CQU 课表会把同一时间格内超出展示上限的课程折叠为
@@ -88,15 +89,14 @@ class CquAdapter extends SchoolAdapter {
     // 无编号课程必须有完整标题，不能把仅含时间/教室的子元素当成卡片。
     if (!/\[\d{4,}-\d{2,}/.test(t) && !uncodedTitle(t)) continue;
     // 必须包含周次信息
-    if (!/\d+.*周/.test(t)) continue;
-    // 必须包含节次信息
-    if (!/\d+.*节/.test(t)) continue;
+    if (!/周/.test(t)) continue;
+    // 已识别课程的缺失节次交给预览校验，不猜补第一节。
     // 排除包含多个课程编号的父容器（保留最内层匹配元素）
     var codeMatches = t.match(/\[\d{4,}-\d{2,}[^\]]*\]/g);
     if (codeMatches && codeMatches.length > 1) continue;
     // 实验课没有编号，按周次/节次数量排除包含多张卡片的父容器。
-    if ((t.match(/\[[^\[\]]*周\]/g) || []).length !== 1 ||
-        (t.match(/\[[^\[\]]*节\]/g) || []).length !== 1) continue;
+    if ((t.match(/\[[^\[\]]*周[^\[\]]*\]/g) || []).length !== 1 ||
+        (t.match(/\[[^\[\]]*节\]/g) || []).length > 1) continue;
     candidates.push(el);
   }
 
@@ -116,6 +116,15 @@ class CquAdapter extends SchoolAdapter {
     }
   }
 
+  // 课表底部的「整周」行放课程设计等整周课：卡片只有周次、没有节次。
+  var hasFullWeekRow = false;
+  for (var i = 0; i < allEls.length; i++) {
+    if ((allEls[i].textContent || '').trim() === '整周') {
+      hasFullWeekRow = true;
+      break;
+    }
+  }
+
   // 对每个候选元素解析课程信息
   var seen = {};
   filtered.forEach(function(el) {
@@ -125,23 +134,14 @@ class CquAdapter extends SchoolAdapter {
 
     // 解析周次：支持 [1-7周], [1-3,5-14周], [5、7-9、11-15周] 等
     // 也支持 单周（奇数周）和 双周（偶数周）
-    var weeks = [];
-    if (/单周/.test(text)) {
-      for (var i = 1; i <= 20; i += 2) weeks.push(i);
-    } else if (/双周/.test(text)) {
-      for (var i = 2; i <= 20; i += 2) weeks.push(i);
-    } else {
-      var weekMatch = text.match(/\[((?:\d+(?:\s*[-–~]\s*\d+)?)(?:\s*[,，、]\s*\d+(?:\s*[-–~]\s*\d+)?)*)\s*周\]/);
-      if (weekMatch) {
-        weeks = parseRange(weekMatch[1]);
-      }
-    }
+    var weekMatch = text.match(/\[([^\[\]]*周[^\[\]]*)\](?:\s*[,，、]?\s*[(（]?([单双奇偶](?:周)?)[)）]?)?/);
+    var weeks = schoolWeekNumbers(weekMatch ? weekMatch[1] + (weekMatch[2] || '') : '');
 
     // 解析节次：[1-2节], [3-4节], [1-2,3-4节], [1、3节] 等
     var secMatch = text.match(/\[((?:\d+(?:\s*[-–~]\s*\d+)?)(?:\s*[,，、]\s*\d+(?:\s*[-–~]\s*\d+)?)*)\s*节\]/);
-    var startSec = 1, endSec = 1;
+    var startSec = null, endSec = null;
     if (secMatch) {
-      var secs = parseRange(secMatch[1]);
+      var secs = schoolParseSections(secMatch[1]);
       if (secs.length > 0) {
         startSec = secs[0];
         endSec = secs[secs.length - 1];
@@ -185,6 +185,24 @@ class CquAdapter extends SchoolAdapter {
     // 去掉课程名中的括号备注（如 "体育自选项目（花样跳绳3）" 保留，但 "高等数学(2024秋)" 去掉）
     name = name.replace(/\(\d{4}[^\)]*\)\s*$/, '').trim();
 
+    // 整周课没有星期和节次；只认带课程编号的卡片，其他缺节次的卡片仍交给预览校验。
+    if (!secMatch && hasFullWeekRow && !labTitle) {
+      var fullKey = 'fullWeek|' + name + '|' + weeks.join(',');
+      if (seen[fullKey]) return;
+      seen[fullKey] = true;
+      results.push({
+        name: name,
+        teacher: null,
+        location: null,
+        dayOfWeek: null,
+        startSection: null,
+        endSection: null,
+        weeks: weeks,
+        fullWeek: true
+      });
+      return;
+    }
+
     // 推断星期
     var day = findDay(el);
 
@@ -208,14 +226,14 @@ class CquAdapter extends SchoolAdapter {
   if (results.length === 0) {
     var bodyText = document.body ? document.body.innerText : '';
     var lines = bodyText.split(/\n/).map(function(l){return l.trim();}).filter(Boolean);
-    var currentDay = 1;
+    var currentDay = 0;
 
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
 
       // 检测星期标记
       var dm = line.match(/^周([一二三四五六日天])$/) || line.match(/^星期([一二三四五六日天])$/);
-      if (dm && dayMap[dm[1]]) { currentDay = dayMap[dm[1]]; continue; }
+      if (dm && schoolDayMap[dm[1]]) { currentDay = schoolDayMap[dm[1]]; continue; }
 
       // 匹配课程编号行
       if (!/^\[\d{4,}-\d{2,}/.test(line)) continue;
@@ -223,9 +241,9 @@ class CquAdapter extends SchoolAdapter {
       // 下一行：周次 + 节次 + 教室
       if (i + 1 >= lines.length) continue;
       var infoLine = lines[i + 1];
-      var wm = infoLine.match(/\[((?:\d+(?:\s*[-–~]\s*\d+)?)(?:\s*[,，、]\s*\d+(?:\s*[-–~]\s*\d+)?)*)\s*周\]/);
-      var sm = infoLine.match(/\[(\d+(?:\s*[-–~]\s*\d+)?)\s*节\]/);
-      if (!wm || !sm) continue;
+      var wm = infoLine.match(/\[([^\[\]]*周[^\[\]]*)\](?:\s*[,，、]?\s*[(（]?([单双奇偶](?:周)?)[)）]?)?/);
+      var sm = infoLine.match(/\[([^\[\]]*)节\]/);
+      if (!wm && !sm) continue;
 
       // 再下一行：课程名
       if (i + 2 >= lines.length) continue;
@@ -236,8 +254,8 @@ class CquAdapter extends SchoolAdapter {
       var locM = infoLine.match(/\d+\s*节\]\s*([^\n\[]+)/);
       var loc = locM ? locM[1].trim() : null;
 
-      var wks = parseRange(wm[1]);
-      var scs = parseRange(sm[1]);
+      var wks = schoolWeekNumbers(wm ? wm[1] + (wm[2] || '') : null);
+      var scs = schoolParseSections(sm ? sm[1] : null);
 
       var key2 = nm + '|' + currentDay + '|' + (scs[0]||1) + '|' + wks.join(',');
       if (seen[key2]) { i += 2; continue; }
@@ -248,8 +266,8 @@ class CquAdapter extends SchoolAdapter {
         teacher: null,
         location: loc,
         dayOfWeek: currentDay,
-        startSection: scs.length > 0 ? scs[0] : 1,
-        endSection: scs.length > 0 ? scs[scs.length - 1] : 1,
+        startSection: scs[0],
+        endSection: scs[scs.length - 1],
         weeks: wks
       });
       i += 2;
@@ -273,8 +291,9 @@ class CquAdapter extends SchoolAdapter {
     if (names.length === 0) return null;
     var info = rest.match(/^([^\[\]]*)\[((?:\d+(?:\s*[-–~]\s*\d+)?)(?:\s*[,，、]\s*\d+(?:\s*[-–~]\s*\d+)?)*)\s*周\]\s*\[((?:\d+(?:\s*[-–~]\s*\d+)?)(?:\s*[,，、]\s*\d+(?:\s*[-–~]\s*\d+)?)*)\s*节\]\s*$/);
     if (!info) return null;
-    var weeks = parseRange(info[2]);
-    var sections = parseRange(info[3]);
+    // info[2] 是周次文本：按基线 parseRange 的语义解析（schoolParseSections 即其等价物），与 schoolParseWeeks 不同。
+    var weeks = schoolParseSections(info[2]);
+    var sections = schoolParseSections(info[3]);
     return {
       teacher: names.join('、'),
       weeks: weeks.join(','),
@@ -310,32 +329,6 @@ class CquAdapter extends SchoolAdapter {
     if (/[^\s;；\[\]]+-\d{4,}\[[^\[\]]+\]/.test(title)) return '';
     if (title.length < 2 || title.length > 200 || /^\[/.test(title)) return '';
     return title;
-  }
-
-  function parseRange(text) {
-    if (!text) return [];
-    var nums = [];
-    var parts = text.split(/[,，、\s]+/);
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      if (!p) continue;
-      var m = p.match(/(\d+)\s*[-–~]\s*(\d+)/);
-      if (m) {
-        var a = parseInt(m[1]), b = parseInt(m[2]);
-        for (var j = a; j <= b; j++) nums.push(j);
-      } else {
-        var n = parseInt(p);
-        if (!isNaN(n)) nums.push(n);
-      }
-    }
-    // 去重排序
-    var unique = [];
-    var seenN = {};
-    for (var i = 0; i < nums.length; i++) {
-      if (!seenN[nums[i]]) { seenN[nums[i]] = true; unique.push(nums[i]); }
-    }
-    unique.sort(function(a,b){return a-b;});
-    return unique;
   }
 
   function findCollapsedCourseTriggers() {
@@ -383,17 +376,17 @@ class CquAdapter extends SchoolAdapter {
     for (var d = 0; d < 12 && node; d++) {
       var val = node.getAttribute ? node.getAttribute('data-day') : null;
       if (val) {
-        var n = parseInt(val);
+        var n = schoolInteger(val);
         if (n >= 1 && n <= 7) { method1Result = n; method1Depth = d; break; }
         // 兼容 0-indexed（0=周一 … 6=周日）
         if (n >= 0 && n <= 6) { method1Result = n + 1; method1Depth = d; break; }
       }
       val = node.getAttribute ? node.getAttribute('data-weekday') : null;
       if (val) {
-        var n = parseInt(val);
+        var n = schoolInteger(val);
         if (n >= 1 && n <= 7) { method1Result = n; method1Depth = d; break; }
         var dm2 = val.match(/([一二三四五六日天])/);
-        if (dm2 && dayMap[dm2[1]]) { method1Result = dayMap[dm2[1]]; method1Depth = d; break; }
+        if (dm2 && schoolDayMap[dm2[1]]) { method1Result = schoolDayMap[dm2[1]]; method1Depth = d; break; }
       }
       node = node.parentElement;
     }
@@ -411,7 +404,7 @@ class CquAdapter extends SchoolAdapter {
         if (t.length === 0 || t.length > 20) continue;
         // 放宽正则：允许"周一 09/02"、"周一(开学)"等格式
         var dm = t.match(/^周([一二三四五六日天])/) || t.match(/^星期([一二三四五六日天])/);
-        if (dm && dayMap[dm[1]]) {
+        if (dm && schoolDayMap[dm[1]]) {
           var rect = h.getBoundingClientRect();
           if (rect.width > 0 && rect.height > 0) {
             var x = rect.left + rect.width / 2;
@@ -425,7 +418,7 @@ class CquAdapter extends SchoolAdapter {
               if (Math.abs(_dayHeaders[j].x - x) < 2) { isDup = true; break; }
             }
             if (!isDup) {
-              _dayHeaders.push({ day: dayMap[dm[1]], x: x, inferred: false });
+              _dayHeaders.push({ day: schoolDayMap[dm[1]], x: x, inferred: false });
             }
           }
         }

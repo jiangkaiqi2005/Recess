@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,9 @@ import 'package:recess/data/repositories/backup_repository.dart';
 import 'package:recess/data/repositories/course_platform_repository.dart';
 import 'package:recess/data/repositories/course_repository.dart';
 import 'package:recess/data/repositories/semester_repository.dart';
+import 'package:recess/features/notification/application/reminder_scheduler.dart';
+import 'package:recess/features/schedule/domain/schedule_helpers.dart';
+import 'package:recess/features/settings/domain/section_time.dart';
 
 void main() {
   late db.AppDatabase database;
@@ -26,6 +30,32 @@ void main() {
 
   tearDown(() async {
     await database.close();
+  });
+
+  test('首次空库导出的实际字节文件包含默认激活学期并能恢复', () async {
+    final directory = await Directory.systemTemp.createTemp('recess_first_backup_');
+    try {
+      final file = File('${directory.path}/backup.json');
+      await file.writeAsBytes(await backup.exportBytes());
+      final parsed = BackupFile.parseBytes(await file.readAsBytes());
+      final source = await semesters.getSemesters();
+      expect(source, hasLength(1));
+      expect(parsed.semesters.single.id, source.single.id);
+      expect(parsed.activeSemesterId, source.single.id);
+      expect(parsed.semesters.single.totalWeeks, 18);
+      expect(parsed.semesters.single.startDate.weekday, DateTime.monday);
+
+      final restored = await backup.restoreBackup(parsed);
+      expect(restored.semesterCount, 1);
+      expect(restored.courseCount, 0);
+      final active = await semesters.getActiveSemester();
+      expect(active?.id, source.single.id);
+      expect(active?.name, source.single.name);
+      expect(active?.startDate, source.single.startDate);
+      expect(active?.totalWeeks, 18);
+    } finally {
+      await directory.delete(recursive: true);
+    }
   });
 
   test('新旧色板与自定义 ARGB 在备份导出恢复后保持原始值', () async {
@@ -99,6 +129,66 @@ void main() {
     };
     return const JsonEncoder().convert(data);
   }
+
+  test('最终激活失败时旧学期课程平台和激活状态整体保留', () async {
+    await semesters.upsert(Semester(
+      id: 'old-s', name: '旧学期', startDate: DateTime(2020), totalWeeks: 10,
+    ));
+    await semesters.setActive('old-s');
+    await courses.upsert(const Course(
+      id: 'old-c', semesterId: 'old-s', name: '旧课程', dayOfWeek: 1,
+      startSection: 1, endSection: 2, weeks: [1, 2], notes: '旧备注 📚',
+    ));
+    await CoursePlatformRepository(database).replacePlatforms(
+      'old-s', '旧课程', const [
+        CoursePlatform(purpose: CoursePlatformPurpose.lab, name: '旧平台'),
+      ],
+    );
+    final before = jsonDecode(await backup.exportJson()) as Map;
+    before.remove('exportedAt');
+    await database.customStatement('''
+      CREATE TRIGGER fail_restore_activation BEFORE UPDATE OF is_active ON semesters
+      BEGIN SELECT RAISE(ABORT, 'forced activation failure'); END;
+    ''');
+
+    await expectLater(backup.restore(exportFixture()), throwsA(anything));
+    expect((await semesters.getSemesters()).map((s) => s.id), ['old-s']);
+    await database.customStatement('DROP TRIGGER fail_restore_activation');
+
+    final after = jsonDecode(await backup.exportJson()) as Map;
+    after.remove('exportedAt');
+    expect(after, before);
+    expect((await semesters.getActiveSemester())?.id, 'old-s');
+  });
+
+  test('课程插入失败时全部替换回滚', () async {
+    await backup.restore(exportFixture());
+    final before = jsonDecode(await backup.exportJson()) as Map;
+    before.remove('exportedAt');
+    await database.customStatement('''
+      CREATE TRIGGER fail_course_insert BEFORE INSERT ON courses
+      WHEN NEW.id = 'c2'
+      BEGIN SELECT RAISE(ABORT, 'forced course insert failure'); END;
+    ''');
+
+    await expectLater(backup.restore(exportFixture()), throwsA(anything));
+
+    final after = jsonDecode(await backup.exportJson()) as Map;
+    after.remove('exportedAt');
+    expect(after, before);
+  });
+
+  test('旧备份没有激活标记时选定文件中的第一个学期', () async {
+    final data = jsonDecode(exportFixture()) as Map<String, dynamic>;
+    for (final semester in data['semesters'] as List) {
+      (semester as Map).remove('isActive');
+    }
+
+    await backup.restore(jsonEncode(data));
+
+    expect((await semesters.getActiveSemester())?.id, 's1');
+    expect(await courses.getCourses('s2'), hasLength(1));
+  });
 
   test('恢复备份后数据与备份一致，激活学期与周次覆盖被保留', () async {
     // 先写入一些旧数据，确保被覆盖。
@@ -295,6 +385,96 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  test('新备份往返保留逐门钟点语义，跟随课程的旧钟点原样保留', () async {
+    await semesters.upsert(
+      Semester(
+        id: 's',
+        name: '学期',
+        startDate: DateTime(2026, 9, 7),
+        totalWeeks: 18,
+      ),
+      activate: true,
+    );
+    const following = Course(
+      id: 'follow',
+      semesterId: 's',
+      name: '教务课程',
+      dayOfWeek: 7,
+      startSection: 6,
+      endSection: 9,
+      weeks: [7],
+      startTime: '14:55',
+      endTime: '19:45',
+    );
+    final independent = following.copyWith(
+      id: 'file',
+      name: '独立钟点课程',
+      useExplicitTimes: true,
+    );
+    await courses.upsert(following);
+    await courses.upsert(independent);
+    final invalid = independent.copyWith(
+      id: 'invalid',
+      name: '原始空钟点',
+      startTime: '',
+      endTime: '不是钟点',
+    );
+    await courses.upsert(invalid);
+    final exported = await backup.exportJson();
+    await backup.restore(exported);
+    expect(await courses.getCourse('follow'), following);
+    expect(await courses.getCourse('file'), independent);
+    expect(await courses.getCourse('invalid'), invalid);
+  });
+
+  test('旧备份缺少钟点语义时默认跟随，原钟点不丢失', () async {
+    await backup.restore(exportFixture());
+    final course = (await courses.getCourse('c1'))!;
+    expect(course.useExplicitTimes, false);
+    expect((course.startTime, course.endTime), ('08:00', '09:35'));
+    final semester = (await semesters.getActiveSemester())!;
+    const times = {1: SectionTime('14:25', 45), 2: SectionTime('17:20', 45)};
+    expect(
+      computeReminders(
+        courses: [course],
+        semester: semester,
+        sectionTimes: times,
+        now: DateTime(2026, 9, 7, 12),
+        leadMinutes: 10,
+      ).first.trigger,
+      DateTime(2026, 9, 7, 14, 15),
+    );
+    expect(
+      todayCourseSlots(
+        courses: [course],
+        currentWeek: 3,
+        sectionTimes: times,
+        now: DateTime(2026, 9, 7, 17),
+      ).single.status,
+      CourseStatus.ongoing,
+    );
+    final exported = await backup.exportJson();
+    await backup.restore(exported);
+    expect(await courses.getCourse('c1'), course);
+  });
+
+  for (final unsupported in ['independent-v2', 1, null]) {
+    test('未知钟点语义 $unsupported 在覆盖前拒绝，原课程完整保留', () async {
+      await backup.restore(exportFixture());
+      final original = await courses.getCourse('c1');
+      final data = jsonDecode(exportFixture()) as Map<String, dynamic>;
+      ((data['semesters'] as List).first['courses'] as List)
+              .first['useExplicitTimes'] =
+          unsupported;
+      await expectLater(
+        backup.restore(jsonEncode(data)),
+        throwsFormatException,
+      );
+      expect(await courses.getCourse('c1'), original);
+      expect((await semesters.getActiveSemester())?.id, 's1');
+    });
+  }
 
   test('含重复学期 id 的备份抛出异常', () async {
     final data = {

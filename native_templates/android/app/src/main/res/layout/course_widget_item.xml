@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  一条课次：左侧课程色条，右侧三行（课程名 / 时间段 / 地点），每行单行省略。
+  色条通过 alignTop/alignBottom 在两端的文字之间拉伸，颜色由 CourseWidgetService
+  按深浅色写入，布局里只放一个占位色。
+  列表从第二条起由工厂给根布局增加 8dp 上内边距，间隔也属于可点击条目；
+  色条仍只对齐文字，不包含这段内边距。兜底条目不加内边距，外观保持一致。
+  复制到 android/app/src/main/res/layout/course_widget_item.xml
+-->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_item_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:id="@+id/widget_item_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="11dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_item_time"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/widget_item_name"
+        android:layout_marginLeft="11dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/widget_text_muted"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/widget_item_location"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/widget_item_time"
+        android:layout_marginLeft="11dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/widget_text_muted"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/widget_item_bar"
+        android:layout_width="3dp"
+        android:layout_height="match_parent"
+        android:layout_alignBottom="@id/widget_item_location"
+        android:layout_alignTop="@id/widget_item_name"
+        android:background="@color/widget_text_muted" />
+</RelativeLayout>

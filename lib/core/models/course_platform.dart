@@ -1,3 +1,5 @@
+import 'import_diagnostic.dart';
+
 /// 课程平台的用途。[key] 是持久化与备份 JSON 中使用的稳定键，不随文案变化。
 enum CoursePlatformPurpose {
   onlineCourse('online_course', '网课'),
@@ -52,27 +54,69 @@ class CoursePlatform {
 /// 同一学期内按课程名分组的课程平台：课程名 → 该课的平台（组内有序）。
 typedef CoursePlatformGroups = Map<String, List<CoursePlatform>>;
 
+final _emailPattern = RegExp(r'^[^@\s/:?#]+@[^@\s/:?#]+\.[^@\s/:?#]+$');
+
+/// 课程平台链接仅允许 http/https 与 mailto，防止导入文件携带任意协议的 URI
+///（如 intent://、content://）被外部打开。
+bool isAllowedPlatformUrl(String url) {
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null) return false;
+  if (uri.scheme == 'mailto') return _emailPattern.hasMatch(uri.path);
+  return (uri.scheme == 'http' || uri.scheme == 'https') &&
+      uri.host.isNotEmpty;
+}
+
+/// 规范化用户填写或导入的链接：裸邮箱地址补成 `mailto:`，其余只去首尾空白。
+String normalizePlatformUrl(String input) {
+  final trimmed = input.trim();
+  return _emailPattern.hasMatch(trimmed) ? 'mailto:$trimmed' : trimmed;
+}
+
+/// 链接的展示文本：mailto 链接只显示邮箱地址，其余原样返回。
+String platformUrlLabel(String url) {
+  final uri = Uri.tryParse(url);
+  return uri != null && uri.scheme == 'mailto' ? uri.path : url;
+}
+
+/// 是否为邮箱链接（mailto）。
+bool isMailtoPlatformUrl(String url) =>
+    Uri.tryParse(url)?.scheme == 'mailto';
+
 /// 解析 JSON 中的 `platforms` 字段：`{"<课程名>": [{"purpose", "name", "url"}]}`。
 ///
 /// 备份恢复与 JSON 课表导入共用。用途键未知、平台名为空或条目不是对象时跳过
-/// 该条，并把原因追加到 [skipped]；字段整体不是对象时视为没有平台。
+/// 该条（整条未导入，记 [ImportDiagnosticKind.skipped]）；裸邮箱补成 mailto，
+/// 链接协议非 http/https/mailto 时保留条目但忽略链接，同样记入 [diagnostics]
+///（[ImportDiagnosticKind.partial]）；字段整体不是对象时视为没有平台。
 CoursePlatformGroups parseCoursePlatformGroups(
   Object? raw, {
-  List<String>? skipped,
+  List<ImportDiagnostic>? diagnostics,
 }) {
+  void skip(String record, String reason) => diagnostics?.add(
+        ImportDiagnostic(
+          kind: ImportDiagnosticKind.skipped,
+          record: record,
+          reason: reason,
+        ),
+      );
+
   final CoursePlatformGroups result = {};
   if (raw is! Map) return result;
   for (final entry in raw.entries) {
     final courseName = entry.key.toString().trim();
     final items = entry.value;
     if (courseName.isEmpty || items is! List) {
-      skipped?.add('课程平台「$courseName」：格式非法');
+      skip(
+        courseName.isEmpty ? '课程平台' : '课程平台「$courseName」',
+        '分组格式非法',
+      );
       continue;
     }
     for (var i = 0; i < items.length; i++) {
+      final record = '课程平台「$courseName」第${i + 1}条';
       final item = items[i];
       if (item is! Map) {
-        skipped?.add('课程平台「$courseName」第${i + 1}条：非对象');
+        skip(record, '非对象');
         continue;
       }
       final purpose = CoursePlatformPurpose.fromKey(
@@ -80,10 +124,19 @@ CoursePlatformGroups parseCoursePlatformGroups(
       );
       final name = item['name']?.toString().trim() ?? '';
       if (purpose == null || name.isEmpty) {
-        skipped?.add('课程平台「$courseName」第${i + 1}条：用途或平台名非法');
+        skip(record, '用途或平台名非法');
         continue;
       }
-      final url = item['url']?.toString().trim();
+      final rawUrl = item['url']?.toString();
+      var url = rawUrl == null ? null : normalizePlatformUrl(rawUrl);
+      if (url != null && url.isNotEmpty && !isAllowedPlatformUrl(url)) {
+        url = null;
+        diagnostics?.add(ImportDiagnostic(
+          kind: ImportDiagnosticKind.partial,
+          record: record,
+          reason: '链接协议不允许，已忽略',
+        ));
+      }
       result
           .putIfAbsent(courseName, () => [])
           .add(

@@ -22,7 +22,6 @@ concurrency:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   build-android:
@@ -31,7 +30,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -62,7 +61,7 @@ jobs:
           # Platform generation may rewrite the lockfile. Use the release's pinned dependencies.
           git restore --source=HEAD -- pubspec.lock
 
-      # Apply custom Gradle config (AGP 8.11 compat, NDK, Kotlin 2.2.20, desugaring)
+      # Apply custom Gradle config (AGP 9.3, NDK, Kotlin 2.4, desugaring)
       - name: Apply custom Gradle config
         run: |
           NDK_VERSION=$(ls $ANDROID_HOME/ndk/ | sort -V | tail -1)
@@ -71,20 +70,9 @@ jobs:
           cp native_templates/android/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
           # app 模块启用 desugaring、固定签名、小组件和应用内更新原生配置。
           cp native_templates/android/app/build.gradle.kts android/app/build.gradle.kts
-          cp native_templates/android/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
-          mkdir -p android/app/src/main/java/io/github/jiangkaiqi2005/recess
-          mkdir -p android/app/src/main/res/layout android/app/src/main/res/xml
-          cp native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt \
-            android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt
-          cp native_templates/android/app/src/main/res/layout/course_widget.xml \
-            android/app/src/main/res/layout/course_widget.xml
-          cp native_templates/android/app/src/main/res/xml/course_widget_info.xml \
-            android/app/src/main/res/xml/course_widget_info.xml
-          mkdir -p android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess
-          cp native_templates/android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt \
-            android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt
-          cp native_templates/android/app/src/main/res/xml/filepaths.xml \
-            android/app/src/main/res/xml/filepaths.xml
+          cp native_templates/android/app/proguard-rules.pro android/app/proguard-rules.pro
+          # 整个 src/main 目录一起复制：新增 Kotlin 文件、布局或资源时不会漏拷。
+          cp -R native_templates/android/app/src/main/. android/app/src/main/
 
       - name: Configure stable release signing
         env:
@@ -114,7 +102,7 @@ jobs:
         run: flutter pub get
 
       - name: Generate drift code
-        run: dart run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build
 
       - name: Generate launcher icons
         run: dart run flutter_launcher_icons
@@ -162,7 +150,7 @@ jobs:
           python3 scripts/prepare_update_manifest.py --tag "$RELEASE_TAG"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: android-release-${{ env.RELEASE_TAG }}
           path: build/release/*

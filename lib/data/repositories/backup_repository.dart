@@ -3,14 +3,17 @@ import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/core/models/semester.dart';
+import 'package:recess/core/utils/json_parsing.dart';
 import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/mappers.dart';
 import 'package:recess/data/repositories/course_platform_repository.dart';
 import 'package:recess/data/repositories/course_repository.dart';
+import 'package:recess/data/repositories/full_week_course_repository.dart';
 import 'package:recess/data/repositories/semester_repository.dart';
 
-/// 备份恢复的结果：恢复了多少学期、多少课程。
+/// 备份恢复的结果：恢复了多少学期、多少课程（含整周课）。
 class RestoreResult {
   final int semesterCount;
   final int courseCount;
@@ -25,6 +28,9 @@ class BackupFile {
   final List<Semester> semesters;
   final Map<String, List<Course>> coursesBySemester;
 
+  /// 旧版备份没有整周课，解析为空。
+  final Map<String, List<FullWeekCourse>> fullWeekCoursesBySemester;
+
   /// 学期 id → 课程名 → 课程平台。
   final Map<String, CoursePlatformGroups> platformsBySemester;
   final String? activeSemesterId;
@@ -32,9 +38,13 @@ class BackupFile {
   const BackupFile._({
     required this.semesters,
     required this.coursesBySemester,
+    required this.fullWeekCoursesBySemester,
     required this.platformsBySemester,
     this.activeSemesterId,
   });
+
+  /// 严格按 UTF-8 读取文件；非法字节在覆盖确认之前拒绝。
+  static BackupFile parseBytes(List<int> bytes) => parse(utf8.decode(bytes));
 
   static BackupFile parse(String jsonText) {
     final dynamic decoded;
@@ -56,6 +66,7 @@ class BackupFile {
 
     final semesters = <Semester>[];
     final coursesBySemester = <String, List<Course>>{};
+    final fullWeekCoursesBySemester = <String, List<FullWeekCourse>>{};
     final platformsBySemester = <String, CoursePlatformGroups>{};
     final semesterIds = <String>{};
     String? activeSemesterId;
@@ -72,7 +83,7 @@ class BackupFile {
       }
       final name = s['name']?.toString() ?? '';
       final startDateRaw = s['startDate']?.toString();
-      final totalWeeks = _toInt(s['totalWeeks']);
+      final totalWeeks = toIntOrNull(s['totalWeeks']);
       if (startDateRaw == null || totalWeeks == null) {
         throw FormatException('学期「$name」缺少 startDate 或 totalWeeks');
       }
@@ -80,7 +91,7 @@ class BackupFile {
       if (startDate == null) {
         throw FormatException('学期「$name」的 startDate 非法');
       }
-      final override = _toInt(s['currentWeekOverride']);
+      final override = toIntOrNull(s['currentWeekOverride']);
       final sem = Semester(
         id: id,
         name: name,
@@ -97,12 +108,16 @@ class BackupFile {
         for (final rc in rawCourses) {
           if (rc is! Map) continue;
           final map = rc as Map<String, dynamic>;
+          if (map.containsKey('useExplicitTimes') &&
+              map['useExplicitTimes'] is! bool) {
+            throw const FormatException('备份中存在无法识别的课程钟点使用方式');
+          }
           final cid = map['id']?.toString() ?? '';
           if (cid.isEmpty) continue; // 旧版导出无 id 的兜底：丢弃该条
           final cname = map['name']?.toString() ?? '';
-          final day = _toInt(map['dayOfWeek']);
-          final start = _toInt(map['startSection']);
-          final end = _toInt(map['endSection']);
+          final day = toIntOrNull(map['dayOfWeek']);
+          final start = toIntOrNull(map['startSection']);
+          final end = toIntOrNull(map['endSection']);
           if (cname.isEmpty || day == null || start == null || end == null) {
             continue;
           }
@@ -110,62 +125,61 @@ class BackupFile {
             id: cid,
             semesterId: id,
             name: cname,
-            teacher: _optString(map['teacher']),
-            location: _optString(map['location']),
+            teacher: toStringOrNull(map['teacher']),
+            location: toStringOrNull(map['location']),
             dayOfWeek: day,
             startSection: start,
             endSection: end,
-            startTime: _optString(map['startTime']),
-            endTime: _optString(map['endTime']),
+            startTime: map['startTime']?.toString(),
+            endTime: map['endTime']?.toString(),
+            useExplicitTimes: map['useExplicitTimes'] as bool? ?? false,
             weeks: _weeks(map['weeks']),
-            colorValue: _toInt(map['colorValue']) ??
-                _parseColor(map['color']?.toString()),
-            notes: _optString(map['notes']),
+            colorValue: toIntOrNull(map['colorValue']) ??
+                parseHexColor(map['color']?.toString(), fallback: 0xFF5B8DEF),
+            notes: toStringOrNull(map['notes']),
           ));
         }
         coursesBySemester[id] = courses;
       }
+      final rawFullWeek = s['fullWeekCourses'];
+      fullWeekCoursesBySemester[id] = [
+        if (rawFullWeek is List)
+          for (final rc in rawFullWeek)
+            if (rc is Map &&
+                (rc['id']?.toString() ?? '').isNotEmpty &&
+                (rc['name']?.toString() ?? '').isNotEmpty)
+              FullWeekCourse(
+                id: rc['id'].toString(),
+                semesterId: id,
+                name: rc['name'].toString(),
+                teacher: toStringOrNull(rc['teacher']),
+                location: toStringOrNull(rc['location']),
+                weeks: _weeks(rc['weeks']),
+                colorValue: toIntOrNull(rc['colorValue']) ?? 0xFF5B8DEF,
+                notes: toStringOrNull(rc['notes']),
+              ),
+      ];
       // 旧版备份没有 platforms 字段，解析为空即可。
       platformsBySemester[id] = parseCoursePlatformGroups(s['platforms']);
     }
     return BackupFile._(
       semesters: semesters,
       coursesBySemester: coursesBySemester,
+      fullWeekCoursesBySemester: fullWeekCoursesBySemester,
       platformsBySemester: platformsBySemester,
       activeSemesterId: activeSemesterId,
     );
   }
 
-  static int? _toInt(dynamic v) {
-    if (v is int) return v;
-    if (v is double) return v.toInt();
-    if (v is String) return int.tryParse(v);
-    return null;
-  }
-
-  static String? _optString(dynamic v) {
-    if (v == null) return null;
-    final s = v.toString().trim();
-    return s.isEmpty ? null : s;
-  }
-
   static List<int> _weeks(dynamic v) {
     if (v is! List) return const [];
     return v
-        .map((w) => _toInt(w))
+        .map(toIntOrNull)
         .whereType<int>()
         .where((w) => w >= 1)
         .toSet()
         .toList()
       ..sort();
-  }
-
-  static int _parseColor(String? s) {
-    if (s == null) return 0xFF5B8DEF;
-    var hex = s.replaceAll('#', '').replaceAll('0x', '').replaceAll('0X', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    if (hex.length == 8) return int.tryParse(hex, radix: 16) ?? 0xFF5B8DEF;
-    return 0xFF5B8DEF;
   }
 }
 
@@ -175,23 +189,28 @@ class BackupRepository {
 
   BackupRepository(this._db);
 
+  /// 导出供文件 adapter 直接写入的 UTF-8 内容。
+  Future<List<int>> exportBytes() async => utf8.encode(await exportJson());
+
   /// 把全部学期、课程与课程平台导出为备份 JSON（格式与 [BackupFile] 对应）。
   Future<String> exportJson() async {
     final semesterRepo = SemesterRepository(_db);
     final courseRepo = CourseRepository(_db);
+    final fullWeekRepo = FullWeekCourseRepository(_db);
     final platformRepo = CoursePlatformRepository(_db);
 
-    final semesters = await semesterRepo.getSemesters();
     final active = await semesterRepo.getActiveSemester();
+    final semesters = await semesterRepo.getSemesters();
     final data = <String, dynamic>{
       'app': 'recess',
-      'version': 1,
+      'version': 2,
       'exportedAt': DateTime.now().toIso8601String(),
       'semesters': <Map<String, dynamic>>[],
     };
 
     for (final semester in semesters) {
       final courses = await courseRepo.getCourses(semester.id);
+      final fullWeekCourses = await fullWeekRepo.getAll(semester.id);
       final platforms = await platformRepo.getPlatformsBySemester(semester.id);
       (data['semesters'] as List).add({
         'id': semester.id,
@@ -211,6 +230,18 @@ class BackupRepository {
                   'endSection': c.endSection,
                   'startTime': c.startTime,
                   'endTime': c.endTime,
+                  'useExplicitTimes': c.useExplicitTimes,
+                  'weeks': c.weeks,
+                  'colorValue': c.colorValue,
+                  'notes': c.notes,
+                })
+            .toList(),
+        'fullWeekCourses': fullWeekCourses
+            .map((c) => {
+                  'id': c.id,
+                  'name': c.name,
+                  'teacher': c.teacher,
+                  'location': c.location,
                   'weeks': c.weeks,
                   'colorValue': c.colorValue,
                   'notes': c.notes,
@@ -228,14 +259,18 @@ class BackupRepository {
   /// 解析并恢复备份。成功返回恢复统计；失败抛异常且数据库保持原样
   /// （全部写入在单个事务内，任一步失败即回滚）。
   Future<RestoreResult> restore(String jsonText) async {
-    final backup = BackupFile.parse(jsonText);
+    return restoreBackup(BackupFile.parse(jsonText));
+  }
 
+  /// 恢复覆盖确认时已经校验的同一份备份内容。
+  Future<RestoreResult> restoreBackup(BackupFile backup) async {
     var courseCount = 0;
     await _db.transaction(() async {
       // 1. 清空现有数据
       await _db.delete(_db.courses).go();
       await _db.delete(_db.semesters).go();
       await _db.delete(_db.coursePlatforms).go();
+      await _db.delete(_db.fullWeekCourses).go();
 
       // 2. 批量写入学期、课程与课程平台
       await _db.batch((batch) {
@@ -246,6 +281,13 @@ class BackupRepository {
         for (final entry in backup.coursesBySemester.entries) {
           batch.insertAll(
             _db.courses,
+            entry.value.map((c) => c.toCompanion()).toList(),
+          );
+          courseCount += entry.value.length;
+        }
+        for (final entry in backup.fullWeekCoursesBySemester.entries) {
+          batch.insertAll(
+            _db.fullWeekCourses,
             entry.value.map((c) => c.toCompanion()).toList(),
           );
           courseCount += entry.value.length;
@@ -262,31 +304,31 @@ class BackupRepository {
           }
         }
       });
-    });
 
-    // 3. 恢复激活学期（若备份标记了，且仍存在）
-    if (backup.activeSemesterId != null) {
-      await _db.batch((batch) {
-        batch.update(
-          _db.semesters,
-          const db.SemestersCompanion(isActive: Value(false)),
-        );
-        batch.update(
-          _db.semesters,
-          const db.SemestersCompanion(isActive: Value(true)),
-          where: (s) => s.id.equals(backup.activeSemesterId!),
-        );
-      });
-    } else {
-      // 无激活标记：将第一个学期设为激活，避免零激活态。
-      await _db.batch((batch) {
-        batch.update(
-          _db.semesters,
-          const db.SemestersCompanion(isActive: Value(true)),
-          where: (s) => s.id.equals(backup.semesters.first.id),
-        );
-      });
-    }
+      // 3. 恢复激活学期（若备份标记了，且仍存在）
+      if (backup.activeSemesterId != null) {
+        await _db.batch((batch) {
+          batch.update(
+            _db.semesters,
+            const db.SemestersCompanion(isActive: Value(false)),
+          );
+          batch.update(
+            _db.semesters,
+            const db.SemestersCompanion(isActive: Value(true)),
+            where: (s) => s.id.equals(backup.activeSemesterId!),
+          );
+        });
+      } else {
+        // 无激活标记：将第一个学期设为激活，避免零激活态。
+        await _db.batch((batch) {
+          batch.update(
+            _db.semesters,
+            const db.SemestersCompanion(isActive: Value(true)),
+            where: (s) => s.id.equals(backup.semesters.first.id),
+          );
+        });
+      }
+    });
     return RestoreResult(
       semesterCount: backup.semesters.length,
       courseCount: courseCount,

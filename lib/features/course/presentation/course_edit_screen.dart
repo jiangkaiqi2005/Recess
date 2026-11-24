@@ -1,26 +1,18 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/widgets/load_failed_view.dart';
 import 'package:recess/features/course/application/course_form_provider.dart';
 import 'package:recess/features/course/application/course_platforms_provider.dart';
+import 'package:recess/features/course/domain/unsaved_course_changes.dart';
 import 'package:recess/features/course/presentation/course_platform_display.dart';
 import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
-
-const List<String> _weekdayLabels = [
-  '周一',
-  '周二',
-  '周三',
-  '周四',
-  '周五',
-  '周六',
-  '周日'
-];
 
 class CourseEditScreen extends ConsumerStatefulWidget {
   final String? courseId;
@@ -32,64 +24,100 @@ class CourseEditScreen extends ConsumerStatefulWidget {
 
 class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
   bool _initialized = false;
-  bool _isDirty = false;
+  Course? _initialCourse;
+  List<CoursePlatform>? _initialPlatforms;
 
   @override
   Widget build(BuildContext context) {
     final initAsync = ref.watch(courseInitialProvider(widget.courseId));
     final isCopy = widget.courseId?.startsWith('copy:') ?? false;
     final isEdit = widget.courseId != null && widget.courseId!.isNotEmpty && !isCopy;
+    final hasChanges = _hasUnsavedChanges();
+    // 平台区块在列表底部，首帧可能不在屏内而未构建；由页面持有平台表单，
+    // 避免 autoDispose 在 init 解析期间回收它，滚到区块时拿到空白的新实例。
+    ref.watch(coursePlatformsFormProvider.notifier);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => _handleClose(context),
-        ),
-        title: Text(isEdit ? '编辑课程' : '添加课程'),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            tooltip: '保存',
-            onPressed: () => _save(context),
+    return PopScope<Object?>(
+      // 路由级退出保护：关闭按钮、系统返回键与返回手势都经过这里。
+      canPop: !hasChanges,
+      onPopInvokedWithResult: _handlePopInvoked,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.maybePop(context),
           ),
-        ],
-      ),
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        behavior: HitTestBehavior.translucent,
-        child: initAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('加载失败：$e')),
-          data: (initial) {
-            if (!_initialized) {
-              _initialized = true;
-              Future.microtask(() {
-                ref.read(courseFormProvider.notifier).init(initial);
-                ref.read(coursePlatformsFormProvider.notifier).init(
-                      semesterId: initial.semesterId,
-                      courseName: initial.name,
-                      originalName: initial.id.isEmpty ? null : initial.name,
+          title: Text(isEdit ? '编辑课程' : '添加课程'),
+          centerTitle: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.check),
+              tooltip: '保存',
+              onPressed: () => _save(context),
+            ),
+          ],
+        ),
+        body: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          behavior: HitTestBehavior.translucent,
+          child: initAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            // 初始化失败：易懂说明 + 重试；重试按当前路由参数重新执行初始化，
+            // 成功后仍走原有「仅初始化一次」的表单与课程平台流程。
+            error: (e, _) => LoadFailedView(
+              title: '课程加载失败',
+              message: '课程数据没有读取出来，点击重试重新加载',
+              onRetry: () =>
+                  ref.invalidate(courseInitialProvider(widget.courseId)),
+            ),
+            data: (initial) {
+              if (!_initialized) {
+                _initialized = true;
+                _initialCourse = initial;
+                Future.microtask(() async {
+                  ref.read(courseFormProvider.notifier).init(initial);
+                  await ref.read(coursePlatformsFormProvider.notifier).init(
+                        semesterId: initial.semesterId,
+                        courseName: initial.name,
+                        originalName: initial.id.isEmpty ? null : initial.name,
+                      );
+                  if (!mounted) return;
+                  setState(() {
+                    _initialPlatforms = List.unmodifiable(
+                      ref.read(coursePlatformsFormProvider),
                     );
-              });
-            }
-            return CourseFormBody(
-              initial: initial,
-              isEdit: isEdit,
-              onChanged: () => _isDirty = true,
-            );
-          },
+                  });
+                });
+              }
+              return CourseFormBody(initial: initial, isEdit: isEdit);
+            },
+          ),
         ),
       ),
     );
   }
 
-  Future<void> _handleClose(BuildContext context) async {
-    if (!_isDirty) {
-      if (context.mounted) context.pop();
-      return;
+  /// 草稿与初始快照是否存在实际差异（平台基线在解析完成后才有）。
+  bool _hasUnsavedChanges() {
+    final initial = _initialCourse;
+    final initialPlatforms = _initialPlatforms;
+    if (initial == null || initialPlatforms == null) return false;
+    return hasUnsavedCourseChanges(
+      draft: ref.watch(courseFormProvider),
+      initial: initial,
+      platforms: ref.watch(coursePlatformsFormProvider),
+      initialPlatforms: initialPlatforms,
+    );
+  }
+
+  Future<void> _handlePopInvoked(bool didPop, Object? result) async {
+    if (didPop) return;
+    if (context.mounted && await _confirmDiscard() && context.mounted) {
+      context.pop();
     }
+  }
+
+  Future<bool> _confirmDiscard() async {
     final discard = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -107,7 +135,7 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
         ],
       ),
     );
-    if (discard == true && context.mounted) context.pop();
+    return discard == true;
   }
 
   Future<void> _save(BuildContext context) async {
@@ -152,12 +180,10 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
 class CourseFormBody extends ConsumerStatefulWidget {
   final Course initial;
   final bool isEdit;
-  final VoidCallback? onChanged;
   const CourseFormBody({
     super.key,
     required this.initial,
     required this.isEdit,
-    this.onChanged,
   });
 
   @override
@@ -184,19 +210,15 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
       ref
           .read(coursePlatformsFormProvider.notifier)
           .setCourseName(_nameCtrl.text);
-      widget.onChanged?.call();
     });
     _teacherCtrl.addListener(() {
       ref.read(courseFormProvider.notifier).setTeacher(_teacherCtrl.text);
-      widget.onChanged?.call();
     });
     _locationCtrl.addListener(() {
       ref.read(courseFormProvider.notifier).setLocation(_locationCtrl.text);
-      widget.onChanged?.call();
     });
     _notesCtrl.addListener(() {
       ref.read(courseFormProvider.notifier).setNotes(_notesCtrl.text);
-      widget.onChanged?.call();
     });
   }
 
@@ -256,7 +278,7 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
             final day = i + 1;
             final selected = course.dayOfWeek == day;
             return ChoiceChip(
-              label: Text(_weekdayLabels[i]),
+              label: Text('周${AppConstants.weekdayLabels[i]}'),
               selected: selected,
               onSelected: (_) =>
                   ref.read(courseFormProvider.notifier).setDayOfWeek(day),
@@ -356,7 +378,6 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
             return InkWell(
               onTap: () {
                 ref.read(courseFormProvider.notifier).setColor(c);
-                widget.onChanged?.call();
               },
               child: Container(
                 width: 32,
@@ -382,10 +403,7 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
           }).toList(),
         ),
         const SizedBox(height: 20),
-        _PlatformSection(
-          courseName: course.name.trim(),
-          onChanged: widget.onChanged,
-        ),
+        _PlatformSection(courseName: course.name.trim()),
         const SizedBox(height: 20),
         const _FieldLabel('备注'),
         TextField(
@@ -450,9 +468,8 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
 /// 「课程平台」区块：列表 + 添加/编辑/删除。改动随页面「保存」一起持久化。
 class _PlatformSection extends ConsumerWidget {
   final String courseName;
-  final VoidCallback? onChanged;
 
-  const _PlatformSection({required this.courseName, this.onChanged});
+  const _PlatformSection({required this.courseName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -473,7 +490,6 @@ class _PlatformSection extends ConsumerWidget {
       } else {
         notifier.replaceAt(index, result);
       }
-      onChanged?.call();
     }
 
     return Column(
@@ -507,7 +523,7 @@ class _PlatformSection extends ConsumerWidget {
               subtitle: platforms[i].url == null
                   ? null
                   : Text(
-                      platforms[i].url!,
+                      platformUrlLabel(platforms[i].url!),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -516,7 +532,6 @@ class _PlatformSection extends ConsumerWidget {
                 tooltip: '删除平台',
                 onPressed: () {
                   notifier.removeAt(i);
-                  onChanged?.call();
                 },
               ),
               onTap: () => edit(i),
@@ -540,8 +555,13 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
   late CoursePlatformPurpose _purpose =
       widget.initial?.purpose ?? CoursePlatformPurpose.onlineCourse;
   late final _nameCtrl = TextEditingController(text: widget.initial?.name);
-  late final _urlCtrl = TextEditingController(text: widget.initial?.url);
+  late final _urlCtrl = TextEditingController(
+    text: widget.initial?.url == null
+        ? null
+        : platformUrlLabel(widget.initial!.url!),
+  );
   String? _nameError;
+  String? _urlError;
 
   @override
   void dispose() {
@@ -556,7 +576,11 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
       setState(() => _nameError = '请填写平台名');
       return;
     }
-    final url = _urlCtrl.text.trim();
+    final url = normalizePlatformUrl(_urlCtrl.text);
+    if (url.isNotEmpty && !isAllowedPlatformUrl(url)) {
+      setState(() => _urlError = '需为 http(s):// 开头的完整地址或邮箱');
+      return;
+    }
     Navigator.of(context).pop(CoursePlatform(
       purpose: _purpose,
       name: name,
@@ -605,9 +629,11 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _urlCtrl,
-              decoration: const InputDecoration(
-                labelText: '链接（可选）',
-                hintText: 'https://',
+              decoration: InputDecoration(
+                labelText: '链接或邮箱（可选）',
+                hintText: 'https:// 或 name@example.com',
+                errorText: _urlError,
+                errorMaxLines: 2,
               ),
               keyboardType: TextInputType.url,
               onSubmitted: (_) => _submit(),

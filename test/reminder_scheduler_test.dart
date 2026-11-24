@@ -88,6 +88,7 @@ void main() {
       startSection: 3,
       endSection: 4,
       startTime: '09:30',
+      useExplicitTimes: true,
       weeks: [1],
     );
     final now = DateTime(2026, 8, 30);
@@ -122,6 +123,43 @@ void main() {
       horizonDays: 7,
     );
     expect(reminders, isEmpty);
+  });
+
+  test('提醒只需可解析开始端，不回退空串或无效显式值', () {
+    final base = makeM1().copyWith(weeks: [1], useExplicitTimes: true);
+    final reminders = computeReminders(
+      courses: [
+        base.copyWith(name: '冲突显式', startTime: '08:30', endTime: '09:00'),
+        base.copyWith(name: '缺结束', startTime: '08:30', endSection: 16),
+        base.copyWith(name: '坏结束', startTime: '08:30', endTime: '无效'),
+        base.copyWith(name: '只结束', endTime: '09:00'),
+        base.copyWith(name: '空开始', startTime: ''),
+        base.copyWith(name: '坏开始', startTime: '08点30分'),
+      ],
+      semester: semester,
+      sectionTimes: sectionTimes,
+      now: DateTime(2026, 8, 30),
+      leadMinutes: 10,
+    );
+    expect({for (final r in reminders) r.title: r.trigger}, {
+      '冲突显式': DateTime(2026, 8, 31, 8, 20),
+      '缺结束': DateTime(2026, 8, 31, 8, 20),
+      '坏结束': DateTime(2026, 8, 31, 8, 20),
+      '只结束': DateTime(2026, 8, 31, 7, 50),
+    });
+  });
+
+  test('提醒保留既有小时分钟溢出的日期归一化', () {
+    final reminders = computeReminders(
+      courses: [makeM1().copyWith(
+        startTime: '25:75', weeks: [1], useExplicitTimes: true,
+      )],
+      semester: semester,
+      sectionTimes: sectionTimes,
+      now: DateTime(2026, 8, 30),
+      leadMinutes: 10,
+    );
+    expect(reminders.single.trigger, DateTime(2026, 9, 1, 2, 5));
   });
 
   test('结果按触发时间升序', () {

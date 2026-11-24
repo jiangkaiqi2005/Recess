@@ -12,6 +12,9 @@ class Course {
   final int endSection;
   final String? startTime; // "08:00"
   final String? endTime; // "08:45"
+
+  /// 仅明确提供独立钟点的课程使用它们；旧课程默认跟随节次作息。
+  final bool useExplicitTimes;
   final List<int> weeks;
   final int colorValue; // 卡片主题色（ARGB）
   final String? notes;
@@ -27,6 +30,7 @@ class Course {
     required this.endSection,
     this.startTime,
     this.endTime,
+    this.useExplicitTimes = false,
     this.weeks = const [],
     this.colorValue = AppConstants.defaultCourseColor,
     this.notes,
@@ -45,6 +49,7 @@ class Course {
     int? endSection,
     String? startTime,
     String? endTime,
+    bool? useExplicitTimes,
     List<int>? weeks,
     int? colorValue,
     String? notes,
@@ -60,6 +65,7 @@ class Course {
         endSection: endSection ?? this.endSection,
         startTime: startTime ?? this.startTime,
         endTime: endTime ?? this.endTime,
+        useExplicitTimes: useExplicitTimes ?? this.useExplicitTimes,
         weeks: weeks ?? this.weeks,
         colorValue: colorValue ?? this.colorValue,
         notes: notes ?? this.notes,
@@ -79,6 +85,7 @@ class Course {
           endSection == other.endSection &&
           startTime == other.startTime &&
           endTime == other.endTime &&
+          useExplicitTimes == other.useExplicitTimes &&
           _listEquals(weeks, other.weeks) &&
           colorValue == other.colorValue &&
           notes == other.notes;
@@ -95,6 +102,7 @@ class Course {
         endSection,
         startTime,
         endTime,
+        useExplicitTimes,
         Object.hashAll(weeks),
         colorValue,
         notes,

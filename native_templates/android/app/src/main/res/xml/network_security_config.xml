@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 众多高校教务系统仅提供 http 站点，WebView 导入必须允许明文访问；
+     以显式网络安全配置替代 usesCleartextTraffic 开关，行为等价（全局允许明文），
+     便于将来按域收紧。 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 固定 4×4：透明垫片保持 1:1，卡片在桌面分配区域居中。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <RelativeLayout
+        android:id="@android:id/background"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/course_widget_background">
+
+        <ImageView
+            android:id="@+id/widget_square"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:importantForAccessibility="no"
+            android:src="@drawable/course_widget_square" />
+
+        <include
+            layout="@layout/course_widget_content"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_alignBottom="@id/widget_square"
+            android:layout_alignLeft="@id/widget_square"
+            android:layout_alignRight="@id/widget_square"
+            android:layout_alignTop="@id/widget_square" />
+    </RelativeLayout>
+</FrameLayout>

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:recess/features/schedule/presentation/schedule_screen.dart';
 import 'package:recess/features/course/presentation/course_edit_screen.dart';

@@ -51,6 +51,24 @@ void main() {
     });
   });
 
+  group('clampWeek', () {
+    test('把周次钳制到 1..totalWeeks', () {
+      expect(clampWeek(0, 18), 1);
+      expect(clampWeek(-3, 18), 1);
+      expect(clampWeek(1, 18), 1);
+      expect(clampWeek(18, 18), 18);
+      expect(clampWeek(19, 18), 18);
+      expect(clampWeek(2, 1), 1);
+    });
+
+    test('总周数小于 1 时按 1 周处理', () {
+      expect(clampWeek(0, 0), 1);
+      expect(clampWeek(1, 0), 1);
+      expect(clampWeek(3, 0), 1);
+      expect(clampWeek(3, -5), 1);
+    });
+  });
+
   group('dateForWeekday', () {
     test('第1周周一 = 开学日', () {
       expect(dateForWeekday(monday, 1, 1), DateTime(2024, 9, 2));
@@ -79,6 +97,43 @@ void main() {
     });
   });
 
+  group('lastSemesterDay', () {
+    test('周一开学时取总周数最后一周的周日', () {
+      final semester = Semester(
+        id: 's',
+        name: '学期',
+        startDate: monday,
+        totalWeeks: 3,
+      );
+      expect(lastSemesterDay(semester), DateTime(2024, 9, 22));
+      expect(lastSemesterDay(semester), dateForWeekday(monday, 3, 7));
+    });
+
+    test('非周一开学时按开学日所在周的周一计算', () {
+      final semester = Semester(
+        id: 's',
+        name: '学期',
+        startDate: DateTime(2024, 9, 4),
+        totalWeeks: 8,
+      );
+      expect(lastSemesterDay(semester), DateTime(2024, 10, 27));
+    });
+
+    test('忽略开始日期的时间部分，并把总周数调整到合法范围', () {
+      final zero = Semester(
+        id: 's',
+        name: '学期',
+        startDate: DateTime(2024, 9, 2, 23, 30),
+        totalWeeks: 0,
+      );
+      expect(lastSemesterDay(zero), DateTime(2024, 9, 8));
+      expect(
+        lastSemesterDay(zero.copyWith(totalWeeks: 99)),
+        DateTime(2025, 3, 30),
+      );
+    });
+  });
+
   group('computeCurrentWeek 与 dateForWeekday 一致性', () {
     test('非周一开学时两函数对同一日期的周次判定一致', () {
       final wednesday = DateTime(2024, 9, 4);
@@ -102,6 +157,28 @@ void main() {
   });
 
   group('currentWeekOf', () {
+    test('自动周保留非周一开学的周一对齐和学期前后原始周数', () {
+      final semester = Semester(
+        id: 's', name: '学期', startDate: DateTime(2024, 9, 4), totalWeeks: 8,
+      );
+      expect(currentWeekOf(semester, DateTime(2024, 9, 1)), 0);
+      expect(currentWeekOf(semester, DateTime(2024, 9, 2)), 1);
+      expect(currentWeekOf(semester, DateTime(2024, 9, 4)), 1);
+      expect(currentWeekOf(semester, DateTime(2024, 10, 27)), 8);
+      expect(currentWeekOf(semester, DateTime(2024, 10, 28)), 9);
+      expect(semester.currentWeekOverride, isNull);
+    });
+    test('读取旧越界手动当前周时调整到最近合法周', () {
+      final semester = Semester(
+        id: 's', name: '学期', startDate: monday, totalWeeks: 8,
+        currentWeekOverride: 12,
+      );
+      expect(currentWeekOf(semester, monday), 8);
+      expect(currentWeekOf(semester.copyWith(currentWeekOverride: 0), monday), 1);
+      expect(currentWeekOf(semester.copyWith(currentWeekOverride: -3), monday), 1);
+      expect(semester.currentWeekOverride, 12);
+    });
+
     test('没有手动修改时按开学日期推算', () {
       final semester = Semester(
         id: 's',

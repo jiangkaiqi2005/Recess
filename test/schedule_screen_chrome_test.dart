@@ -1,5 +1,5 @@
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +12,7 @@ import 'package:recess/data/repositories/semester_repository.dart';
 import 'package:recess/features/schedule/application/schedule_providers.dart';
 import 'package:recess/features/schedule/presentation/schedule_screen.dart';
 import 'package:recess/features/schedule/presentation/week_view.dart';
+import 'package:recess/features/semester/application/semester_mutations.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
 
 void main() {
@@ -64,6 +65,9 @@ void main() {
       ProviderScope(
         overrides: [
           appDatabaseProvider.overrideWithValue(database),
+          scheduleFullWeekCoursesProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           scheduleCoursesProvider.overrideWith(
             (ref) => Stream.value(const [course]),
           ),
@@ -252,22 +256,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('切换激活学期更新总周数并定位到新学期当前周', (tester) async {
+  testWidgets('切换当前学期更新总周数并定位到新学期当前周', (tester) async {
     await pumpSchedule(tester);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(ScheduleScreen)),
     );
-    final repo = SemesterRepository(database);
     await tester.runAsync(() async {
-      await repo.upsert(Semester(
+      await container.read(semesterMutationsProvider).save(Semester(
         id: 'new-semester',
         name: '新学期',
         startDate: semesterStart.subtract(const Duration(days: 14)),
         totalWeeks: 8,
-      ));
-      await repo.setActive('new-semester');
+      ), activate: true);
+      await container.read(activeSemesterProvider.future);
     });
-    container.invalidate(activeSemesterProvider);
     await tester.pumpAndSettle();
 
     final pageView = tester.widget<PageView>(find.byType(PageView));
@@ -309,6 +311,27 @@ void main() {
     await openWeekMenu(tester);
     expect(find.text('回到本周'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('修改当前周保存失败保持旧周数并提示失败', (tester) async {
+    await pumpSchedule(tester);
+    await tester.runAsync(() => database.customStatement('''
+      CREATE TRIGGER fail_week_save BEFORE UPDATE ON semesters
+      BEGIN SELECT RAISE(ABORT, 'forced week save failure'); END;
+    '''));
+    await openWeekMenu(tester);
+    await tester.tap(find.text('修改当前周'));
+    await tester.pumpAndSettle();
+    await tester.tap(weekCell('7'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('第 3 周'), findsOneWidget);
+    expect(find.textContaining('保存失败'), findsOneWidget);
+    expect(find.text('当前周已改为第 7 周'), findsNothing);
+    final saved = await tester.runAsync(
+      () => SemesterRepository(database).getActiveSemester(),
+    );
+    expect(saved?.currentWeekOverride, isNull);
   });
 
   testWidgets('开学前没有当前周：标题不带“当前为第 N 周”，菜单没有“回到本周”',

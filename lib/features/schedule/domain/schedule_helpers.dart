@@ -1,5 +1,6 @@
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
 
 /// 今日某一门课的状态（相对当前时刻）。
@@ -43,12 +44,12 @@ List<TodayCourseSlot> todayCourseSlots({
   final nowMin = now.hour * 60 + now.minute;
   return slots
       .map((c) {
-        final start = _clockToMinutes(
-          c.startTime ?? sectionTimes[c.startSection]?.startTime,
-        );
-        final end = _clockToMinutes(
-          c.endTime ?? sectionTimes[c.endSection]?.endTime,
-        );
+        final clock = CourseClock(c, sectionTimes);
+        final startClock = clock.start;
+        final endClock = clock.end;
+        final start =
+            startClock == null ? null : startClock.$1 * 60 + startClock.$2;
+        final end = endClock == null ? null : endClock.$1 * 60 + endClock.$2;
         var status = CourseStatus.upcoming;
         if (start != null && end != null) {
           if (nowMin >= end) {
@@ -90,14 +91,4 @@ int visibleSectionCount({
     if (c.endSection > count) count = c.endSection;
   }
   return count;
-}
-
-int? _clockToMinutes(String? clock) {
-  if (clock == null || clock.isEmpty) return null;
-  final parts = clock.split(':');
-  if (parts.length != 2) return null;
-  final h = int.tryParse(parts[0]);
-  final m = int.tryParse(parts[1]);
-  if (h == null || m == null) return null;
-  return h * 60 + m;
 }
