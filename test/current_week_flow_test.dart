@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -62,7 +62,6 @@ void main() {
     binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
       call,
     ) async {
-      if (call.method == 'initiallyLaunchedFromHomeWidget') return null;
       if (call.method == 'saveWidgetData') {
         final args = call.arguments as Map;
         widgetData[args['id'] as String] = args['data'];

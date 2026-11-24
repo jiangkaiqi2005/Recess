@@ -11,7 +11,7 @@ Recess (课表) — a minimal Android college course-schedule app built with Flu
 ```bash
 flutter pub get                                              # install deps
 flutter create . --platforms=android --org io.github.jiangkaiqi2005         # regenerate Android platform dir (see below)
-dart run build_runner build --delete-conflicting-outputs      # codegen: drift + go_router (after changing tables/routes)
+dart run build_runner build                                  # codegen: drift + go_router (after changing tables/routes)
 dart run flutter_launcher_icons                              # regenerate app icons (after changing assets/icon/icon.png)
 dart run flutter_native_splash:create                        # regenerate splash screen
 flutter test                                                 # run all tests
@@ -33,7 +33,7 @@ flutter build appbundle --release                            # Android AAB
 
 Feature-first layering under `lib/`:
 
-- `core/` — persistence-free domain: `models/` (`Course`, `Semester`), `constants/`, `theme/`, pure `utils/` (`week_calculator.dart`).
+- `core/` — persistence-free domain: `models/` (`Course`, `Semester`), `constants/`, `theme/`, `widgets/` (shared state views), pure `utils/` (`week_calculator.dart`).
 - `data/` — drift persistence: `tables/` (drift `Table` defs), `repositories/` (domain-typed data access), `mappers.dart`, `providers/`, and `app_database.dart`.
 - `features/` — feature modules, each with `application/` (Riverpod providers) + `presentation/` (screens) + optionally `data/`/`domain/`: `schedule`, `course`, `semester`, `import`, `settings`, `widget`.
 - `app/router.dart` — go_router route table (7 routes).
@@ -52,7 +52,7 @@ drift generates data classes also named `Course` / `Semester`, identical to the 
 
 ### Import pipeline
 
-`features/import/` supports three sources: WebView教务-system import, ICS file, JSON file. `ImportCourse` (`domain/import_course.dart`) is the intermediate, persistence-free representation used for the preview/select UI before writing to the DB; `Course.id` is generated at write time. `coursesConflict(a, b)` checks day + section overlap + week intersection. Adding a new school's教务 system = implement `SchoolAdapter` (`loginUrl`, `scheduleUrl`, `isSchedulePage`, `extractJs`) in `features/import/data/`, then register it in the `schoolAdapters` list in `school_adapter.dart`. `extractJs` must emit JSON parseable by `ExtractedCourse.fromJson`.
+`features/import/` supports three sources: WebView教务-system import, ICS file, JSON file. `ImportCourse` (`domain/import_course.dart`) is the intermediate, persistence-free representation used for the preview/select UI before writing to the DB; `Course.id` is generated at write time. `coursesConflict(a, b)` checks day + section overlap + week intersection. Adding a new school's教务 system = implement `SchoolAdapter` (`pinyin`, `loginUrl`, `isSchedulePage`, `extractJs`) in `features/import/data/`, then register it in the `_schoolCatalog` table in `school_adapter.dart`. `extractJs` must emit JSON that `previewWebviewCourses` (`domain/webview_course_parser.dart`) can parse and validate.
 
 ### Routing conventions
 
@@ -60,13 +60,14 @@ go_router, declared once in `app/router.dart`. Screens `context.push` existing r
 
 ### Desktop widget bridge
 
-`features/widget/application/widget_service.dart` serializes every occurrence from today through the end of the semester to native via `home_widget`, together with a per-date teaching-week map (`semester_days`) and a `widget_loaded` marker (no App Group is configured on Android; widget provider `CourseWidgetProvider`, package `io.github.jiangkaiqi2005.recess`). Native `WidgetSelector` picks what to show from the current local time; `WidgetRefreshScheduler` re-renders at the next class boundary or midnight with an inexact alarm. Failures are swallowed — the widget is a nice-to-have and must not affect the main app. `widgetServiceProvider` is a global singleton invoked after imports/edits to refresh.
+`features/widget/application/widget_service.dart` serializes every occurrence from today through the end of the semester to native via `home_widget`, together with a per-date teaching-week map (`semester_days`) and a `widget_loaded` marker (no App Group is configured on Android; widget provider `CourseWidgetProvider`, package `io.github.jiangkaiqi2005.recess`). Native `WidgetSelector` picks what to show from the current local time; `WidgetRefreshScheduler` re-renders at the next class boundary or midnight with an inexact alarm. Failures are swallowed — the widget is a nice-to-have and must not affect the main app. `widgetServiceProvider` is a global singleton; refreshes are triggered centrally by `_AppEffects` in `main.dart` (data-change listeners, midnight timer, app resume), not by individual screens.
 
 ## Conventions
 
 - `dayOfWeek`: 1=Mon … 7=Sun, matching `DateTime.weekday`.
 - Weeks are 1-based; `computeCurrentWeek(startDate, today)` returns 0 if before start. `currentWeekOverride` on `Semester` takes precedence over the computed week (for调课/假期).
 - Default course color is `0xFF5B8DEF` (the app's primary blue); 10-color palette in the editor.
+- Material 组件一律从 `package:material_ui/material_ui.dart` 导入；`package:flutter/material.dart` 在 Flutter 3.47 后已弃用，CI 的 `--fatal-infos` 会拦截。
 - Pure logic (week math, parsers, conflict detection) goes in `core/utils/` or `features/*/domain/` and is unit-tested. Existing tests include: `week_calculator`, `ics_parser`, `json_importer`, `import_course`, `schedule_helpers`, `course_platform_repository`, `backup_repository`, `app_database_migration`.
 
 ## CI

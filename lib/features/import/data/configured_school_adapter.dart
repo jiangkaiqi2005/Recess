@@ -1,4 +1,4 @@
-import 'school_week_parser.dart';
+import 'school_extraction_runtime.dart';
 import 'generic_adapter.dart';
 import 'school_adapter.dart';
 
@@ -26,24 +26,23 @@ class ConfiguredSchoolAdapter extends SchoolAdapter {
   final String loginUrl;
 
   final AcademicSystemType system;
-  final String? _scheduleUrl;
-  final List<String> scheduleMarkers;
+
+  /// 校名无声调拼音；未显式给出时回退到小写校名。
+  final String? _pinyin;
 
   const ConfiguredSchoolAdapter({
     required this.schoolName,
     required this.loginUrl,
     required this.system,
-    String? scheduleUrl,
-    this.scheduleMarkers = const [],
-  }) : _scheduleUrl = scheduleUrl;
+    String? pinyin,
+  }) : _pinyin = pinyin;
 
   @override
-  String get scheduleUrl => _scheduleUrl ?? loginUrl;
+  String get pinyin => _pinyin ?? super.pinyin;
 
+  // 配置型适配器不做课表页自动检测，提取由用户在页面上手动触发。
   @override
-  bool isSchedulePage(String currentUrl) {
-    return scheduleMarkers.any(currentUrl.contains);
-  }
+  bool isSchedulePage(String currentUrl) => false;
 
   @override
   AdapterSupportLevel get supportLevel => system == AcademicSystemType.generic
@@ -73,33 +72,22 @@ class ConfiguredSchoolAdapter extends SchoolAdapter {
   String get _zhengfangExtractor =>
       r'''
 (function() {
-''' + schoolWeekParserJs + r'''
+''' + schoolExtractionRuntimeJs + r'''
   var results = [];
   var seen = {};
-
-  function range(text) {
-    return schoolWeekNumbers(text, true);
-  }
 
   function add(item) {
     if (!item || typeof item !== 'object') { results.push(null); return; }
     var name = String(item.kcmc || item.courseName || '').trim();
     var day = schoolInteger(item.xqj || item.dayOfWeek || item.weekDay);
-    var sections = range(item.jcs || item.jc || item.sections || '');
-    var weeks = schoolWeekNumbers(item.zcd || item.weeks || item.weekDescription || '');
+    var sections = schoolParseSections(item.jcs || item.jc || item.sections || '');
+    var weeks = schoolParseWeeks(item.zcd || item.weeks || item.weekDescription || '');
 
     var key = name + '|' + day + '|' + sections.join(',') + '|' + weeks.join(',');
-    if (seen[key]) return;
-    seen[key] = true;
-    results.push({
-      name: name,
-      teacher: item.xm || item.jsxm || item.teacherName || null,
-      location: item.cdmc || item.jxcd || item.classroomName || null,
-      dayOfWeek: day,
-      startSection: sections[0],
-      endSection: sections[sections.length - 1],
-      weeks: weeks
-    });
+    schoolPushCourse(results, seen, key, name,
+        item.xm || item.jsxm || item.teacherName || null,
+        item.cdmc || item.jxcd || item.classroomName || null,
+        day, sections, weeks);
   }
 
   try {

@@ -1,5 +1,5 @@
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -48,7 +48,10 @@ void main() {
         );
     router = GoRouter(
       routes: [
-        GoRoute(path: '/', builder: (_, __) => const ScheduleScreen()),
+        GoRoute(
+          path: '/',
+          builder: (_, __) => ScheduleScreen(now: () => today),
+        ),
         GoRoute(
           path: '/semester',
           builder: (_, __) => SemesterScreen(now: () => today),

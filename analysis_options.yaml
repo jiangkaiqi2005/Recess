@@ -1,6 +1,8 @@
 analyzer:
   exclude:
     - '**/*.g.dart'
+    - build/**
+    - android/**
 
 linter:
   rules:

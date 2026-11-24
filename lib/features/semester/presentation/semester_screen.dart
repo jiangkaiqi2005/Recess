@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/core/utils/week_calculator.dart';
+import 'package:recess/core/widgets/load_failed_view.dart';
 import 'package:recess/features/semester/application/semester_form_provider.dart';
 import 'package:recess/features/semester/application/semester_mutations.dart';
 import 'package:recess/features/semester/application/semester_providers.dart';
@@ -30,7 +31,9 @@ class SemesterScreen extends ConsumerWidget {
       body: semestersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         // 学期列表与当前学期任一失败都进入重试态；重试同时覆盖两个数据源。
-        error: (e, _) => _LoadFailedView(
+        error: (e, _) => LoadFailedView(
+          title: '学期加载失败',
+          message: '学期数据没有读取出来，点击重试重新加载',
           onRetry: () {
             ref.invalidate(activeSemesterProvider);
             ref.invalidate(semestersProvider);
@@ -81,45 +84,6 @@ class SemesterScreen extends ConsumerWidget {
   }
 }
 
-/// 学期加载失败状态：易懂的说明加重试入口，不展示原始异常。
-class _LoadFailedView extends StatelessWidget {
-  final VoidCallback onRetry;
-  const _LoadFailedView({required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.cloud_off_outlined, size: 48, color: theme.hintColor),
-          const SizedBox(height: 12),
-          Text(
-            '学期加载失败',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.hintColor,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '学期数据没有读取出来，点击重试重新加载',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.hintColor,
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('重试'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SemesterCard extends StatelessWidget {
   final Semester semester;
   final bool isActive;
@@ -139,8 +103,7 @@ class _SemesterCard extends StatelessWidget {
     final weekLabel = week != null
         ? '第 $week 周'
         : (currentWeekOf(semester, now) < 1 ? '未开学' : '已结束');
-    final end = semester.startDate
-        .add(Duration(days: semester.totalWeeks * 7 - 1));
+    final end = lastSemesterDay(semester);
     final range =
         '${DateFormat('yyyy-MM-dd').format(semester.startDate)} ~ ${DateFormat('yyyy-MM-dd').format(end)}';
 
@@ -340,11 +303,8 @@ class _SemesterEditSheetState extends ConsumerState<SemesterEditSheet> {
                         // 默认使用计算出的当前周，而非最后一周
                         final computedWeek = computeCurrentWeek(
                             semester.startDate, DateTime.now());
-                        final defaultWeek = computedWeek < 1
-                            ? 1
-                            : (computedWeek > semester.totalWeeks
-                                ? semester.totalWeeks
-                                : computedWeek);
+                        final defaultWeek =
+                            clampWeek(computedWeek, semester.totalWeeks);
                         ref
                             .read(semesterFormProvider.notifier)
                             .setCurrentWeekOverride(
@@ -355,9 +315,10 @@ class _SemesterEditSheetState extends ConsumerState<SemesterEditSheet> {
                   if (_overrideOn)
                     _Stepper(
                       value: semester.currentWeekOverride ??
-                          computeCurrentWeek(
-                              semester.startDate, DateTime.now())
-                              .clamp(1, semester.totalWeeks),
+                          clampWeek(
+                              computeCurrentWeek(
+                                  semester.startDate, DateTime.now()),
+                              semester.totalWeeks),
                       min: 1,
                       max: semester.totalWeeks,
                       onChanged: (v) => ref

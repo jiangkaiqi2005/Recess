@@ -34,7 +34,6 @@ class ImportState {
   /// 本次文件的逐条导入诊断：随预览、错误、提交失败与完成状态保留，
   /// 选择新文件时整体清理（见 [ImportNotifier.pickAndParse]）。
   final List<ImportDiagnostic> diagnostics;
-  final int totalWeeks;
   final ImportMode mode;
 
   /// JSON 文件里按课程名给出的课程平台，确认导入时写入目标学期。
@@ -46,7 +45,6 @@ class ImportState {
     this.errorMessage,
     this.importedCount = 0,
     this.diagnostics = const [],
-    this.totalWeeks = 18,
     this.mode = ImportMode.replace,
     this.platforms = const {},
   });
@@ -57,7 +55,6 @@ class ImportState {
     String? errorMessage,
     int? importedCount,
     List<ImportDiagnostic>? diagnostics,
-    int? totalWeeks,
     ImportMode? mode,
     CoursePlatformGroups? platforms,
   }) =>
@@ -67,7 +64,6 @@ class ImportState {
         errorMessage: errorMessage ?? this.errorMessage,
         importedCount: importedCount ?? this.importedCount,
         diagnostics: diagnostics ?? this.diagnostics,
-        totalWeeks: totalWeeks ?? this.totalWeeks,
         mode: mode ?? this.mode,
         platforms: platforms ?? this.platforms,
       );
@@ -139,7 +135,6 @@ class ImportNotifier extends StateNotifier<ImportState> {
       state = state.copyWith(
         status: ImportStatus.preview,
         courses: courses,
-        totalWeeks: semester.totalWeeks,
         diagnostics: diagnostics,
         platforms: platforms,
       );
@@ -155,13 +150,13 @@ class ImportNotifier extends StateNotifier<ImportState> {
   void toggleSelected(int index) {
     if (index < 0 || index >= state.courses.length) return;
     final list = [...state.courses];
-    list[index] = list[index]._copyWithSelected(!list[index].selected);
+    list[index] = list[index].withSelected(!list[index].selected);
     state = state.copyWith(courses: list);
   }
 
   void setAllSelected(bool selected) {
     state = state.copyWith(
-      courses: state.courses.map((c) => c._copyWithSelected(selected)).toList(),
+      courses: state.courses.map((c) => c.withSelected(selected)).toList(),
     );
   }
 
@@ -256,24 +251,4 @@ class ImportNotifier extends StateNotifier<ImportState> {
     // withData:true 应始终提供字节；缺失视为错误。
     throw Exception('无法读取文件内容，请重试。');
   }
-}
-
-/// [ImportCourse] 的私有便捷复制（仅翻转 selected），避免对外暴露可变字段。
-extension _ImportCourseCopy on ImportCourse {
-  ImportCourse _copyWithSelected(bool selected) => ImportCourse(
-        name: name,
-        teacher: teacher,
-        location: location,
-        dayOfWeek: dayOfWeek,
-        startSection: startSection,
-        endSection: endSection,
-        startTime: startTime,
-        endTime: endTime,
-        useExplicitTimes: useExplicitTimes,
-        weeks: weeks,
-        colorValue: colorValue,
-        notes: notes,
-        source: source,
-        selected: selected,
-      );
 }

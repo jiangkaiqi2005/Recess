@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/features/course/domain/course_clock.dart';
@@ -16,7 +17,9 @@ import 'week_view.dart';
 
 /// 课程表主页：日期 + 查看周标题（点开为周操作菜单）+ 可左右滑动的周视图。
 class ScheduleScreen extends ConsumerStatefulWidget {
-  const ScheduleScreen({super.key});
+  const ScheduleScreen({super.key, this.now});
+
+  final DateTime Function()? now;
 
   @override
   ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -43,7 +46,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   Widget build(BuildContext context) {
     final semester = ref.watch(activeSemesterProvider).valueOrNull;
     final totalWeeks = semester?.totalWeeks ?? 18;
-    final now = DateTime.now();
+    final now = (widget.now ?? DateTime.now)();
     // 开学前或学期已结束时没有可翻到的「本周」，不显示后缀与「回到本周」。
     final currentWeek = semester == null ? null : teachingWeekOf(semester, now);
     final theme = Theme.of(context);
@@ -374,7 +377,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   /// 所有显式跳周都使用同一套动画；距离越远动画略长，但设置上限避免拖沓。
   /// 系统要求减少动态效果时直接跳转，尊重无障碍偏好。
   void _animateToWeek(int week, int totalWeeks) {
-    final safeWeek = week.clamp(1, totalWeeks);
+    final safeWeek = clampWeek(week, totalWeeks);
     final targetPage = safeWeek - 1;
     if (!_pageController.hasClients ||
         MediaQuery.of(context).disableAnimations) {
@@ -404,7 +407,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final courses =
         ref.read(scheduleCoursesProvider).value ?? const <Course>[];
     final sectionTimes = ref.read(sectionTimesProvider);
-    final now = DateTime.now();
+    final now = (widget.now ?? DateTime.now)();
     final currentWeek = semester == null ? null : teachingWeekOf(semester, now);
     final beforeStart = semester == null || currentWeekOf(semester, now) < 1;
     final slots = currentWeek == null
@@ -417,7 +420,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           );
 
     final theme = Theme.of(context);
-    final todayLabel = _dayLabels[now.weekday - 1];
+    final todayLabel = AppConstants.weekdayLabels[now.weekday - 1];
     final dateLabel = '${now.month}月${now.day}日';
 
     await showModalBottomSheet<void>(
@@ -576,8 +579,6 @@ class _ScheduleMenuItem extends StatelessWidget {
     );
   }
 }
-
-const _dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
 
 /// 今日课程时间线的状态标签。
 class _StatusChip extends StatelessWidget {

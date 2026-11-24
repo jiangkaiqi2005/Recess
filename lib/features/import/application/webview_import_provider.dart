@@ -55,9 +55,6 @@ class WebviewImportState {
 /// 平台相关操作（WebView 控制器、横竖屏切换、JS 注入、对话框）留在
 /// Screen 里，这里只承载可单测的纯状态转换与抓取结果解析。
 class WebviewImportNotifier extends StateNotifier<WebviewImportState> {
-  /// 导航到课表页后的自动重试次数（frame 内导航不触发 onPageFinished）。
-  int navRetry = 0;
-
   WebviewImportNotifier() : super(const WebviewImportState());
 
   void startLogin() => state = state.copyWith(phase: WebviewPhase.login);
@@ -72,7 +69,7 @@ class WebviewImportNotifier extends StateNotifier<WebviewImportState> {
   void showPreview(List<ImportCourse> courses, int skippedCount) {
     state = state.copyWith(
       phase: WebviewPhase.preview,
-      courses: courses.map(_withSelected).toList(growable: false),
+      courses: courses.map((c) => c.withSelected(true)).toList(growable: false),
       skippedCount: skippedCount,
       extracting: false,
       loading: false,
@@ -87,7 +84,7 @@ class WebviewImportNotifier extends StateNotifier<WebviewImportState> {
   void toggle(int index) {
     if (index < 0 || index >= state.courses.length) return;
     final list = [...state.courses];
-    list[index] = _withSelected(list[index], !list[index].selected);
+    list[index] = list[index].withSelected(!list[index].selected);
     state = state.copyWith(courses: list);
   }
 
@@ -96,30 +93,12 @@ class WebviewImportNotifier extends StateNotifier<WebviewImportState> {
     final all = state.courses.length > 0 &&
         state.selectedCount == state.courses.length;
     state = state.copyWith(
-      courses: state.courses.map((c) => _withSelected(c, !all)).toList(),
+      courses: state.courses.map((c) => c.withSelected(!all)).toList(),
     );
   }
 
   void backToLogin() => state = state.copyWith(phase: WebviewPhase.login);
 }
-
-ImportCourse _withSelected(ImportCourse c, [bool selected = true]) =>
-    ImportCourse(
-      name: c.name,
-      teacher: c.teacher,
-      location: c.location,
-      dayOfWeek: c.dayOfWeek,
-      startSection: c.startSection,
-      endSection: c.endSection,
-      startTime: c.startTime,
-      endTime: c.endTime,
-      useExplicitTimes: c.useExplicitTimes,
-      weeks: c.weeks,
-      colorValue: c.colorValue,
-      notes: c.notes,
-      source: c.source,
-      selected: selected,
-    );
 
 /// WebView 导入状态控制器（页面生命周期内自管理）。
 final webviewImportProvider =

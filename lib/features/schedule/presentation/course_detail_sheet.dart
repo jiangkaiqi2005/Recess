@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,8 +11,6 @@ import 'package:recess/features/course/application/course_platforms_provider.dar
 import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/course/presentation/course_platform_display.dart';
 import 'package:recess/features/settings/application/section_times_provider.dart';
-
-const _dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
 
 /// 弹出课程详情底部弹层（课程表点击与搜索结果共用）。
 ///
@@ -77,7 +75,7 @@ void showCourseDetailSheet(
             _DetailRow(
               icon: Icons.calendar_today_outlined,
               label: '时间',
-              value: '周${_dayLabels[course.dayOfWeek - 1]} '
+              value: '周${AppConstants.weekdayLabels[course.dayOfWeek - 1]} '
                   '第${course.startSection}-${course.endSection}节'
                   '${_formatCourseTime(course, sectionTimes)}',
             ),

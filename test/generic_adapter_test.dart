@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'support/node_extractor.dart';
+import 'support/webview_parse_helper.dart';
 import 'package:recess/features/import/data/generic_adapter.dart';
 import 'package:recess/features/import/data/configured_school_adapter.dart';
 import 'package:recess/features/import/data/ncu_adapter.dart';
 import 'package:recess/features/import/data/school_adapter.dart';
-import 'package:recess/features/import/application/webview_import_provider.dart';
 
 void main() {
   for (final adapter in <SchoolAdapter>[
@@ -29,13 +30,13 @@ void main() {
           final records = await _runSingleLine(
             adapter, ['课程甲', '教师甲', '教室甲', entry.key].join(separator),
           );
-          final (courses, skipped) = importCoursesFromDecoded(records);
+          final (courses, skipped) = parseWebviewCourses(records);
           expect(skipped, 0, reason: '$separator ${entry.key}');
           expect(courses.single.name, '课程甲');
           expect(courses.single.weeks, entry.value);
         }
       }
-      final (invalid, skipped) = importCoursesFromDecoded(
+      final (invalid, skipped) = parseWebviewCourses(
         await _runSingleLine(adapter, '课程甲,教师甲,教室甲,1-4,未知周,单周'),
       );
       expect(invalid, isEmpty);
@@ -126,6 +127,42 @@ void main() {
     } finally {
       if (await file.exists()) await file.delete();
     }
+  });
+
+  test('正方接口按名称/星期/节次/周次去重，教师与教室不参与键', () async {
+    const adapter = ConfiguredSchoolAdapter(
+      schoolName: '正方',
+      loginUrl: 'https://example.edu',
+      system: AcademicSystemType.zhengfang,
+    );
+    final courses = await runAdapterCourses(adapter, r'''
+      global.window = {location: {pathname: '/jwglxt/'}};
+      global.document = {
+        querySelector: function() { return null; },
+        querySelectorAll: function() { return []; },
+        body: {innerText: ''}
+      };
+      global.XMLHttpRequest = function() {
+        this.open = function() {};
+        this.setRequestHeader = function() {};
+        this.send = function() {
+          this.status = 200;
+          this.responseText = JSON.stringify({kbList: [
+            {kcmc: '高等数学', xqj: '1', jcs: '1-2', zcd: '1-16周',
+             xm: '张老师', cdmc: 'A-201'},
+            {kcmc: '高等数学', xqj: '1', jcs: '1-2', zcd: '1-16周',
+             xm: '李老师', cdmc: 'B-302'},
+            {kcmc: '高等数学', xqj: '1', jcs: '3-4', zcd: '1-16周',
+             xm: '张老师', cdmc: 'A-201'}
+          ]});
+        };
+      };
+    ''', tag: 'zhengfang_dedupe');
+
+    expect(courses, hasLength(2));
+    expect(courses.map((c) => c['teacher']), ['张老师', '张老师']);
+    expect(courses.map((c) => c['location']), ['A-201', 'A-201']);
+    expect(courses.map((c) => c['startSection']), [1, 3]);
   });
 }
 

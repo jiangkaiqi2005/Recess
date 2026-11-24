@@ -86,6 +86,7 @@ android {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            proguardFiles("proguard-rules.pro")
         }
     }
 }

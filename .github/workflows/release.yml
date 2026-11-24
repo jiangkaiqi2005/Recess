@@ -61,7 +61,7 @@ jobs:
           # Platform generation may rewrite the lockfile. Use the release's pinned dependencies.
           git restore --source=HEAD -- pubspec.lock
 
-      # Apply custom Gradle config (AGP 8.11 compat, NDK, Kotlin 2.2.20, desugaring)
+      # Apply custom Gradle config (AGP 9.3, NDK, Kotlin 2.4, desugaring)
       - name: Apply custom Gradle config
         run: |
           NDK_VERSION=$(ls $ANDROID_HOME/ndk/ | sort -V | tail -1)
@@ -70,6 +70,7 @@ jobs:
           cp native_templates/android/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
           # app 模块启用 desugaring、固定签名、小组件和应用内更新原生配置。
           cp native_templates/android/app/build.gradle.kts android/app/build.gradle.kts
+          cp native_templates/android/app/proguard-rules.pro android/app/proguard-rules.pro
           # 整个 src/main 目录一起复制：新增 Kotlin 文件、布局或资源时不会漏拷。
           cp -R native_templates/android/app/src/main/. android/app/src/main/
 
@@ -101,7 +102,7 @@ jobs:
         run: flutter pub get
 
       - name: Generate drift code
-        run: dart run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build
 
       - name: Generate launcher icons
         run: dart run flutter_launcher_icons
