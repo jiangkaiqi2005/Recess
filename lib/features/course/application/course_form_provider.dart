@@ -130,11 +130,41 @@ class CourseFormNotifier extends StateNotifier<Course> {
 
   void setName(String v) => state = state.copyWith(name: v);
 
-  void setTeacher(String v) =>
-      state = state.copyWith(teacher: v.isEmpty ? null : v);
+  void setTeacher(String v) => state = _withOptionalText(
+        teacher: v.isEmpty ? null : v,
+        location: state.location,
+        notes: state.notes,
+      );
 
-  void setLocation(String v) =>
-      state = state.copyWith(location: v.isEmpty ? null : v);
+  void setLocation(String v) => state = _withOptionalText(
+        teacher: state.teacher,
+        location: v.isEmpty ? null : v,
+        notes: state.notes,
+      );
+
+  /// [Course.copyWith] 把 null 当作「不修改」，清空教师、教室、备注时
+  /// 用它会留下旧值，所以这三项按给定值重建草稿。
+  Course _withOptionalText({
+    required String? teacher,
+    required String? location,
+    required String? notes,
+  }) =>
+      Course(
+        id: state.id,
+        semesterId: state.semesterId,
+        name: state.name,
+        teacher: teacher,
+        location: location,
+        dayOfWeek: state.dayOfWeek,
+        startSection: state.startSection,
+        endSection: state.endSection,
+        startTime: state.startTime,
+        endTime: state.endTime,
+        useExplicitTimes: state.useExplicitTimes,
+        weeks: state.weeks,
+        colorValue: state.colorValue,
+        notes: notes,
+      );
 
   void setDayOfWeek(int d) => state = state.copyWith(dayOfWeek: d);
 
@@ -188,8 +218,11 @@ class CourseFormNotifier extends StateNotifier<Course> {
 
   void setColor(int v) => state = state.copyWith(colorValue: v);
 
-  void setNotes(String v) =>
-      state = state.copyWith(notes: v.isEmpty ? null : v);
+  void setNotes(String v) => state = _withOptionalText(
+        teacher: state.teacher,
+        location: state.location,
+        notes: v.isEmpty ? null : v,
+      );
 
   /// 保存：新增时生成 id，编辑时沿用。
   /// 无学期时返回 false；无周次时返回 null（课程不会显示）；

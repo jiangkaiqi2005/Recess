@@ -234,4 +234,60 @@ void main() {
       expect((await courses.getCourse('c2'))?.colorValue, teal);
     });
   });
+
+  test('清空教师、教室和备注后保存，三项都被清掉', () async {
+    final (form, platformForm) = await openForm(
+      existing.copyWith(teacher: '张三', location: '教三-201', notes: '带书'),
+    );
+    form
+      ..setTeacher('')
+      ..setLocation('')
+      ..setNotes('');
+    expect(await save(form, platformForm), isTrue);
+
+    final saved = await courses.getCourse('c1');
+    expect(saved!.teacher, isNull);
+    expect(saved.location, isNull);
+    expect(saved.notes, isNull);
+  });
+
+  test('整周课清空教师、教室和备注后保存，三项都被清掉', () async {
+    final fullWeekRepo = FullWeekCourseRepository(database);
+    await fullWeekRepo.addAll('s1', const [
+      FullWeekCourse(
+        id: 'f1',
+        semesterId: 's1',
+        name: '课程设计',
+        teacher: '王老师',
+        location: '实验楼',
+        notes: '带电脑',
+        weeks: [17],
+      ),
+    ]);
+    final form = CourseFormNotifier(courses, fullWeekRepo: fullWeekRepo)
+      ..init(
+        const Course(
+          id: 'f1',
+          semesterId: 's1',
+          name: '课程设计',
+          teacher: '王老师',
+          location: '实验楼',
+          notes: '带电脑',
+          dayOfWeek: 1,
+          startSection: 1,
+          endSection: 1,
+          weeks: [17],
+        ),
+        fullWeek: true,
+      )
+      ..setTeacher('')
+      ..setLocation('')
+      ..setNotes('');
+    expect(await form.save(), isTrue);
+
+    final saved = await fullWeekRepo.get('f1');
+    expect(saved!.teacher, isNull);
+    expect(saved.location, isNull);
+    expect(saved.notes, isNull);
+  });
 }
