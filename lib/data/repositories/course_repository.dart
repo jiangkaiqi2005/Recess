@@ -62,18 +62,12 @@ class CourseRepository {
     return _db.transaction(() async {
       await upsert(course);
       if (syncColor) {
-        await (_db.update(_db.courses)
-              ..where((c) =>
-                  c.semesterId.equals(course.semesterId) &
-                  c.name.equals(course.name)))
-            .write(db.CoursesCompanion(colorValue: Value(course.colorValue)));
-        await (_db.update(_db.fullWeekCourses)
-              ..where((c) =>
-                  c.semesterId.equals(course.semesterId) &
-                  c.name.equals(course.name)))
-            .write(db.FullWeekCoursesCompanion(
-              colorValue: Value(course.colorValue),
-            ));
+        await syncColorByName(
+          _db,
+          course.semesterId,
+          course.name,
+          course.colorValue,
+        );
       }
       if (renamedFrom != null) {
         await platformRepo.migrateOnRename(
@@ -161,4 +155,20 @@ class CourseRepository {
     }
     return list;
   }
+}
+
+/// 把本学期名为 [name] 的全部课程和整周课改成 [colorValue]。
+/// 普通课和整周课的编辑保存共用；调用方负责放进事务。
+Future<void> syncColorByName(
+  db.AppDatabase database,
+  String semesterId,
+  String name,
+  int colorValue,
+) async {
+  await (database.update(database.courses)
+        ..where((c) => c.semesterId.equals(semesterId) & c.name.equals(name)))
+      .write(db.CoursesCompanion(colorValue: Value(colorValue)));
+  await (database.update(database.fullWeekCourses)
+        ..where((c) => c.semesterId.equals(semesterId) & c.name.equals(name)))
+      .write(db.FullWeekCoursesCompanion(colorValue: Value(colorValue)));
 }

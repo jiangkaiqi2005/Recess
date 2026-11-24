@@ -32,6 +32,7 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
     final initAsync = ref.watch(courseInitialProvider(widget.courseId));
     final isCopy = widget.courseId?.startsWith('copy:') ?? false;
     final isEdit = widget.courseId != null && widget.courseId!.isNotEmpty && !isCopy;
+    final fullWeek = isFullWeekCourseEdit(widget.courseId);
     final hasChanges = _hasUnsavedChanges();
     // 平台区块在列表底部，首帧可能不在屏内而未构建；由页面持有平台表单，
     // 避免 autoDispose 在 init 解析期间回收它，滚到区块时拿到空白的新实例。
@@ -47,7 +48,9 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.maybePop(context),
           ),
-          title: Text(isEdit ? '编辑课程' : '添加课程'),
+          title: Text(
+            fullWeek ? '编辑整周课' : (isEdit ? '编辑课程' : '添加课程'),
+          ),
           centerTitle: false,
           actions: [
             IconButton(
@@ -75,7 +78,9 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
                 _initialized = true;
                 _initialCourse = initial;
                 Future.microtask(() async {
-                  ref.read(courseFormProvider.notifier).init(initial);
+                  ref
+                      .read(courseFormProvider.notifier)
+                      .init(initial, fullWeek: fullWeek);
                   await ref.read(coursePlatformsFormProvider.notifier).init(
                         semesterId: initial.semesterId,
                         courseName: initial.name,
@@ -89,7 +94,11 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
                   });
                 });
               }
-              return CourseFormBody(initial: initial, isEdit: isEdit);
+              return CourseFormBody(
+                initial: initial,
+                isEdit: isEdit,
+                fullWeek: fullWeek,
+              );
             },
           ),
         ),
@@ -180,10 +189,14 @@ class _CourseEditScreenState extends ConsumerState<CourseEditScreen> {
 class CourseFormBody extends ConsumerStatefulWidget {
   final Course initial;
   final bool isEdit;
+
+  /// 整周课没有星期、节次，也没有课程平台入口，这三块不显示。
+  final bool fullWeek;
   const CourseFormBody({
     super.key,
     required this.initial,
     required this.isEdit,
+    this.fullWeek = false,
   });
 
   @override
@@ -270,46 +283,48 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
           ),
           textInputAction: TextInputAction.next,
         ),
-        const SizedBox(height: 20),
-        const _FieldLabel('星期'),
-        Wrap(
-          spacing: 8,
-          children: List.generate(7, (i) {
-            final day = i + 1;
-            final selected = course.dayOfWeek == day;
-            return ChoiceChip(
-              label: Text('周${AppConstants.weekdayLabels[i]}'),
-              selected: selected,
-              onSelected: (_) =>
-                  ref.read(courseFormProvider.notifier).setDayOfWeek(day),
-            );
-          }),
-        ),
-        const SizedBox(height: 20),
-        const _FieldLabel('节次'),
-        Row(
-          children: [
-            Expanded(
-              child: _SectionDropdown(
-                label: '起始',
-                value: course.startSection,
-                sectionTimes: ref.watch(sectionTimesProvider),
-                onChanged: (v) =>
-                    ref.read(courseFormProvider.notifier).setStartSection(v!),
+        if (!widget.fullWeek) ...[
+          const SizedBox(height: 20),
+          const _FieldLabel('星期'),
+          Wrap(
+            spacing: 8,
+            children: List.generate(7, (i) {
+              final day = i + 1;
+              final selected = course.dayOfWeek == day;
+              return ChoiceChip(
+                label: Text('周${AppConstants.weekdayLabels[i]}'),
+                selected: selected,
+                onSelected: (_) =>
+                    ref.read(courseFormProvider.notifier).setDayOfWeek(day),
+              );
+            }),
+          ),
+          const SizedBox(height: 20),
+          const _FieldLabel('节次'),
+          Row(
+            children: [
+              Expanded(
+                child: _SectionDropdown(
+                  label: '起始',
+                  value: course.startSection,
+                  sectionTimes: ref.watch(sectionTimesProvider),
+                  onChanged: (v) =>
+                      ref.read(courseFormProvider.notifier).setStartSection(v!),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _SectionDropdown(
-                label: '结束',
-                value: course.endSection,
-                sectionTimes: ref.watch(sectionTimesProvider),
-                onChanged: (v) =>
-                    ref.read(courseFormProvider.notifier).setEndSection(v!),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _SectionDropdown(
+                  label: '结束',
+                  value: course.endSection,
+                  sectionTimes: ref.watch(sectionTimesProvider),
+                  onChanged: (v) =>
+                      ref.read(courseFormProvider.notifier).setEndSection(v!),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
         const SizedBox(height: 20),
         const _FieldLabel('上课周次'),
         Wrap(
@@ -402,8 +417,10 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
             );
           }).toList(),
         ),
-        const SizedBox(height: 20),
-        _PlatformSection(courseName: course.name.trim()),
+        if (!widget.fullWeek) ...[
+          const SizedBox(height: 20),
+          _PlatformSection(courseName: course.name.trim()),
+        ],
         const SizedBox(height: 20),
         const _FieldLabel('备注'),
         TextField(
@@ -451,7 +468,11 @@ class _CourseFormBodyState extends ConsumerState<CourseFormBody> {
     );
     if (confirmed == true) {
       try {
-        await ref.read(courseRepositoryProvider).delete(id);
+        if (widget.fullWeek) {
+          await ref.read(fullWeekCourseRepositoryProvider).delete(id);
+        } else {
+          await ref.read(courseRepositoryProvider).delete(id);
+        }
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
