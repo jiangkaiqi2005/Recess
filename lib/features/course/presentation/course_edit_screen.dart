@@ -523,7 +523,7 @@ class _PlatformSection extends ConsumerWidget {
               subtitle: platforms[i].url == null
                   ? null
                   : Text(
-                      platforms[i].url!,
+                      platformUrlLabel(platforms[i].url!),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -555,7 +555,11 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
   late CoursePlatformPurpose _purpose =
       widget.initial?.purpose ?? CoursePlatformPurpose.onlineCourse;
   late final _nameCtrl = TextEditingController(text: widget.initial?.name);
-  late final _urlCtrl = TextEditingController(text: widget.initial?.url);
+  late final _urlCtrl = TextEditingController(
+    text: widget.initial?.url == null
+        ? null
+        : platformUrlLabel(widget.initial!.url!),
+  );
   String? _nameError;
   String? _urlError;
 
@@ -572,9 +576,9 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
       setState(() => _nameError = '请填写平台名');
       return;
     }
-    final url = _urlCtrl.text.trim();
+    final url = normalizePlatformUrl(_urlCtrl.text);
     if (url.isNotEmpty && !isAllowedPlatformUrl(url)) {
-      setState(() => _urlError = '链接需为 http(s):// 开头的完整地址');
+      setState(() => _urlError = '需为 http(s):// 开头的完整地址或邮箱');
       return;
     }
     Navigator.of(context).pop(CoursePlatform(
@@ -626,9 +630,10 @@ class _CoursePlatformDialogState extends State<_CoursePlatformDialog> {
             TextField(
               controller: _urlCtrl,
               decoration: InputDecoration(
-                labelText: '链接（可选）',
-                hintText: 'https://',
+                labelText: '链接或邮箱（可选）',
+                hintText: 'https:// 或 name@example.com',
                 errorText: _urlError,
+                errorMaxLines: 2,
               ),
               keyboardType: TextInputType.url,
               onSubmitted: (_) => _submit(),
