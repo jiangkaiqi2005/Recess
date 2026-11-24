@@ -54,20 +54,39 @@ class CoursePlatform {
 /// 同一学期内按课程名分组的课程平台：课程名 → 该课的平台（组内有序）。
 typedef CoursePlatformGroups = Map<String, List<CoursePlatform>>;
 
-/// 课程平台链接仅允许 http/https，防止导入文件携带任意协议的 URI
+final _emailPattern = RegExp(r'^[^@\s/:?#]+@[^@\s/:?#]+\.[^@\s/:?#]+$');
+
+/// 课程平台链接仅允许 http/https 与 mailto，防止导入文件携带任意协议的 URI
 ///（如 intent://、content://）被外部打开。
 bool isAllowedPlatformUrl(String url) {
   final uri = Uri.tryParse(url.trim());
-  return uri != null &&
-      (uri.scheme == 'http' || uri.scheme == 'https') &&
+  if (uri == null) return false;
+  if (uri.scheme == 'mailto') return _emailPattern.hasMatch(uri.path);
+  return (uri.scheme == 'http' || uri.scheme == 'https') &&
       uri.host.isNotEmpty;
 }
+
+/// 规范化用户填写或导入的链接：裸邮箱地址补成 `mailto:`，其余只去首尾空白。
+String normalizePlatformUrl(String input) {
+  final trimmed = input.trim();
+  return _emailPattern.hasMatch(trimmed) ? 'mailto:$trimmed' : trimmed;
+}
+
+/// 链接的展示文本：mailto 链接只显示邮箱地址，其余原样返回。
+String platformUrlLabel(String url) {
+  final uri = Uri.tryParse(url);
+  return uri != null && uri.scheme == 'mailto' ? uri.path : url;
+}
+
+/// 是否为邮箱链接（mailto）。
+bool isMailtoPlatformUrl(String url) =>
+    Uri.tryParse(url)?.scheme == 'mailto';
 
 /// 解析 JSON 中的 `platforms` 字段：`{"<课程名>": [{"purpose", "name", "url"}]}`。
 ///
 /// 备份恢复与 JSON 课表导入共用。用途键未知、平台名为空或条目不是对象时跳过
-/// 该条（整条未导入，记 [ImportDiagnosticKind.skipped]）；链接协议非
-/// http/https 时保留条目但忽略链接，同样记入 [diagnostics]
+/// 该条（整条未导入，记 [ImportDiagnosticKind.skipped]）；裸邮箱补成 mailto，
+/// 链接协议非 http/https/mailto 时保留条目但忽略链接，同样记入 [diagnostics]
 ///（[ImportDiagnosticKind.partial]）；字段整体不是对象时视为没有平台。
 CoursePlatformGroups parseCoursePlatformGroups(
   Object? raw, {
@@ -108,7 +127,8 @@ CoursePlatformGroups parseCoursePlatformGroups(
         skip(record, '用途或平台名非法');
         continue;
       }
-      var url = item['url']?.toString().trim();
+      final rawUrl = item['url']?.toString();
+      var url = rawUrl == null ? null : normalizePlatformUrl(rawUrl);
       if (url != null && url.isNotEmpty && !isAllowedPlatformUrl(url)) {
         url = null;
         diagnostics?.add(ImportDiagnostic(

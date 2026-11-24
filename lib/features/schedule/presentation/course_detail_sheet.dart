@@ -243,13 +243,18 @@ class _PlatformSection extends ConsumerWidget {
                 subtitle: platform.url == null
                     ? null
                     : Text(
-                        platform.url!,
+                        platformUrlLabel(platform.url!),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                 trailing: platform.url == null
                     ? null
-                    : const Icon(Icons.open_in_new, size: 18),
+                    : Icon(
+                        isMailtoPlatformUrl(platform.url!)
+                            ? Icons.mail_outline
+                            : Icons.open_in_new,
+                        size: 18,
+                      ),
                 onTap: platform.url == null
                     ? null
                     : () => _open(context, platform.url!),
@@ -277,14 +282,21 @@ class _PlatformSection extends ConsumerWidget {
       opened = false;
     }
     if (!opened) {
-      messenger.showSnackBar(SnackBar(content: Text('无法打开链接：$url')));
+      messenger.showSnackBar(SnackBar(
+        content: Text(isMailtoPlatformUrl(url)
+            ? '没有可用的邮件应用，可长按复制邮箱'
+            : '无法打开链接：$url'),
+      ));
     }
   }
 
   Future<void> _copy(BuildContext context, String url) async {
     final messenger = ScaffoldMessenger.of(context);
-    await Clipboard.setData(ClipboardData(text: url));
-    messenger.showSnackBar(const SnackBar(content: Text('已复制链接')));
+    final isMail = isMailtoPlatformUrl(url);
+    await Clipboard.setData(ClipboardData(text: platformUrlLabel(url)));
+    messenger.showSnackBar(
+      SnackBar(content: Text(isMail ? '已复制邮箱' : '已复制链接')),
+    );
   }
 }
 

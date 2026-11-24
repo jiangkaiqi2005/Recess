@@ -100,7 +100,7 @@ void main() {
       '头歌',
     );
     await tester.enterText(
-      find.widgetWithText(TextField, '链接（可选）'),
+      find.widgetWithText(TextField, '链接或邮箱（可选）'),
       'https://www.educoder.net',
     );
     await tester.tap(find.text('确定'));

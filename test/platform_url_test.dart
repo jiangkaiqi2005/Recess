@@ -18,6 +18,35 @@ void main() {
       expect(isAllowedPlatformUrl('https://'), isFalse);
       expect(isAllowedPlatformUrl(' javascript:alert(1)'), isFalse);
     });
+
+    test('允许地址合法的 mailto 链接', () {
+      expect(isAllowedPlatformUrl('mailto:t@cqu.edu.cn'), isTrue);
+      expect(isAllowedPlatformUrl('mailto:t@cqu.edu.cn?subject=作业'), isTrue);
+    });
+
+    test('拒绝地址不完整的 mailto 链接与裸邮箱', () {
+      expect(isAllowedPlatformUrl('mailto:'), isFalse);
+      expect(isAllowedPlatformUrl('mailto:t'), isFalse);
+      expect(isAllowedPlatformUrl('mailto:t@cqu'), isFalse);
+      expect(isAllowedPlatformUrl('mailto:@cqu.edu.cn'), isFalse);
+      expect(isAllowedPlatformUrl('t@cqu.edu.cn'), isFalse);
+    });
+  });
+
+  group('normalizePlatformUrl', () {
+    test('裸邮箱补成 mailto，其余只去空白', () {
+      expect(normalizePlatformUrl(' t@cqu.edu.cn '), 'mailto:t@cqu.edu.cn');
+      expect(normalizePlatformUrl('mailto:t@cqu.edu.cn'), 'mailto:t@cqu.edu.cn');
+      expect(normalizePlatformUrl(' https://a.b '), 'https://a.b');
+      expect(normalizePlatformUrl('https://a.b/@x'), 'https://a.b/@x');
+    });
+  });
+
+  group('platformUrlLabel', () {
+    test('mailto 只显示地址，其余原样', () {
+      expect(platformUrlLabel('mailto:t@cqu.edu.cn'), 't@cqu.edu.cn');
+      expect(platformUrlLabel('https://a.b'), 'https://a.b');
+    });
   });
 
   group('parseCoursePlatformGroups', () {
@@ -57,6 +86,18 @@ void main() {
       final list = groups['英语']!;
       expect(list[0].url, 'https://x.y/z');
       expect(list[1].url, isNull);
+    });
+
+    test('裸邮箱导入后补成 mailto', () {
+      final diagnostics = <ImportDiagnostic>[];
+      final groups = parseCoursePlatformGroups({
+        '物理': [
+          {'purpose': 'homework', 'name': '交作业', 'url': 't@cqu.edu.cn'},
+        ],
+      }, diagnostics: diagnostics);
+
+      expect(diagnostics, isEmpty);
+      expect(groups['物理']!.single.url, 'mailto:t@cqu.edu.cn');
     });
   });
 }
