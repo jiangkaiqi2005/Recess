@@ -71,6 +71,12 @@ class ImportSubmission {
   }) {
     final replacements = <Course>[];
     final fullWeek = <FullWeekCourse>[];
+    // 同名课程（含整周课）共用一个颜色，不同课程按首次出现的顺序取色。
+    final colors = <String, int>{};
+    int colorFor(String name) => colors.putIfAbsent(
+          name,
+          () => AppConstants.courseAutoColor(colors.length),
+        );
     for (final c in courses.where((c) => c.selected)) {
       if (c.fullWeek) {
         fullWeek.add(FullWeekCourse(
@@ -80,9 +86,7 @@ class ImportSubmission {
           teacher: c.teacher,
           location: c.location,
           weeks: List.unmodifiable(c.weeks),
-          colorValue: AppConstants.courseAutoColor(
-            replacements.length + fullWeek.length,
-          ),
+          colorValue: colorFor(c.name),
         ));
         continue;
       }
@@ -97,7 +101,7 @@ class ImportSubmission {
           startSection: c.startSection,
           endSection: c.endSection,
           weeks: c.weeks,
-          colorValue: AppConstants.courseAutoColor(replacements.length),
+          colorValue: colorFor(c.name),
         ),
       );
     }

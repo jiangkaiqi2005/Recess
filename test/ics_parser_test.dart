@@ -71,6 +71,10 @@ END:VCALENDAR
       final days = courses.map((c) => c.dayOfWeek).toList()..sort();
       expect(days, [1, 3]);
     });
+
+    test('同一门课的每节课颜色相同', () {
+      expect(courses.map((c) => c.colorValue).toSet(), hasLength(1));
+    });
   });
 
   group('IcsCourseParser - 双周（INTERVAL=2）', () {

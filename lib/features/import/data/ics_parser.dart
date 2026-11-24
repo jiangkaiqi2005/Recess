@@ -34,6 +34,8 @@ class IcsCourseParser {
   }) {
     final blocks = _extractVevents(_unfold(ics));
     final result = <ImportCourse>[];
+    // 同名课程共用一个颜色，不同课程按首次出现的顺序取色。
+    final colors = <String, int>{};
 
     void skip(int index, String summary, String reason) {
       final name = summary.trim();
@@ -116,7 +118,10 @@ class IcsCourseParser {
           startTime: _hhmm(start),
           endTime: end != null ? _hhmm(end) : null,
           weeks: weeks,
-          colorValue: _pickColor(result.length),
+          colorValue: colors.putIfAbsent(
+            summary,
+            () => AppConstants.courseAutoColor(colors.length),
+          ),
           notes: _stripTeacher(description),
           source: 'ics',
         ));
@@ -300,7 +305,4 @@ class IcsCourseParser {
         .replaceAll(RegExp(r'[\n\s]+'), ' ')
         .trim();
   }
-
-  static int _pickColor(int index) =>
-      AppConstants.courseAutoColor(index);
 }

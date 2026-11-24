@@ -101,6 +101,27 @@ void main() {
           previewContext: context,
         );
 
+    test('同名课程每节课颜色相同，不同课程颜色不同', () {
+      final s = submission(ImportMode.replace, [
+        ImportCourse(
+            name: '高数', dayOfWeek: 1, startSection: 1, endSection: 2,
+            weeks: const [1], source: 'webview'),
+        ImportCourse(
+            name: '物理', dayOfWeek: 2, startSection: 1, endSection: 2,
+            weeks: const [1], source: 'webview'),
+        ImportCourse(
+            name: '高数', dayOfWeek: 3, startSection: 3, endSection: 4,
+            weeks: const [1], source: 'webview'),
+        ImportCourse.fullWeek(
+            name: '课程设计', weeks: const [18], source: 'webview'),
+      ]);
+
+      final colors = s.courses.map((c) => c.colorValue).toList();
+      expect(colors[0], colors[2]);
+      expect(colors[0], isNot(colors[1]));
+      expect(s.fullWeekCourses.single.colorValue, isNot(isIn(colors)));
+    });
+
     test('替换导入分别写入普通课和整周课，再次替换会清掉旧整周课', () async {
       final preview = previewWebviewCourses([
         lectureRecord('边缘计算'),
