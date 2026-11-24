@@ -9,9 +9,9 @@ allprojects {
     }
 }
 
-rootProject.buildDir = "../build"
+rootProject.layout.buildDirectory.set(rootProject.layout.projectDirectory.dir("../build"))
 subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    project.layout.buildDirectory.set(rootProject.layout.buildDirectory.dir(project.name))
 }
 // 为旧版 Flutter 插件注入 flutter 扩展属性（AGP 8.9+ 不再自动注入），
 // 解决 package_info_plus 等插件引用 flutter.compileSdkVersion 报错的问题。
@@ -31,18 +31,20 @@ subprojects {
 }
 
 tasks.register("clean", Delete) {
-    delete rootProject.buildDir
+    delete rootProject.layout.buildDirectory
 }
 
-// 兼容新版 AGP（8.5+）：为所有 Android 子项目（含 Flutter 插件）显式兜底 compileSdk。
+// 为所有 Android 子项目（含 Flutter 插件）统一 compileSdk：
+// 旧插件自报 34/35，与新版 AndroidX 依赖（flutter_plugin_android_lifecycle 等）
+// 要求编译 API 36+ 的 AAR metadata 冲突。
 subprojects {
     def fixCompileSdk = { proj ->
         def android = proj.extensions.findByName("android")
-        if (android != null && android.compileSdk == null) {
+        if (android != null) {
             android.compileSdk = 36
-        }
-        if (android != null && android.ndkVersion == null) {
-            android.ndkVersion = "__NDK_VERSION__"
+            if (android.ndkVersion == null) {
+                android.ndkVersion = "__NDK_VERSION__"
+            }
         }
     }
     if (project.state.executed) {
@@ -52,13 +54,3 @@ subprojects {
     }
 }
 
-// 强制所有子项目的 Kotlin 编译任务使用 languageVersion 1.8，
-// 解决 sentry_flutter 等旧插件声明 languageVersion 1.6 在 Kotlin 2.2 下报错的问题。
-subprojects {
-    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-        kotlinOptions {
-            languageVersion = "1.8"
-            apiVersion = "1.8"
-        }
-    }
-}

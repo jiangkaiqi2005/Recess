@@ -23,6 +23,7 @@ flutter pub get
 | `native_templates/android/settings.gradle` | `android/settings.gradle` |
 | `native_templates/android/gradle/wrapper/gradle-wrapper.properties` | `android/gradle/wrapper/gradle-wrapper.properties` |
 | `native_templates/android/app/build.gradle.kts` | `android/app/build.gradle.kts` |
+| `native_templates/android/app/proguard-rules.pro` | `android/app/proguard-rules.pro`（旧 Room/WorkManager 的 keep 规则） |
 | `native_templates/android/app/src/main/AndroidManifest.xml` | `android/app/src/main/AndroidManifest.xml` |
 | `native_templates/android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt` | `android/app/src/main/kotlin/io/github/jiangkaiqi2005/recess/MainActivity.kt` |
 | `native_templates/android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt` | `android/app/src/main/java/io/github/jiangkaiqi2005/recess/CourseWidgetProvider.kt` |
@@ -58,6 +59,7 @@ flutter pub get
 cp native_templates/android/settings.gradle android/settings.gradle
 cp native_templates/android/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
 cp native_templates/android/app/build.gradle.kts android/app/build.gradle.kts
+cp native_templates/android/app/proguard-rules.pro android/app/proguard-rules.pro
 mkdir -p android/app/src/test
 cp -R native_templates/android/app/src/main/. android/app/src/main/
 cp -R native_templates/android/app/src/test/. android/app/src/test/
