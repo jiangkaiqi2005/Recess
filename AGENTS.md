@@ -11,7 +11,7 @@ Recess (课表) — a minimal Android college course-schedule app built with Flu
 ```bash
 flutter pub get                                              # install deps
 flutter create . --platforms=android --org io.github.jiangkaiqi2005         # regenerate Android platform dir (see below)
-dart run build_runner build --delete-conflicting-outputs      # codegen: drift + go_router (after changing tables/routes)
+dart run build_runner build                                  # codegen: drift + go_router (after changing tables/routes)
 dart run flutter_launcher_icons                              # regenerate app icons (after changing assets/icon/icon.png)
 dart run flutter_native_splash:create                        # regenerate splash screen
 flutter test                                                 # run all tests
@@ -67,6 +67,7 @@ go_router, declared once in `app/router.dart`. Screens `context.push` existing r
 - `dayOfWeek`: 1=Mon … 7=Sun, matching `DateTime.weekday`.
 - Weeks are 1-based; `computeCurrentWeek(startDate, today)` returns 0 if before start. `currentWeekOverride` on `Semester` takes precedence over the computed week (for调课/假期).
 - Default course color is `0xFF5B8DEF` (the app's primary blue); 10-color palette in the editor.
+- Material 组件一律从 `package:material_ui/material_ui.dart` 导入；`package:flutter/material.dart` 在 Flutter 3.47 后已弃用，CI 的 `--fatal-infos` 会拦截。
 - Pure logic (week math, parsers, conflict detection) goes in `core/utils/` or `features/*/domain/` and is unit-tested. Existing tests include: `week_calculator`, `ics_parser`, `json_importer`, `import_course`, `schedule_helpers`, `course_platform_repository`, `backup_repository`, `app_database_migration`.
 
 ## CI

@@ -3,7 +3,7 @@
 // 只断言外部行为：可见文案、按钮有无、返回后的正常页面、紧凑区域是否
 // 溢出，以及真实应用根是否安装兜底；不断言错误组件的私有名称或结构。
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';

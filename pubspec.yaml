@@ -13,15 +13,18 @@ dependencies:
   go_router: ^14.2.7
   drift: ^2.18.0
   sqlite3_flutter_libs: ^0.5.0
+  path: ^1.9.1
   path_provider: ^2.1.0
   file_picker: ^8.0.0
   uuid: ^4.4.0
   home_widget: ^0.6.0
-  intl: ^0.19.0
+  intl: ^0.20.2
+  material_ui: ^1.11.1
   # Flutter 的自适应组件在 Android 构建中也会引用这套图标字体；不代表启用 iOS 平台。
   cupertino_icons: ^1.0.6
   shared_preferences: ^2.2.0
   webview_flutter: ^4.8.0
+  webview_flutter_android: ^4.13.0
   url_launcher: ^6.3.0
   package_info_plus: ^9.0.1
   http: ^1.6.0

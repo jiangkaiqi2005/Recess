@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 数据加载失败状态：易懂的说明加重试入口，不展示原始异常。
 ///
