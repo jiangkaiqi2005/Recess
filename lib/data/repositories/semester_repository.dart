@@ -81,6 +81,9 @@ class SemesterRepository {
       await (_db.delete(_db.coursePlatforms)
             ..where((p) => p.semesterId.equals(id)))
           .go();
+      await (_db.delete(_db.fullWeekCourses)
+            ..where((c) => c.semesterId.equals(id)))
+          .go();
       await (_db.delete(_db.semesters)..where((s) => s.id.equals(id))).go();
       await getActiveSemester();
     });

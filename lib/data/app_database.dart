@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import 'tables/course_platform_table.dart';
 import 'tables/course_table.dart';
+import 'tables/full_week_course_table.dart';
 import 'tables/semester_table.dart';
 
 part 'app_database.g.dart';
@@ -16,13 +17,15 @@ part 'app_database.g.dart';
 ///
 /// 首次启动无学期时，[seedDefaultSemester] 写入一个默认激活学期，
 /// 让用户立刻拥有可操作的「当前周」，避免空状态困惑。
-@DriftDatabase(tables: [Courses, Semesters, CoursePlatforms])
+@DriftDatabase(
+    tables: [Courses, Semesters, CoursePlatforms, FullWeekCourses])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   /// 版本 3：明确课程是否使用独立钟点，旧记录默认跟随节次作息。
+  /// 版本 4：新增整周课表。
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -31,6 +34,7 @@ class AppDatabase extends _$AppDatabase {
           // 1 → 2 只新建课程平台表，已有课程与学期保持不动。
           if (from < 2) await m.createTable(coursePlatforms);
           if (from < 3) await m.addColumn(courses, courses.useExplicitTimes);
+          if (from < 4) await m.createTable(fullWeekCourses);
         },
       );
 

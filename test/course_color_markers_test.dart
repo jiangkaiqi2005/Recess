@@ -34,6 +34,9 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
+              scheduleFullWeekCoursesProvider.overrideWith(
+                (ref) => Stream.value(const []),
+              ),
               scheduleCoursesProvider.overrideWith(
                 (ref) => Stream.value([course]),
               ),

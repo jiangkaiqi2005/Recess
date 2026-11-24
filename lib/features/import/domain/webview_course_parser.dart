@@ -36,6 +36,17 @@ ImportCourse _parseCourse(Map<String, dynamic> json) {
   if (name is! String || name.trim().isEmpty) {
     throw const FormatException('课程名为空或无效');
   }
+  // 整周课只有周次，没有星期和节次（见 docs/adr/0003）。
+  if (json['fullWeek'] == true) {
+    final weeks = _weeks(json);
+    return ImportCourse.fullWeek(
+      name: name.trim(),
+      teacher: _optionalText(json, 'teacher'),
+      location: _optionalText(json, 'location'),
+      weeks: weeks,
+      source: 'webview',
+    );
+  }
   final dayOfWeek = json['dayOfWeek'];
   if (dayOfWeek is! int || dayOfWeek < 1 || dayOfWeek > 7) {
     throw const FormatException('星期缺失或无效');
@@ -54,27 +65,35 @@ ImportCourse _parseCourse(Map<String, dynamic> json) {
   if (endSection < startSection) {
     throw const FormatException('结束节次早于开始节次');
   }
+  final weeks = _weeks(json);
+  return ImportCourse(
+    name: name.trim(),
+    teacher: _optionalText(json, 'teacher'),
+    location: _optionalText(json, 'location'),
+    dayOfWeek: dayOfWeek,
+    startSection: startSection,
+    endSection: endSection,
+    weeks: weeks,
+    source: 'webview',
+  );
+}
+
+List<int> _weeks(Map<String, dynamic> json) {
   final rawWeeks = json['weeks'];
   if (rawWeeks is! List ||
       rawWeeks.isEmpty ||
       rawWeeks.any((w) => w is! int || w < 1)) {
     throw const FormatException('周次缺失或无效');
   }
-  final weeks = rawWeeks.cast<int>().toSet().toList()..sort();
-  if ((json['teacher'] != null && json['teacher'] is! String) ||
-      (json['location'] != null && json['location'] is! String)) {
+  return List.unmodifiable(rawWeeks.cast<int>().toSet().toList()..sort());
+}
+
+String? _optionalText(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  if (value != null && value is! String) {
     throw const FormatException('教师或教室格式无效');
   }
-  return ImportCourse(
-    name: name.trim(),
-    teacher: json['teacher'] as String?,
-    location: json['location'] as String?,
-    dayOfWeek: dayOfWeek,
-    startSection: startSection,
-    endSection: endSection,
-    weeks: List.unmodifiable(weeks),
-    source: 'webview',
-  );
+  return value as String?;
 }
 
 /// 有效课程、逐条跳过诊断及学期冲突，共同组成一次预览。

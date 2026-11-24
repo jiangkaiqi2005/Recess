@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/core/widgets/load_failed_view.dart';
 import 'package:recess/features/schedule/domain/schedule_helpers.dart';
@@ -60,6 +61,12 @@ class WeekView extends ConsumerWidget {
     final currentWeek = semester != null ? teachingWeekOf(semester, now) : null;
     final isCurrentWeek = currentWeek != null && currentWeek == selectedWeek;
 
+    final allFullWeek =
+        ref.watch(scheduleFullWeekCoursesProvider).valueOrNull ?? const [];
+    final weekFullWeek = allFullWeek
+        .where((c) => courseOnWeek(c.weeks, selectedWeek))
+        .toList();
+
     return Column(
       children: [
         _DayHeaderRow(
@@ -68,6 +75,7 @@ class WeekView extends ConsumerWidget {
           selectedWeek: selectedWeek,
           isCurrentWeek: isCurrentWeek,
         ),
+        if (weekFullWeek.isNotEmpty) _AllDayRow(courses: weekFullWeek),
         Expanded(
           // 当前学期（上游）失败时不能当作无课程：同样进入失败重试状态。
           child: semesterAsync.hasError && !semesterAsync.isLoading
@@ -89,8 +97,13 @@ class WeekView extends ConsumerWidget {
                         .toList();
 
                     if (weekCourses.isEmpty) {
+                      // 只有整周课的周：全天行已经显示课程，这里不能再说“暂无课程”。
+                      if (weekFullWeek.isNotEmpty) {
+                        return const _NoSectionCoursesHint();
+                      }
                       return _EmptyWeekHint(
-                        hasAnyCourses: allCourses.isNotEmpty,
+                        hasAnyCourses:
+                            allCourses.isNotEmpty || allFullWeek.isNotEmpty,
                         onImport: onImport,
                         onWebViewImport: onWebViewImport,
                       );
@@ -161,6 +174,107 @@ class WeekView extends ConsumerWidget {
   void _retryReload(WidgetRef ref) {
     ref.invalidate(activeSemesterProvider);
     ref.invalidate(scheduleCoursesProvider);
+    ref.invalidate(scheduleFullWeekCoursesProvider);
+  }
+}
+
+/// 星期表头下方的全天行：本周的整周课各占一条横跨 7 列的色条。
+class _AllDayRow extends StatelessWidget {
+  final List<FullWeekCourse> courses;
+  const _AllDayRow({required this.courses});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const Key('week-view-all-day-row'),
+      padding: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: _timeAxisWidth,
+            height: 28,
+            child: Center(
+              child: Text(
+                '全天',
+                softWrap: false,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                for (final c in courses)
+                  Padding(
+                    padding: const EdgeInsets.all(_cardInset),
+                    child: Semantics(
+                      button: true,
+                      excludeSemantics: true,
+                      label: '${c.name}，整周',
+                      hint: '点击查看详情',
+                      child: Material(
+                        color: courseCardColor(
+                          Color(c.colorValue),
+                          theme.brightness,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () =>
+                              showFullWeekCourseDetailSheet(context, c),
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 24),
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${c.name} · 整周',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 本周只有整周课时的网格区提示。
+class _NoSectionCoursesHint extends StatelessWidget {
+  const _NoSectionCoursesHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Align(
+      alignment: const Alignment(0, -0.6),
+      child: Text(
+        '本周没有按节次安排的课程',
+        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+      ),
+    );
   }
 }
 

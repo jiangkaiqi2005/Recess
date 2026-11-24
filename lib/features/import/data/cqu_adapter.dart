@@ -116,6 +116,15 @@ class CquAdapter extends SchoolAdapter {
     }
   }
 
+  // 课表底部的「整周」行放课程设计等整周课：卡片只有周次、没有节次。
+  var hasFullWeekRow = false;
+  for (var i = 0; i < allEls.length; i++) {
+    if ((allEls[i].textContent || '').trim() === '整周') {
+      hasFullWeekRow = true;
+      break;
+    }
+  }
+
   // 对每个候选元素解析课程信息
   var seen = {};
   filtered.forEach(function(el) {
@@ -175,6 +184,24 @@ class CquAdapter extends SchoolAdapter {
     if (!name || name.length < 2) return;
     // 去掉课程名中的括号备注（如 "体育自选项目（花样跳绳3）" 保留，但 "高等数学(2024秋)" 去掉）
     name = name.replace(/\(\d{4}[^\)]*\)\s*$/, '').trim();
+
+    // 整周课没有星期和节次；只认带课程编号的卡片，其他缺节次的卡片仍交给预览校验。
+    if (!secMatch && hasFullWeekRow && !labTitle) {
+      var fullKey = 'fullWeek|' + name + '|' + weeks.join(',');
+      if (seen[fullKey]) return;
+      seen[fullKey] = true;
+      results.push({
+        name: name,
+        teacher: null,
+        location: null,
+        dayOfWeek: null,
+        startSection: null,
+        endSection: null,
+        weeks: weeks,
+        fullWeek: true
+      });
+      return;
+    }
 
     // 推断星期
     var day = findDay(el);

@@ -326,6 +326,43 @@ void main() {
       expect(courses.map((c) => c['endSection']), [9, 9, 7]);
     });
 
+    test('「整周」行里只有周次的课程卡片导出为整周课，不推断星期', () async {
+      final courses = await _runExtractor(r'''
+        const headers = makeHeaders([
+          [1, 100], [2, 200], [3, 300], [4, 400],
+          [5, 500], [6, 600], [7, 700]
+        ]);
+        installDocument(headers.concat([
+          new FakeElement('整周', 0, 30),
+          new FakeElement('本科 - 硬件综合设计[188242-001]\n[18-20周]', 80, 40),
+          new FakeElement('本科 - 操作系统课程设计[994790-001]\n[17周]', 180, 40),
+          new FakeElement('本科 - 边缘计算[992499-001]\n[4,6-14周] [1-2节] D1210', 80, 40)
+        ]));
+      ''');
+
+      expect(courses, hasLength(3));
+      final fullWeek = courses.where((c) => c['fullWeek'] == true).toList();
+      expect(fullWeek.map((c) => c['name']), ['硬件综合设计', '操作系统课程设计']);
+      expect(fullWeek.first['weeks'], [18, 19, 20]);
+      expect(fullWeek.first['dayOfWeek'], isNull);
+      expect(fullWeek.first['startSection'], isNull);
+      final lecture = courses.singleWhere((c) => c['name'] == '边缘计算');
+      expect(lecture['fullWeek'], isNull);
+      expect(lecture['startSection'], 1);
+    });
+
+    test('页面没有「整周」行时缺节次的卡片不当作整周课', () async {
+      final courses = await _runExtractor(r'''
+        installDocument([
+          new FakeElement('本科 - 硬件综合设计[188242-001]\n[18-20周]', 80, 40,
+              {'data-day': '1'})
+        ]);
+      ''');
+
+      expect(courses.single['fullWeek'], isNull);
+      expect(courses.single['startSection'], isNull);
+    });
+
     test('仅有周次节次和教室时不生成无名实验课', () async {
       final courses = await _runExtractor(r'''
         installDocument([

@@ -3,15 +3,17 @@ import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/core/utils/json_parsing.dart';
 import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/mappers.dart';
 import 'package:recess/data/repositories/course_platform_repository.dart';
 import 'package:recess/data/repositories/course_repository.dart';
+import 'package:recess/data/repositories/full_week_course_repository.dart';
 import 'package:recess/data/repositories/semester_repository.dart';
 
-/// 备份恢复的结果：恢复了多少学期、多少课程。
+/// 备份恢复的结果：恢复了多少学期、多少课程（含整周课）。
 class RestoreResult {
   final int semesterCount;
   final int courseCount;
@@ -26,6 +28,9 @@ class BackupFile {
   final List<Semester> semesters;
   final Map<String, List<Course>> coursesBySemester;
 
+  /// 旧版备份没有整周课，解析为空。
+  final Map<String, List<FullWeekCourse>> fullWeekCoursesBySemester;
+
   /// 学期 id → 课程名 → 课程平台。
   final Map<String, CoursePlatformGroups> platformsBySemester;
   final String? activeSemesterId;
@@ -33,6 +38,7 @@ class BackupFile {
   const BackupFile._({
     required this.semesters,
     required this.coursesBySemester,
+    required this.fullWeekCoursesBySemester,
     required this.platformsBySemester,
     this.activeSemesterId,
   });
@@ -60,6 +66,7 @@ class BackupFile {
 
     final semesters = <Semester>[];
     final coursesBySemester = <String, List<Course>>{};
+    final fullWeekCoursesBySemester = <String, List<FullWeekCourse>>{};
     final platformsBySemester = <String, CoursePlatformGroups>{};
     final semesterIds = <String>{};
     String? activeSemesterId;
@@ -134,12 +141,31 @@ class BackupFile {
         }
         coursesBySemester[id] = courses;
       }
+      final rawFullWeek = s['fullWeekCourses'];
+      fullWeekCoursesBySemester[id] = [
+        if (rawFullWeek is List)
+          for (final rc in rawFullWeek)
+            if (rc is Map &&
+                (rc['id']?.toString() ?? '').isNotEmpty &&
+                (rc['name']?.toString() ?? '').isNotEmpty)
+              FullWeekCourse(
+                id: rc['id'].toString(),
+                semesterId: id,
+                name: rc['name'].toString(),
+                teacher: toStringOrNull(rc['teacher']),
+                location: toStringOrNull(rc['location']),
+                weeks: _weeks(rc['weeks']),
+                colorValue: toIntOrNull(rc['colorValue']) ?? 0xFF5B8DEF,
+                notes: toStringOrNull(rc['notes']),
+              ),
+      ];
       // 旧版备份没有 platforms 字段，解析为空即可。
       platformsBySemester[id] = parseCoursePlatformGroups(s['platforms']);
     }
     return BackupFile._(
       semesters: semesters,
       coursesBySemester: coursesBySemester,
+      fullWeekCoursesBySemester: fullWeekCoursesBySemester,
       platformsBySemester: platformsBySemester,
       activeSemesterId: activeSemesterId,
     );
@@ -170,6 +196,7 @@ class BackupRepository {
   Future<String> exportJson() async {
     final semesterRepo = SemesterRepository(_db);
     final courseRepo = CourseRepository(_db);
+    final fullWeekRepo = FullWeekCourseRepository(_db);
     final platformRepo = CoursePlatformRepository(_db);
 
     final active = await semesterRepo.getActiveSemester();
@@ -183,6 +210,7 @@ class BackupRepository {
 
     for (final semester in semesters) {
       final courses = await courseRepo.getCourses(semester.id);
+      final fullWeekCourses = await fullWeekRepo.getAll(semester.id);
       final platforms = await platformRepo.getPlatformsBySemester(semester.id);
       (data['semesters'] as List).add({
         'id': semester.id,
@@ -203,6 +231,17 @@ class BackupRepository {
                   'startTime': c.startTime,
                   'endTime': c.endTime,
                   'useExplicitTimes': c.useExplicitTimes,
+                  'weeks': c.weeks,
+                  'colorValue': c.colorValue,
+                  'notes': c.notes,
+                })
+            .toList(),
+        'fullWeekCourses': fullWeekCourses
+            .map((c) => {
+                  'id': c.id,
+                  'name': c.name,
+                  'teacher': c.teacher,
+                  'location': c.location,
                   'weeks': c.weeks,
                   'colorValue': c.colorValue,
                   'notes': c.notes,
@@ -231,6 +270,7 @@ class BackupRepository {
       await _db.delete(_db.courses).go();
       await _db.delete(_db.semesters).go();
       await _db.delete(_db.coursePlatforms).go();
+      await _db.delete(_db.fullWeekCourses).go();
 
       // 2. 批量写入学期、课程与课程平台
       await _db.batch((batch) {
@@ -241,6 +281,13 @@ class BackupRepository {
         for (final entry in backup.coursesBySemester.entries) {
           batch.insertAll(
             _db.courses,
+            entry.value.map((c) => c.toCompanion()).toList(),
+          );
+          courseCount += entry.value.length;
+        }
+        for (final entry in backup.fullWeekCoursesBySemester.entries) {
+          batch.insertAll(
+            _db.fullWeekCourses,
             entry.value.map((c) => c.toCompanion()).toList(),
           );
           courseCount += entry.value.length;

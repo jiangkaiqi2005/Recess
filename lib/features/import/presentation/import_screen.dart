@@ -111,8 +111,13 @@ class ImportScreen extends ConsumerWidget {
   ) async {
     final submission = await notifier.prepareImport();
     if (submission == null || submission.courses.isEmpty) return;
+    // 替换模式也会清掉整周课，确认框里一并计入。
     final existing = (await ref.read(courseRepositoryProvider)
-        .getCourses(submission.semesterId)).length;
+            .getCourses(submission.semesterId))
+        .length +
+        (await ref.read(fullWeekCourseRepositoryProvider)
+            .getAll(submission.semesterId))
+        .length;
     if (!context.mounted) return;
     final ok = await showImportConfirmDialog(
       context,

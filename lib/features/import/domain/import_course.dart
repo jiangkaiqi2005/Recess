@@ -20,7 +20,29 @@ class ImportCourse {
   final int colorValue;
   final String? notes;
   final String source; // 'ics' | 'json'
+
+  /// 整周课没有星期和节次，[dayOfWeek] 与节次为 0，不能用 [toCourse]，
+  /// 提交时写成 `FullWeekCourse`。
+  final bool fullWeek;
   bool selected;
+
+  /// 整周课：只有周次，没有星期和节次（如课程设计）。
+  ImportCourse.fullWeek({
+    required this.name,
+    this.teacher,
+    this.location,
+    required this.weeks,
+    this.colorValue = AppConstants.defaultCourseColor,
+    this.notes,
+    required this.source,
+    this.selected = true,
+  })  : dayOfWeek = 0,
+        startSection = 0,
+        endSection = 0,
+        startTime = null,
+        endTime = null,
+        useExplicitTimes = false,
+        fullWeek = true;
 
   ImportCourse({
     required this.name,
@@ -37,11 +59,23 @@ class ImportCourse {
     this.notes,
     required this.source,
     this.selected = true,
-  }) : useExplicitTimes = useExplicitTimes ??
-            (startTime != null || endTime != null);
+  })  : useExplicitTimes = useExplicitTimes ??
+            (startTime != null || endTime != null),
+        fullWeek = false;
 
   /// 返回勾选状态改为 [selected] 的副本；`selected` 字段本身保持可变。
-  ImportCourse withSelected(bool selected) => ImportCourse(
+  ImportCourse withSelected(bool selected) => fullWeek
+      ? ImportCourse.fullWeek(
+          name: name,
+          teacher: teacher,
+          location: location,
+          weeks: weeks,
+          colorValue: colorValue,
+          notes: notes,
+          source: source,
+          selected: selected,
+        )
+      : ImportCourse(
         name: name,
         teacher: teacher,
         location: location,
@@ -78,6 +112,7 @@ class ImportCourse {
 
   /// 人类可读的星期+节次摘要，用于预览卡片副标题。
   String get sectionLabel {
+    if (fullWeek) return '整周';
     final day = dayOfWeek >= 1 && dayOfWeek <= 7
         ? '周${AppConstants.weekdayLabels[dayOfWeek - 1]}'
         : '?';
@@ -129,13 +164,19 @@ bool _overlaps(
     weeks.any(otherWeeks.contains);
 
 /// 判断两门导入课程是否时间冲突：同一星期、节次重叠且周次有交集。
-bool coursesConflict(ImportCourse a, ImportCourse b) => _overlaps(
+/// 整周课没有具体时段，不参与冲突判断。
+bool coursesConflict(ImportCourse a, ImportCourse b) =>
+    !a.fullWeek &&
+    !b.fullWeek &&
+    _overlaps(
       a.dayOfWeek, a.startSection, a.endSection, a.weeks,
       b.dayOfWeek, b.startSection, b.endSection, b.weeks,
     );
 
 /// 判断导入课程与已落库课程是否时间冲突（合并导入时提示用户）。
-bool conflictsWithCourse(ImportCourse a, Course b) => _overlaps(
+bool conflictsWithCourse(ImportCourse a, Course b) =>
+    !a.fullWeek &&
+    _overlaps(
       a.dayOfWeek, a.startSection, a.endSection, a.weeks,
       b.dayOfWeek, b.startSection, b.endSection, b.weeks,
     );

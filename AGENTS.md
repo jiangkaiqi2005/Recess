@@ -48,7 +48,7 @@ drift generates data classes also named `Course` / `Semester`, identical to the 
 
 ### Database specifics
 
-`schemaVersion = 2`; the 1→2 migration only creates the `CoursePlatforms` table, whose rows belong to a semester + course name rather than to a single course row (see `docs/adr/0001-course-platforms-keyed-by-name.md`). The `weeks` list on a course is stored as a CSV string (`"1,2,3,16"`) in the `Courses` table — not a join table — and split/joined in `mappers.dart`. On first launch `AppDatabase.seedDefaultSemester()` writes one default active semester (most recent Monday, 18 weeks) so the app never opens to an empty state; the seed is idempotent and serialized.
+`schemaVersion = 4`; the 1→2 migration only creates the `CoursePlatforms` table, whose rows belong to a semester + course name rather than to a single course row (see `docs/adr/0001-course-platforms-keyed-by-name.md`). 3→4 creates the `FullWeekCourses` table: 整周课 (weeks only, no day/section) are a separate `FullWeekCourse` model, so anything that handles a semester's courses wholesale (semester delete, replace/merge import, backup) must handle that table too (see `docs/adr/0003-full-week-courses-separate-table.md`). The `weeks` list on a course is stored as a CSV string (`"1,2,3,16"`) in the `Courses` table — not a join table — and split/joined in `mappers.dart`. On first launch `AppDatabase.seedDefaultSemester()` writes one default active semester (most recent Monday, 18 weeks) so the app never opens to an empty state; the seed is idempotent and serialized.
 
 ### Import pipeline
 

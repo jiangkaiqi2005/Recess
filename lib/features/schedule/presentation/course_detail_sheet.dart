@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
+import 'package:recess/core/models/full_week_course.dart';
+import 'package:recess/data/providers/database_providers.dart';
 import 'package:recess/features/course/application/course_platforms_provider.dart';
 import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/course/presentation/course_platform_display.dart';
@@ -133,6 +135,110 @@ void showCourseDetailSheet(
         ),
       ));
     },
+  );
+}
+
+/// 整周课详情：没有星期和节次，只能查看和删除。
+void showFullWeekCourseDetailSheet(BuildContext context, FullWeekCourse course) {
+  final theme = Theme.of(context);
+  final color = Color(AppConstants.courseDisplayColor(
+    course.colorValue,
+    dark: theme.brightness == Brightness.dark,
+  ));
+  showModalBottomSheet(
+    context: context,
+    useSafeArea: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(course.name, style: theme.textTheme.titleLarge),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (course.teacher != null && course.teacher!.isNotEmpty)
+            _DetailRow(
+              icon: Icons.person_outline,
+              label: '教师',
+              value: course.teacher!,
+            ),
+          if (course.location != null && course.location!.isNotEmpty)
+            _DetailRow(
+              icon: Icons.room_outlined,
+              label: '教室',
+              value: course.location!,
+            ),
+          const _DetailRow(
+            icon: Icons.calendar_today_outlined,
+            label: '时间',
+            value: '整周，教务系统没有给出具体星期和节次',
+          ),
+          _DetailRow(
+            icon: Icons.date_range_outlined,
+            label: '周次',
+            value: _formatWeeks(course.weeks),
+          ),
+          if (course.notes != null && course.notes!.isNotEmpty)
+            _DetailRow(
+              icon: Icons.notes_outlined,
+              label: '备注',
+              value: course.notes!,
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: Consumer(
+              builder: (context, ref, _) => OutlinedButton.icon(
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: ctx,
+                    builder: (dialogCtx) => AlertDialog(
+                      title: const Text('删除整周课'),
+                      content: Text('确定删除“${course.name}”吗？'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogCtx).pop(false),
+                          child: const Text('取消'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogCtx).pop(true),
+                          child: const Text('删除'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
+                  await ref
+                      .read(fullWeekCourseRepositoryProvider)
+                      .delete(course.id);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('删除'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
   );
 }
 

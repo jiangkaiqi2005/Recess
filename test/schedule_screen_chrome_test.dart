@@ -65,6 +65,9 @@ void main() {
       ProviderScope(
         overrides: [
           appDatabaseProvider.overrideWithValue(database),
+          scheduleFullWeekCoursesProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           scheduleCoursesProvider.overrideWith(
             (ref) => Stream.value(const [course]),
           ),

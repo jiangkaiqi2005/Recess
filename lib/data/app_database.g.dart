@@ -1725,12 +1725,528 @@ class CoursePlatformsCompanion extends UpdateCompanion<CoursePlatform> {
   }
 }
 
+class $FullWeekCoursesTable extends FullWeekCourses
+    with TableInfo<$FullWeekCoursesTable, FullWeekCourse> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FullWeekCoursesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _semesterIdMeta = const VerificationMeta(
+    'semesterId',
+  );
+  @override
+  late final GeneratedColumn<String> semesterId = GeneratedColumn<String>(
+    'semester_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _teacherMeta = const VerificationMeta(
+    'teacher',
+  );
+  @override
+  late final GeneratedColumn<String> teacher = GeneratedColumn<String>(
+    'teacher',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _weeksMeta = const VerificationMeta('weeks');
+  @override
+  late final GeneratedColumn<String> weeks = GeneratedColumn<String>(
+    'weeks',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _colorValueMeta = const VerificationMeta(
+    'colorValue',
+  );
+  @override
+  late final GeneratedColumn<int> colorValue = GeneratedColumn<int>(
+    'color_value',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0xFF5B8DEF),
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    semesterId,
+    name,
+    teacher,
+    location,
+    weeks,
+    colorValue,
+    notes,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'full_week_courses';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FullWeekCourse> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('semester_id')) {
+      context.handle(
+        _semesterIdMeta,
+        semesterId.isAcceptableOrUnknown(data['semester_id']!, _semesterIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_semesterIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('teacher')) {
+      context.handle(
+        _teacherMeta,
+        teacher.isAcceptableOrUnknown(data['teacher']!, _teacherMeta),
+      );
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    }
+    if (data.containsKey('weeks')) {
+      context.handle(
+        _weeksMeta,
+        weeks.isAcceptableOrUnknown(data['weeks']!, _weeksMeta),
+      );
+    }
+    if (data.containsKey('color_value')) {
+      context.handle(
+        _colorValueMeta,
+        colorValue.isAcceptableOrUnknown(data['color_value']!, _colorValueMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FullWeekCourse map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FullWeekCourse(
+      id:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}id'],
+          )!,
+      semesterId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}semester_id'],
+          )!,
+      name:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}name'],
+          )!,
+      teacher: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}teacher'],
+      ),
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      ),
+      weeks:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}weeks'],
+          )!,
+      colorValue:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}color_value'],
+          )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+    );
+  }
+
+  @override
+  $FullWeekCoursesTable createAlias(String alias) {
+    return $FullWeekCoursesTable(attachedDatabase, alias);
+  }
+}
+
+class FullWeekCourse extends DataClass implements Insertable<FullWeekCourse> {
+  final String id;
+  final String semesterId;
+  final String name;
+  final String? teacher;
+  final String? location;
+  final String weeks;
+  final int colorValue;
+  final String? notes;
+  const FullWeekCourse({
+    required this.id,
+    required this.semesterId,
+    required this.name,
+    this.teacher,
+    this.location,
+    required this.weeks,
+    required this.colorValue,
+    this.notes,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['semester_id'] = Variable<String>(semesterId);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || teacher != null) {
+      map['teacher'] = Variable<String>(teacher);
+    }
+    if (!nullToAbsent || location != null) {
+      map['location'] = Variable<String>(location);
+    }
+    map['weeks'] = Variable<String>(weeks);
+    map['color_value'] = Variable<int>(colorValue);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    return map;
+  }
+
+  FullWeekCoursesCompanion toCompanion(bool nullToAbsent) {
+    return FullWeekCoursesCompanion(
+      id: Value(id),
+      semesterId: Value(semesterId),
+      name: Value(name),
+      teacher:
+          teacher == null && nullToAbsent
+              ? const Value.absent()
+              : Value(teacher),
+      location:
+          location == null && nullToAbsent
+              ? const Value.absent()
+              : Value(location),
+      weeks: Value(weeks),
+      colorValue: Value(colorValue),
+      notes:
+          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+    );
+  }
+
+  factory FullWeekCourse.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FullWeekCourse(
+      id: serializer.fromJson<String>(json['id']),
+      semesterId: serializer.fromJson<String>(json['semesterId']),
+      name: serializer.fromJson<String>(json['name']),
+      teacher: serializer.fromJson<String?>(json['teacher']),
+      location: serializer.fromJson<String?>(json['location']),
+      weeks: serializer.fromJson<String>(json['weeks']),
+      colorValue: serializer.fromJson<int>(json['colorValue']),
+      notes: serializer.fromJson<String?>(json['notes']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'semesterId': serializer.toJson<String>(semesterId),
+      'name': serializer.toJson<String>(name),
+      'teacher': serializer.toJson<String?>(teacher),
+      'location': serializer.toJson<String?>(location),
+      'weeks': serializer.toJson<String>(weeks),
+      'colorValue': serializer.toJson<int>(colorValue),
+      'notes': serializer.toJson<String?>(notes),
+    };
+  }
+
+  FullWeekCourse copyWith({
+    String? id,
+    String? semesterId,
+    String? name,
+    Value<String?> teacher = const Value.absent(),
+    Value<String?> location = const Value.absent(),
+    String? weeks,
+    int? colorValue,
+    Value<String?> notes = const Value.absent(),
+  }) => FullWeekCourse(
+    id: id ?? this.id,
+    semesterId: semesterId ?? this.semesterId,
+    name: name ?? this.name,
+    teacher: teacher.present ? teacher.value : this.teacher,
+    location: location.present ? location.value : this.location,
+    weeks: weeks ?? this.weeks,
+    colorValue: colorValue ?? this.colorValue,
+    notes: notes.present ? notes.value : this.notes,
+  );
+  FullWeekCourse copyWithCompanion(FullWeekCoursesCompanion data) {
+    return FullWeekCourse(
+      id: data.id.present ? data.id.value : this.id,
+      semesterId:
+          data.semesterId.present ? data.semesterId.value : this.semesterId,
+      name: data.name.present ? data.name.value : this.name,
+      teacher: data.teacher.present ? data.teacher.value : this.teacher,
+      location: data.location.present ? data.location.value : this.location,
+      weeks: data.weeks.present ? data.weeks.value : this.weeks,
+      colorValue:
+          data.colorValue.present ? data.colorValue.value : this.colorValue,
+      notes: data.notes.present ? data.notes.value : this.notes,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FullWeekCourse(')
+          ..write('id: $id, ')
+          ..write('semesterId: $semesterId, ')
+          ..write('name: $name, ')
+          ..write('teacher: $teacher, ')
+          ..write('location: $location, ')
+          ..write('weeks: $weeks, ')
+          ..write('colorValue: $colorValue, ')
+          ..write('notes: $notes')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    semesterId,
+    name,
+    teacher,
+    location,
+    weeks,
+    colorValue,
+    notes,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FullWeekCourse &&
+          other.id == this.id &&
+          other.semesterId == this.semesterId &&
+          other.name == this.name &&
+          other.teacher == this.teacher &&
+          other.location == this.location &&
+          other.weeks == this.weeks &&
+          other.colorValue == this.colorValue &&
+          other.notes == this.notes);
+}
+
+class FullWeekCoursesCompanion extends UpdateCompanion<FullWeekCourse> {
+  final Value<String> id;
+  final Value<String> semesterId;
+  final Value<String> name;
+  final Value<String?> teacher;
+  final Value<String?> location;
+  final Value<String> weeks;
+  final Value<int> colorValue;
+  final Value<String?> notes;
+  final Value<int> rowid;
+  const FullWeekCoursesCompanion({
+    this.id = const Value.absent(),
+    this.semesterId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.teacher = const Value.absent(),
+    this.location = const Value.absent(),
+    this.weeks = const Value.absent(),
+    this.colorValue = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FullWeekCoursesCompanion.insert({
+    required String id,
+    required String semesterId,
+    required String name,
+    this.teacher = const Value.absent(),
+    this.location = const Value.absent(),
+    this.weeks = const Value.absent(),
+    this.colorValue = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       semesterId = Value(semesterId),
+       name = Value(name);
+  static Insertable<FullWeekCourse> custom({
+    Expression<String>? id,
+    Expression<String>? semesterId,
+    Expression<String>? name,
+    Expression<String>? teacher,
+    Expression<String>? location,
+    Expression<String>? weeks,
+    Expression<int>? colorValue,
+    Expression<String>? notes,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (semesterId != null) 'semester_id': semesterId,
+      if (name != null) 'name': name,
+      if (teacher != null) 'teacher': teacher,
+      if (location != null) 'location': location,
+      if (weeks != null) 'weeks': weeks,
+      if (colorValue != null) 'color_value': colorValue,
+      if (notes != null) 'notes': notes,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FullWeekCoursesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? semesterId,
+    Value<String>? name,
+    Value<String?>? teacher,
+    Value<String?>? location,
+    Value<String>? weeks,
+    Value<int>? colorValue,
+    Value<String?>? notes,
+    Value<int>? rowid,
+  }) {
+    return FullWeekCoursesCompanion(
+      id: id ?? this.id,
+      semesterId: semesterId ?? this.semesterId,
+      name: name ?? this.name,
+      teacher: teacher ?? this.teacher,
+      location: location ?? this.location,
+      weeks: weeks ?? this.weeks,
+      colorValue: colorValue ?? this.colorValue,
+      notes: notes ?? this.notes,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (semesterId.present) {
+      map['semester_id'] = Variable<String>(semesterId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (teacher.present) {
+      map['teacher'] = Variable<String>(teacher.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (weeks.present) {
+      map['weeks'] = Variable<String>(weeks.value);
+    }
+    if (colorValue.present) {
+      map['color_value'] = Variable<int>(colorValue.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FullWeekCoursesCompanion(')
+          ..write('id: $id, ')
+          ..write('semesterId: $semesterId, ')
+          ..write('name: $name, ')
+          ..write('teacher: $teacher, ')
+          ..write('location: $location, ')
+          ..write('weeks: $weeks, ')
+          ..write('colorValue: $colorValue, ')
+          ..write('notes: $notes, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CoursesTable courses = $CoursesTable(this);
   late final $SemestersTable semesters = $SemestersTable(this);
   late final $CoursePlatformsTable coursePlatforms = $CoursePlatformsTable(
+    this,
+  );
+  late final $FullWeekCoursesTable fullWeekCourses = $FullWeekCoursesTable(
     this,
   );
   @override
@@ -1741,6 +2257,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     courses,
     semesters,
     coursePlatforms,
+    fullWeekCourses,
   ];
 }
 
@@ -2606,6 +3123,287 @@ typedef $$CoursePlatformsTableProcessedTableManager =
       CoursePlatform,
       PrefetchHooks Function()
     >;
+typedef $$FullWeekCoursesTableCreateCompanionBuilder =
+    FullWeekCoursesCompanion Function({
+      required String id,
+      required String semesterId,
+      required String name,
+      Value<String?> teacher,
+      Value<String?> location,
+      Value<String> weeks,
+      Value<int> colorValue,
+      Value<String?> notes,
+      Value<int> rowid,
+    });
+typedef $$FullWeekCoursesTableUpdateCompanionBuilder =
+    FullWeekCoursesCompanion Function({
+      Value<String> id,
+      Value<String> semesterId,
+      Value<String> name,
+      Value<String?> teacher,
+      Value<String?> location,
+      Value<String> weeks,
+      Value<int> colorValue,
+      Value<String?> notes,
+      Value<int> rowid,
+    });
+
+class $$FullWeekCoursesTableFilterComposer
+    extends Composer<_$AppDatabase, $FullWeekCoursesTable> {
+  $$FullWeekCoursesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get semesterId => $composableBuilder(
+    column: $table.semesterId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get teacher => $composableBuilder(
+    column: $table.teacher,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get weeks => $composableBuilder(
+    column: $table.weeks,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get colorValue => $composableBuilder(
+    column: $table.colorValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FullWeekCoursesTableOrderingComposer
+    extends Composer<_$AppDatabase, $FullWeekCoursesTable> {
+  $$FullWeekCoursesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get semesterId => $composableBuilder(
+    column: $table.semesterId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get teacher => $composableBuilder(
+    column: $table.teacher,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get weeks => $composableBuilder(
+    column: $table.weeks,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get colorValue => $composableBuilder(
+    column: $table.colorValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FullWeekCoursesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FullWeekCoursesTable> {
+  $$FullWeekCoursesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get semesterId => $composableBuilder(
+    column: $table.semesterId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get teacher =>
+      $composableBuilder(column: $table.teacher, builder: (column) => column);
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<String> get weeks =>
+      $composableBuilder(column: $table.weeks, builder: (column) => column);
+
+  GeneratedColumn<int> get colorValue => $composableBuilder(
+    column: $table.colorValue,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+}
+
+class $$FullWeekCoursesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FullWeekCoursesTable,
+          FullWeekCourse,
+          $$FullWeekCoursesTableFilterComposer,
+          $$FullWeekCoursesTableOrderingComposer,
+          $$FullWeekCoursesTableAnnotationComposer,
+          $$FullWeekCoursesTableCreateCompanionBuilder,
+          $$FullWeekCoursesTableUpdateCompanionBuilder,
+          (
+            FullWeekCourse,
+            BaseReferences<
+              _$AppDatabase,
+              $FullWeekCoursesTable,
+              FullWeekCourse
+            >,
+          ),
+          FullWeekCourse,
+          PrefetchHooks Function()
+        > {
+  $$FullWeekCoursesTableTableManager(
+    _$AppDatabase db,
+    $FullWeekCoursesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () =>
+                  $$FullWeekCoursesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer:
+              () => $$FullWeekCoursesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$FullWeekCoursesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> semesterId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> teacher = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<String> weeks = const Value.absent(),
+                Value<int> colorValue = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FullWeekCoursesCompanion(
+                id: id,
+                semesterId: semesterId,
+                name: name,
+                teacher: teacher,
+                location: location,
+                weeks: weeks,
+                colorValue: colorValue,
+                notes: notes,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String semesterId,
+                required String name,
+                Value<String?> teacher = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<String> weeks = const Value.absent(),
+                Value<int> colorValue = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FullWeekCoursesCompanion.insert(
+                id: id,
+                semesterId: semesterId,
+                name: name,
+                teacher: teacher,
+                location: location,
+                weeks: weeks,
+                colorValue: colorValue,
+                notes: notes,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FullWeekCoursesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FullWeekCoursesTable,
+      FullWeekCourse,
+      $$FullWeekCoursesTableFilterComposer,
+      $$FullWeekCoursesTableOrderingComposer,
+      $$FullWeekCoursesTableAnnotationComposer,
+      $$FullWeekCoursesTableCreateCompanionBuilder,
+      $$FullWeekCoursesTableUpdateCompanionBuilder,
+      (
+        FullWeekCourse,
+        BaseReferences<_$AppDatabase, $FullWeekCoursesTable, FullWeekCourse>,
+      ),
+      FullWeekCourse,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2616,4 +3414,6 @@ class $AppDatabaseManager {
       $$SemestersTableTableManager(_db, _db.semesters);
   $$CoursePlatformsTableTableManager get coursePlatforms =>
       $$CoursePlatformsTableTableManager(_db, _db.coursePlatforms);
+  $$FullWeekCoursesTableTableManager get fullWeekCourses =>
+      $$FullWeekCoursesTableTableManager(_db, _db.fullWeekCourses);
 }

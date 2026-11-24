@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/core/models/semester.dart';
 import 'package:recess/data/providers/database_providers.dart';
 
@@ -28,6 +29,15 @@ final semestersProvider = FutureProvider<List<Semester>>((ref) async {
 });
 
 /// 激活学期下的全部课程流（课程表主视图使用）。
+/// 当前学期的整周课，周视图全天行与今日课程使用。
+final scheduleFullWeekCoursesProvider =
+    StreamProvider<List<FullWeekCourse>>((ref) {
+  final repo = ref.watch(fullWeekCourseRepositoryProvider);
+  final active = ref.watch(activeSemesterProvider).value;
+  if (active == null) return const Stream.empty();
+  return repo.watch(active.id);
+});
+
 final scheduleCoursesProvider =
     StreamProvider<List<Course>>((ref) {
   final repo = ref.watch(courseRepositoryProvider);

@@ -33,6 +33,9 @@ void main() {
       ProviderScope(
         overrides: [
           activeSemesterProvider.overrideWith((ref) async => semester),
+          scheduleFullWeekCoursesProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
           scheduleCoursesProvider.overrideWith(
             (ref) => Stream.value(const [course]),
           ),

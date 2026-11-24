@@ -52,6 +52,9 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         activeSemesterProvider.overrideWith((ref) async => semester),
+        scheduleFullWeekCoursesProvider.overrideWith(
+          (ref) => Stream.value(const []),
+        ),
         scheduleCoursesProvider.overrideWith((ref) => Stream.value([course])),
       ],
     );

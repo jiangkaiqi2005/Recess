@@ -670,14 +670,18 @@ class _WebviewImportScreenState extends ConsumerState<WebviewImportScreen> {
       mode: state.mode,
       courses: state.courses,
     );
-    if (submission.courses.isEmpty) return;
+    if (submission.isEmpty) return;
     final existing = (await ref.read(courseRepositoryProvider)
-        .getCourses(submission.semesterId)).length;
+            .getCourses(submission.semesterId))
+        .length +
+        (await ref.read(fullWeekCourseRepositoryProvider)
+            .getAll(submission.semesterId))
+        .length;
     if (!mounted) return;
     final ok = await showImportConfirmDialog(
       context,
       mode: submission.mode,
-      importCount: submission.courses.length,
+      importCount: submission.count,
       existingCount: existing,
     );
     if (ok && mounted) await _importSelected(submission);

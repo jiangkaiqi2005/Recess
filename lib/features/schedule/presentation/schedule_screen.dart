@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:recess/core/constants/app_constants.dart';
 import 'package:recess/core/models/course.dart';
+import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/core/utils/week_calculator.dart';
 import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/semester/application/semester_mutations.dart';
@@ -418,6 +419,13 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             now: now,
             sectionTimes: sectionTimes,
           );
+    // 整周课没有具体时刻，排在今日课程最前面。
+    final fullWeekToday = currentWeek == null
+        ? const <FullWeekCourse>[]
+        : (ref.read(scheduleFullWeekCoursesProvider).value ??
+                const <FullWeekCourse>[])
+            .where((c) => courseOnWeek(c.weeks, currentWeek))
+            .toList();
 
     final theme = Theme.of(context);
     final todayLabel = AppConstants.weekdayLabels[now.weekday - 1];
@@ -454,7 +462,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 ),
               ),
               const Divider(height: 1),
-              if (slots.isEmpty)
+              if (slots.isEmpty && fullWeekToday.isEmpty)
                 Expanded(
                   child: Center(
                     child: Text(
@@ -471,9 +479,35 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: slots.length,
+                    itemCount: fullWeekToday.length + slots.length,
                     itemBuilder: (context, i) {
-                      final slot = slots[i];
+                      if (i < fullWeekToday.length) {
+                        final c = fullWeekToday[i];
+                        return ListTile(
+                          leading: SizedBox(
+                            width: 64,
+                            child: Text(
+                              '整周',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          title: Text(c.name),
+                          subtitle: Text(
+                            [
+                              if (c.location != null && c.location!.isNotEmpty)
+                                c.location!,
+                              if (c.teacher != null && c.teacher!.isNotEmpty)
+                                c.teacher!,
+                            ].join(' · '),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          onTap: () =>
+                              showFullWeekCourseDetailSheet(context, c),
+                        );
+                      }
+                      final slot = slots[i - fullWeekToday.length];
                       final c = slot.course;
                       return ListTile(
                         leading: SizedBox(
