@@ -1,6 +1,7 @@
 import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/data/app_database.dart' as db;
 import 'package:recess/data/mappers.dart';
+import 'package:recess/data/repositories/course_repository.dart';
 
 /// 整周课数据访问，只以领域模型 [FullWeekCourse] 与外界交互。
 class FullWeekCourseRepository {
@@ -17,6 +18,34 @@ class FullWeekCourseRepository {
     await (_db.select(_db.fullWeekCourses)
       ..where((c) => c.semesterId.equals(semesterId))).get(),
   );
+
+  Future<FullWeekCourse?> get(String id) async {
+    final row = await (_db.select(_db.fullWeekCourses)
+          ..where((c) => c.id.equals(id)))
+        .getSingleOrNull();
+    return row?.toDomain();
+  }
+
+  /// 编辑页保存：写入整周课；[syncColor] 为 true 时把颜色同步到本学期
+  /// 同名的全部课程和整周课，与普通课的保存一致。
+  Future<void> save(FullWeekCourse course, {bool syncColor = false}) {
+    if (course.id.isEmpty) {
+      throw ArgumentError('FullWeekCourse.id must not be empty');
+    }
+    return _db.transaction(() async {
+      await _db
+          .into(_db.fullWeekCourses)
+          .insertOnConflictUpdate(course.toCompanion());
+      if (syncColor) {
+        await syncColorByName(
+          _db,
+          course.semesterId,
+          course.name,
+          course.colorValue,
+        );
+      }
+    });
+  }
 
   Future<void> delete(String id) async {
     await (_db.delete(_db.fullWeekCourses)..where((c) => c.id.equals(id))).go();

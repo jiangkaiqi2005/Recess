@@ -49,16 +49,26 @@ class CourseRepository {
   /// 编辑页保存：写入课程，并在同一事务内处理课程平台。
   ///
   /// [renamedFrom] 为编辑已有课程时的原课程名，名字变了就做改名迁移；
-  /// [platforms] 非 null 时整体写到当前课程名下。任何一步失败整体回滚，
+  /// [platforms] 非 null 时整体写到当前课程名下。[syncColor] 为 true 时把
+  /// 颜色同步到本学期同名的全部课程和整周课。任何一步失败整体回滚，
   /// 不会出现课程已改名、平台却留在旧名下的半截状态。
   Future<void> saveWithPlatforms(
     Course course, {
     String? renamedFrom,
     List<CoursePlatform>? platforms,
+    bool syncColor = false,
   }) {
     final platformRepo = CoursePlatformRepository(_db);
     return _db.transaction(() async {
       await upsert(course);
+      if (syncColor) {
+        await syncColorByName(
+          _db,
+          course.semesterId,
+          course.name,
+          course.colorValue,
+        );
+      }
       if (renamedFrom != null) {
         await platformRepo.migrateOnRename(
           course.semesterId,
@@ -145,4 +155,20 @@ class CourseRepository {
     }
     return list;
   }
+}
+
+/// 把本学期名为 [name] 的全部课程和整周课改成 [colorValue]。
+/// 普通课和整周课的编辑保存共用；调用方负责放进事务。
+Future<void> syncColorByName(
+  db.AppDatabase database,
+  String semesterId,
+  String name,
+  int colorValue,
+) async {
+  await (database.update(database.courses)
+        ..where((c) => c.semesterId.equals(semesterId) & c.name.equals(name)))
+      .write(db.CoursesCompanion(colorValue: Value(colorValue)));
+  await (database.update(database.fullWeekCourses)
+        ..where((c) => c.semesterId.equals(semesterId) & c.name.equals(name)))
+      .write(db.FullWeekCoursesCompanion(colorValue: Value(colorValue)));
 }

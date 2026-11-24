@@ -9,6 +9,7 @@ import 'package:recess/core/models/course.dart';
 import 'package:recess/core/models/course_platform.dart';
 import 'package:recess/core/models/full_week_course.dart';
 import 'package:recess/data/providers/database_providers.dart';
+import 'package:recess/features/course/application/course_form_provider.dart';
 import 'package:recess/features/course/application/course_platforms_provider.dart';
 import 'package:recess/features/course/domain/course_clock.dart';
 import 'package:recess/features/course/presentation/course_platform_display.dart';
@@ -203,6 +204,21 @@ void showFullWeekCourseDetailSheet(BuildContext context, FullWeekCourse course) 
               value: course.notes!,
             ),
           const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                context.push(
+                  '/course/edit',
+                  extra: fullWeekCourseEditExtra(course.id),
+                );
+              },
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('编辑课程'),
+            ),
+          ),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: Consumer(

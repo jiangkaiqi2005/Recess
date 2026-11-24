@@ -76,6 +76,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('整周，教务系统没有给出具体星期和节次'), findsOneWidget);
     expect(find.text('17'), findsWidgets);
+    expect(find.widgetWithText(FilledButton, '编辑课程'), findsOneWidget);
   });
 
   testWidgets('不在整周课周次内时没有全天行', (tester) async {
